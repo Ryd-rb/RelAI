@@ -6,7 +6,7 @@ pub save_term 1 arg uint uint do 2 p uint discard uint 4
   set discard call dictionary 1 call put 3 call put 3 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" call str 1 utf8 "op" call str 1 utf8 "save"
   ret call query 2 call str 1 utf8 "INSERT INTO terms VALUES(?,?,?,?,1,'knowledge') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,revision=terms.revision+1" call append 2 call append 2 call append 2 call append 2 call arr 0 call hash 1 call encode 1 call append 2 call append 2 call arr 0 p call key 2 arg call str 1 utf8 "name" p call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "definition"
 
-pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uint tabs uint item uint rowsval uint row uint cards uint content uint contextval uint role uint forms uint eventval uint payloadval uint projectval uint controls uint details uint summary uint viewname uint i int 14
+pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uint components uint tabs uint row uint viewname uint i int 14
   set projects call query 2 call str 1 utf8 "WITH names AS (SELECT rowid AS ord,id,root,coalesce(nullif((SELECT value FROM json_each('['||replace(json_quote(rtrim(replace(p.root,char(92),'/'),'/')), '/',char(34)||','||char(34))||']') ORDER BY key DESC LIMIT 1),''),root) AS leaf FROM projects AS p) SELECT id,root,CASE WHEN count(*) OVER (PARTITION BY lower(leaf))=1 THEN leaf ELSE root END AS short FROM names ORDER BY ord" call arr 0
   set pid call key 2 arg call str 1 utf8 "project"
   if call same 2 pid 0u 1
@@ -14,8 +14,11 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
   0
   set tabs call arr 0
   set i 0
-  while lt i call size 1 projects 3
+  while lt i call size 1 projects 4
     set row call nth 2 projects i
+    if call same 2 call key 2 row call str 1 utf8 "id" pid 1
+    set projectname call key 2 row call str 1 utf8 "short"
+  0
     set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"$0\",\"shortLabel\":\"$2\",\"navigate\":{\"project\":\"$1\",\"view\":\"relay\",\"reply\":null,\"steer\":null}}" call append 2 call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "root" call key 2 row call str 1 utf8 "id" call key 2 row call str 1 utf8 "short"
     next i
   set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Open project\",\"navigate\":{\"view\":\"open\"}}" call arr 0
@@ -26,14 +29,12 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
     ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"Project relay\",\"components\":\"$0\"}" call append 2 call arr 0 components
   0
   set p call project 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid
-  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"nav\",\"label\":\"Views\",\"items\":[{\"type\":\"button\",\"label\":\"Relay\",\"navigate\":{\"view\":\"relay\"}},{\"type\":\"button\",\"label\":\"Project graph\",\"navigate\":{\"view\":\"graph\"}},{\"type\":\"button\",\"label\":\"Models\",\"navigate\":{\"view\":\"models\"}},{\"type\":\"button\",\"label\":\"Dictionary\",\"navigate\":{\"view\":\"dictionary\"}},{\"type\":\"button\",\"label\":\"Tools\",\"navigate\":{\"view\":\"tools\"}}]}" call arr 0
-  if call same 2 viewname call str 1 utf8 "models" 3
-    set rowsval call query 2 call str 1 utf8 "SELECT scope,role,provider,model,effort,rev FROM presets WHERE scope IN (?,'global') ORDER BY role" call append 2 call arr 0 pid
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"Saved presets\",\"value\":\"$0\"}" call append 2 call arr 0 rowsval
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Save preset\",\"op\":\"save_model\",\"fields\":[{\"name\":\"role\",\"label\":\"Role\",\"type\":\"select\",\"choices\":[\"discriminator\",\"planner\",\"designer\",\"implementer\",\"reviewer\",\"investigator\",\"test_author\",\"tool_author\",\"knowledge_curator\",\"synthesizer\",\"workflow_improver\"]},{\"name\":\"provider\",\"label\":\"Provider\",\"type\":\"select\",\"choices\":[\"codex\",\"anthropic\",\"qwen\"]},{\"name\":\"model\",\"label\":\"Model ID\",\"type\":\"text\",\"required\":true},{\"name\":\"effort\",\"label\":\"Reasoning effort\",\"type\":\"select\",\"choices\":[\"low\",\"medium\",\"high\"]},{\"name\":\"scope\",\"label\":\"Apply to\",\"type\":\"select\",\"choices\":[\"project\",\"global\"]},{\"name\":\"operation\",\"label\":\"Change\",\"type\":\"select\",\"choices\":[\"save\",\"reset\"]}],\"fixed\":{}}" call arr 0
+  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"nav\",\"label\":\"Views\",\"items\":[{\"type\":\"button\",\"label\":\"Relay\",\"navigate\":{\"view\":\"relay\"}},{\"type\":\"button\",\"label\":\"Activity\",\"navigate\":{\"view\":\"activity\"}},{\"type\":\"button\",\"label\":\"Project graph\",\"navigate\":{\"view\":\"graph\"}},{\"type\":\"button\",\"label\":\"Models\",\"navigate\":{\"view\":\"models\"}},{\"type\":\"button\",\"label\":\"Dictionary\",\"navigate\":{\"view\":\"dictionary\"}},{\"type\":\"button\",\"label\":\"Tools\",\"navigate\":{\"view\":\"tools\"}}]}" call arr 0
+  if call same 2 viewname call str 1 utf8 "models" 1
+    set components call append 2 components call model_panel 2 arg pid
   1
     if call same 2 viewname call str 1 utf8 "graph" 1
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"group\",\"label\":\"Snapshot\",\"items\":\"$0\"}" call append 2 call arr 0 call graph_view 2 arg pid
+    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"group\",\"items\":\"$0\"}" call append 2 call arr 0 call graph_view 2 arg pid
   1
     if call same 2 viewname call str 1 utf8 "file" 1
     set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"$0\",\"value\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "file" call readtext 2 call key 2 p call str 1 utf8 "root" call key 2 arg call str 1 utf8 "file"
@@ -45,46 +46,9 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
   1
     if call same 2 viewname call str 1 utf8 "tools" 1
     set components call append 2 components call operations_panel 1 pid
-  8
-    set rowsval call query 2 call str 1 utf8 "SELECT kind,payload AS \"data:json\",cursor FROM (SELECT * FROM events WHERE project=? ORDER BY cursor DESC LIMIT 100) ORDER BY cursor" call append 2 call arr 0 pid
-    set cards call arr 0
-    set i 0
-    while lt i call size 1 rowsval 15
-    set row call nth 2 rowsval i
-    set eventval call key 2 row call str 1 utf8 "data"
-    set payloadval call key 2 eventval call str 1 utf8 "payload"
-    set summary call key 2 eventval call str 1 utf8 "summary"
-    if call same 2 summary 0u 1
-    set summary call key 2 payloadval call str 1 utf8 "summary"
-  0
-    if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Submission" 1
-    set summary call key 2 eventval call str 1 utf8 "text"
-  0
-    if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Job held" 1
-    set summary call key 2 eventval call str 1 utf8 "error"
-  0
-    if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Final result" 1
-    set summary call key 2 call key 2 eventval call str 1 utf8 "result" call str 1 utf8 "findings"
-  0
-    set controls call arr 0
-    if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "ASK" 2
-    set summary call key 2 payloadval call str 1 utf8 "question"
-    set controls call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Reply\",\"navigate\":{\"view\":\"relay\",\"reply\":\"$0\",\"steer\":null}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "action"
-  0
-    if or call same 2 call key 2 eventval call str 1 utf8 "state" call str 1 utf8 "evidence" call same 2 call key 2 eventval call str 1 utf8 "state" call str 1 utf8 "awaiting_acceptance" 2
-    set summary call key 2 payloadval call str 1 utf8 "findings"
-    set controls call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Accept result\",\"op\":\"control\",\"fixed\":{\"op\":\"accept\",\"action\":\"$0\"}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "action"
-  0
-    if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Job held" 1
-    set controls call append 2 call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Retry sealed turn\",\"op\":\"control\",\"fixed\":{\"op\":\"retry\",\"job\":\"$0\"}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "job" call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Replace turn\",\"op\":\"control\",\"fixed\":{\"op\":\"replace\",\"job\":\"$0\"}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "job"
-  0
-    if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Submission" 1
-    set controls call append 2 call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Steer\",\"navigate\":{\"view\":\"relay\",\"steer\":\"$0\",\"reply\":null}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "request" call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Stop\",\"op\":\"control\",\"fixed\":{\"op\":\"stop\",\"request\":\"$0\"}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "request"
-  0
-    set cards call append 2 cards call shape 2 call str 1 utf8 "{\"type\":\"card\",\"label\":\"$0\",\"text\":\"$1\",\"details\":\"$2\",\"items\":\"$3\",\"parts\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "kind" summary eventval controls call key 2 eventval call str 1 utf8 "parts"
-    next i
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"feed\",\"label\":\"Relay\",\"items\":\"$0\"}" call append 2 call arr 0 cards
-    set forms call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Send\",\"op\":\"submit\",\"fields\":[{\"name\":\"text\",\"label\":\"Message\",\"type\":\"textarea\"},{\"name\":\"attachments\",\"label\":\"Attach files\",\"type\":\"files\",\"op\":\"capture\"}],\"fixed\":{},\"draft\":true,\"idempotent\":true}" call arr 0
-    set forms call put 3 forms call str 1 utf8 "fixed" call shape 2 call str 1 utf8 "{\"reply\":\"$0\",\"steer\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "reply" call key 2 arg call str 1 utf8 "steer"
-    set components call append 2 components call skill_composer 2 forms pid
-  ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"$0\",\"project\":\"$1\",\"components\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call key 2 p call str 1 utf8 "root" pid components
+  1
+    if call same 2 viewname call str 1 utf8 "activity" 1
+      set components call append 2 components call activity_panel 1 pid
+    1
+      set components call chat_panel 3 arg pid components
+  ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"$0\",\"project\":\"$1\",\"components\":\"$2\",\"name\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 p call str 1 utf8 "root" pid components projectname

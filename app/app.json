@@ -8,6 +8,7 @@
     "actions.fluxr",
     "receive.fluxr",
     "ui.fluxr",
+    "chat.fluxr",
     "graph.fluxr",
     "tools.fluxr",
     "tool_jobs.fluxr",

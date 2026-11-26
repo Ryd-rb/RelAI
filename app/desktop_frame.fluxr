@@ -1,16 +1,23 @@
 fluxr 1
 
-fn ui_node 5 state uint pid uint spec uint base uint extra uint uint do 8 kind uint labelval uint discard uint event uint detail uint patch uint tabs uint props uint 15
+fn ui_node 5 state uint pid uint spec uint base uint extra uint uint do 8 kind uint labelval uint discard uint event uint detail uint patch uint tabs uint props uint 18
   set kind call key 2 spec call str 1 utf8 "type"
   set labelval call key 2 spec call str 1 utf8 "label"
-  if call same 2 kind call str 1 utf8 "button" 8
+  if call same 2 kind call str 1 utf8 "button" 9
     set patch call key 2 spec call str 1 utf8 "navigate"
     if and call same 2 pid 0u call same 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 "open" 1
       ret 0u
     0
     set event call shape 2 call str 1 utf8 "{\"action\":\"command\",\"spec\":\"$0\"}" call append 2 call arr 0 spec
-    if not call same 2 patch 0u 1
+    if not call same 2 patch 0u 3
       set event call shape 2 call str 1 utf8 "{\"action\":\"nav\",\"patch\":\"$0\"}" call append 2 call arr 0 patch
+      set extra call put 3 extra call str 1 utf8 "icon" call key 2 call decode 1 call str 1 utf8 "{\"relay\":\"chat\",\"graph\":\"graph\",\"activity\":\"activity\",\"models\":\"models\",\"dictionary\":\"dictionary\",\"tools\":\"tools\",\"open\":\"add\"}" call ui_default 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 ""
+      if not call same 2 call key 2 patch call str 1 utf8 "project" 0u 1
+        set extra call put 3 extra call str 1 utf8 "icon" call str 1 utf8 "folder"
+      0
+    0
+    if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "capture_graph" 1
+      set extra call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"icon\":\"graph\",\"width\":185}" call arr 0
     0
     if not call same 2 call key 2 extra call str 1 utf8 "role" 0u 2
       set labelval call ui_default 2 call key 2 spec call str 1 utf8 "shortLabel" labelval
@@ -29,6 +36,20 @@ fn ui_node 5 state uint pid uint spec uint base uint extra uint uint do 8 kind u
       ret call ui_open_form 3 state pid spec
     0
     ret call ui_form 3 state pid spec
+  0
+  if call same 2 kind call str 1 utf8 "preset" 4
+    set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"models/role\",\"kind\":\"select\",\"label\":\"Role\",\"value\":\"$0\",\"choices\":\"$1\",\"event\":{\"action\":\"path\",\"patch\":{\"view\":\"models\",\"project\":\"$2\"},\"key\":\"modelRole\"}}" call append 2 call append 2 call append 2 call arr 0 call key 2 spec call str 1 utf8 "value" call key 2 spec call str 1 utf8 "choices" pid
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "models/active" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "model" call obj 0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "models/source" call str 1 utf8 "label" call cat 2 call cat 2 call cat 2 call cat 2 call key 2 spec call str 1 utf8 "provider" call str 1 utf8 "  ·  " call key 2 spec call str 1 utf8 "effort" call str 1 utf8 " reasoning  ·  " call key 2 spec call str 1 utf8 "source" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    ret 0u
+  0
+  if call same 2 kind call str 1 utf8 "empty" 3
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "title" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call obj 0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "description" call str 1 utf8 "label" call key 2 spec call str 1 utf8 "text" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    ret 0u
+  0
+  if call same 2 kind call str 1 utf8 "transcript" 1
+    ret call chat_transcript 3 state pid spec
   0
   if call same 2 kind call str 1 utf8 "nav" 2
     if call same 2 call key 2 spec call str 1 utf8 "dockable" call decode 1 call str 1 utf8 "true" 3
@@ -50,24 +71,24 @@ fn ui_node 5 state uint pid uint spec uint base uint extra uint uint do 8 kind u
       set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "group" call str 1 utf8 "label" call str 1 utf8 "Workspace" call shape 2 call str 1 utf8 "{\"role\":\"caption\",\"side\":true}" call arr 0
     ret 0u
   0
-  if call same 2 kind call str 1 utf8 "fold" 2
+  if call same 2 kind call str 1 utf8 "fold" 3
+    if not call same 2 call key 2 spec call str 1 utf8 "foldKey" 0u 1
+      set base call cat 2 call cat 2 call cat 2 call cat 2 pid call str 1 utf8 "/" call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay" call str 1 utf8 "/" call key 2 spec call str 1 utf8 "foldKey"
+    0
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 base labelval call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 base call shape 2 call str 1 utf8 "{\"role\":\"nav\",\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "false"
     ret 0u
   0
   if call same 2 kind call str 1 utf8 "feed" 1
-    set labelval call str 1 utf8 "Activity"
+    set labelval call str 1 utf8 "Recent events"
   0
-  if call same 2 kind call str 1 utf8 "card" 2
-    if call same 2 labelval call str 1 utf8 "Submission" 1
-      set labelval call str 1 utf8 "You"
-    0
+  if call same 2 kind call str 1 utf8 "card" 1
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "label" call str 1 utf8 "label" labelval call shape 2 call str 1 utf8 "{\"role\":\"caption\"}" call arr 0
   1
     if not call same 2 labelval 0u 1
       set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "label" call str 1 utf8 "heading" labelval call obj 0
     0
   if call same 2 kind call str 1 utf8 "feed" 1
-    set discard call ui_pager 5 state call str 1 utf8 "history" call key 2 spec call str 1 utf8 "itemCount" call str 1 utf8 "Newer messages" call str 1 utf8 "Older messages"
+    set discard call ui_pager 5 state call str 1 utf8 "history" call key 2 spec call str 1 utf8 "itemCount" call str 1 utf8 "Newer events" call str 1 utf8 "Earlier events"
   0
   if call same 2 kind call str 1 utf8 "tree" 1
     ret call ui_tree 3 state spec base
@@ -93,7 +114,10 @@ fn ui_node 5 state uint pid uint spec uint base uint extra uint uint do 8 kind u
   0
   ret 0u
 
-pub desktop_frame 1 arg uint uint do 15 state uint view uint pid uint prefix uint rows uint r uint spec uint base uint extra uint defaultval uint dropval uint scope uint layoutval uint discard uint i int 12
+pub desktop_frame 1 arg uint uint do 18 state uint view uint pid uint prefix uint rows uint r uint spec uint base uint extra uint defaultval uint dropval uint scope uint layoutval uint composer uint conversation uint followval uint discard uint i int 17
+  set composer 0u
+  set conversation 0u
+  set followval call decode 1 call str 1 utf8 "false"
   set defaultval 0u
   set dropval 0u
   set layoutval call str 1 utf8 "workspace"
@@ -106,14 +130,17 @@ pub desktop_frame 1 arg uint uint do 15 state uint view uint pid uint prefix uin
   0
   set discard call ui_header 3 state view pid
   if lt 0 call size 1 call key 2 state call str 1 utf8 "status" 1
-    set discard call ui_prose 2 call str 1 utf8 "status" call key 2 state call str 1 utf8 "status"
+    if and not call same 2 pid 0u and call same 2 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay" call str 1 utf8 "relay" call same 2 call key 2 state call str 1 utf8 "definition" 0u 1
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "status" call str 1 utf8 "detail" call key 2 state call str 1 utf8 "status" call shape 2 call str 1 utf8 "{\"role\":\"body\",\"area\":\"composer\",\"lines\":2}" call arr 0
+    1
+      set discard call ui_prose 2 call str 1 utf8 "status" call key 2 state call str 1 utf8 "status"
   0
   if not call same 2 call key 2 state call str 1 utf8 "definition" 0u 1
     set discard call ui_definition 1 state
   3
-    set rows call query 2 call str 1 utf8 "WITH RECURSIVE tree(path,s,nav,dock,history) AS (SELECT printf('%04d',key),value,NULL,0,value->>'$.type'='feed' FROM json_each(?1) UNION ALL SELECT tree.path||'.'||printf('%04d',c.key),c.value,CASE WHEN tree.s->>'$.type'='nav' THEN tree.path END,coalesce(tree.s->>'$.dockable',0),tree.history FROM tree JOIN json_each(tree.s,'$.items') c WHERE (tree.s->>'$.type'<>'fold' OR json_extract(?2,'$.\"'||?3||'/'||tree.path||'\"')=1) AND (coalesce(tree.s->>'$.dockable',0)=0 OR json_array_length(tree.s,'$.items')<=5 OR c.value->>'$.navigate.project' IS NULL) AND (tree.s->>'$.type'<>'feed' OR CAST(c.key AS INTEGER) BETWEEN json_array_length(tree.s,'$.items')-12*(1+min(?4,max(0,(json_array_length(tree.s,'$.items')-1)/12))) AND json_array_length(tree.s,'$.items')-1-12*min(?4,max(0,(json_array_length(tree.s,'$.items')-1)/12)))) SELECT path,json_set(json_remove(s,'$.items'),'$.itemCount',json_array_length(s,'$.items'),'$.tabs',json(CASE WHEN s->>'$.dockable'=1 AND json_array_length(s,'$.items')>5 THEN (SELECT json_group_array(json_object('label',coalesce(p.value->>'$.shortLabel',p.value->>'$.label'),'value',p.value->>'$.navigate.project')) FROM json_each(tree.s,'$.items') p WHERE p.value->>'$.navigate.project' IS NOT NULL) END)) AS \"spec:json\",nav,dock FROM tree ORDER BY CASE WHEN ?5=1 AND (nav IS NOT NULL OR s->>'$.type'='nav') THEN 2 ELSE history END,path" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 view call str 1 utf8 "components" call ui_default 2 call key 2 state call str 1 utf8 "folds" call obj 0 prefix call ui_default 2 call key 2 call key 2 state call str 1 utf8 "pages" call str 1 utf8 "history" call integer 1 0 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT ? IS NULL AS flag" call append 2 call arr 0 pid 0 call str 1 utf8 "flag"
+    set rows call query 2 call str 1 utf8 "WITH RECURSIVE tree(path,s,nav,dock,history) AS (SELECT printf('%04d',key),value,NULL,0,value->>'$.type'='feed' FROM json_each(?1) UNION ALL SELECT tree.path||'.'||printf('%04d',c.key),c.value,CASE WHEN tree.s->>'$.type'='nav' THEN tree.path END,coalesce(tree.s->>'$.dockable',0),tree.history FROM tree JOIN json_each(tree.s,'$.items') c WHERE (tree.s->>'$.type'<>'fold' OR json_extract(?2,'$.\"'||?3||'/'||coalesce(tree.s->>'$.foldKey',tree.path)||'\"')=1) AND (coalesce(tree.s->>'$.dockable',0)=0 OR json_array_length(tree.s,'$.items')<=5 OR c.value->>'$.navigate.project' IS NULL) AND (tree.s->>'$.type'<>'feed' OR CAST(c.key AS INTEGER) BETWEEN json_array_length(tree.s,'$.items')-12*(1+min(?4,max(0,(json_array_length(tree.s,'$.items')-1)/12))) AND json_array_length(tree.s,'$.items')-1-12*min(?4,max(0,(json_array_length(tree.s,'$.items')-1)/12)))) SELECT path,json_set(json_remove(s,'$.items'),'$.itemCount',json_array_length(s,'$.items'),'$.tabs',json(CASE WHEN s->>'$.dockable'=1 AND json_array_length(s,'$.items')>5 THEN (SELECT json_group_array(json_object('label',coalesce(p.value->>'$.shortLabel',p.value->>'$.label'),'value',p.value->>'$.navigate.project')) FROM json_each(tree.s,'$.items') p WHERE p.value->>'$.navigate.project' IS NOT NULL) END)) AS \"spec:json\",nav,dock FROM tree ORDER BY CASE WHEN ?5=1 AND (nav IS NOT NULL OR s->>'$.type'='nav') THEN 2 ELSE history END,path" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 view call str 1 utf8 "components" call ui_default 2 call key 2 state call str 1 utf8 "folds" call obj 0 prefix call ui_default 2 call key 2 call key 2 state call str 1 utf8 "pages" call str 1 utf8 "history" call integer 1 0 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT ? IS NULL AS flag" call append 2 call arr 0 pid 0 call str 1 utf8 "flag"
     set i 0
-    while lt i call size 1 rows 9
+    while lt i call size 1 rows 10
       set r call nth 2 rows i
       set spec call key 2 r call str 1 utf8 "spec"
       set base call cat 2 call cat 2 prefix call str 1 utf8 "/" call key 2 r call str 1 utf8 "path"
@@ -126,6 +153,13 @@ pub desktop_frame 1 arg uint uint do 15 state uint view uint pid uint prefix uin
           0
         0
       0
+      if call same 2 call key 2 spec call str 1 utf8 "type" call str 1 utf8 "transcript" 3
+        set layoutval call str 1 utf8 "conversation"
+        set conversation call encode 1 call append 2 call append 2 call append 2 call arr 0 pid call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "older" call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "newer"
+        if and call same 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "older" 0u call same 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "newer" 0u 1
+          set followval call decode 1 call str 1 utf8 "true"
+        0
+      0
       set scope call ui_node 5 state pid spec base extra
       if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "open_project" 2
         set defaultval call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "choose"
@@ -133,9 +167,14 @@ pub desktop_frame 1 arg uint uint do 15 state uint view uint pid uint prefix uin
           set defaultval call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit"
         0
       0
-      if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 2
+      if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 3
         set defaultval call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit"
+        set composer call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "text"
         set dropval call cat 2 call cat 2 scope call str 1 utf8 "/" call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT value->>'$.name' AS name FROM json_each(?) WHERE value->>'$.type'='files' LIMIT 1" call append 2 call arr 0 call key 2 spec call str 1 utf8 "fields" 0 call str 1 utf8 "name"
       0
       next i
-  ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"theme\":\"dark\",\"layout\":\"$3\",\"controls\":\"$0\",\"default\":\"$1\",\"drop\":\"$2\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call ui_collect 0 defaultval dropval layoutval
+  set extra call obj 0
+  if call same 2 layoutval call str 1 utf8 "conversation" 1
+    set extra call shape 2 call str 1 utf8 "{\"composer\":\"$0\",\"conversation\":\"$1\",\"follow_tail\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 composer conversation followval
+  0
+  ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"theme\":\"dark\",\"layout\":\"$3\",\"controls\":\"$0\",\"default\":\"$1\",\"drop\":\"$2\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call ui_collect 0 defaultval dropval layoutval extra

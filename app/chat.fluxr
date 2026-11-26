@@ -1,0 +1,122 @@
+fluxr 1
+
+fn chat_panel 3 arg uint pid uint components uint uint do 4 rowsval uint forms uint target uint mode uint 9
+  set rowsval call query 2 call asset 1 call str 1 utf8 "chat_history.sql" call append 2 call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "older" call key 2 arg call str 1 utf8 "newer"
+  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"transcript\",\"messages\":\"$0\"}" call append 2 call arr 0 rowsval
+  set forms call decode 1 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Send\",\"op\":\"submit\",\"fields\":[{\"name\":\"text\",\"label\":\"Message\",\"type\":\"textarea\"},{\"name\":\"attachments\",\"label\":\"Attach files\",\"type\":\"files\",\"op\":\"capture\"}],\"draft\":true,\"idempotent\":true}"
+  set mode call shape 2 call str 1 utf8 "{\"reply\":\"$0\",\"steer\":\"$1\",\"follow\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "reply" call key 2 arg call str 1 utf8 "steer" call key 2 arg call str 1 utf8 "follow"
+  set target call nth 2 call query 2 call asset 1 call str 1 utf8 "chat_target.sql" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "reply" call key 2 arg call str 1 utf8 "steer" call key 2 arg call str 1 utf8 "follow" call key 2 arg call str 1 utf8 "fresh" 0
+  if call same 2 target 0u 2
+    set target call shape 2 call str 1 utf8 "{\"bind\":\"$0\"}" call append 2 call arr 0 mode
+    if or not call same 2 call key 2 arg call str 1 utf8 "reply" 0u or not call same 2 call key 2 arg call str 1 utf8 "steer" 0u not call same 2 call key 2 arg call str 1 utf8 "follow" 0u 1
+      set target call put 3 target call str 1 utf8 "hint" call str 1 utf8 "This conversation target is no longer available."
+    0
+  0
+  set forms call put 3 forms call str 1 utf8 "fixed" call obj 0
+  set forms call put 3 forms call str 1 utf8 "destination" target
+  ret call append 2 components call skill_composer 2 forms pid
+
+fn activity_panel 1 pid uint uint do 4 rowsval uint row uint cards uint i int 5
+  set rowsval call query 2 call str 1 utf8 "SELECT cursor,kind,payload AS \"data:json\" FROM (SELECT * FROM events WHERE project=? ORDER BY cursor DESC LIMIT 100) ORDER BY cursor" call append 2 call arr 0 pid
+  set cards call arr 0
+  set i 0
+  while lt i call size 1 rowsval 3
+    set row call nth 2 rowsval i
+    set cards call append 2 cards call shape 2 call str 1 utf8 "{\"type\":\"card\",\"label\":\"$0\",\"details\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "kind" call key 2 row call str 1 utf8 "data"
+    next i
+  ret call shape 2 call str 1 utf8 "{\"type\":\"feed\",\"label\":\"Recent events\",\"items\":\"$0\"}" call append 2 call arr 0 cards
+
+fn chat_message 4 state uint pid uint row uint base uint uint do 15 interaction uint speaker uint roleval uint body uint meta uint action uint reqid uint keyval uint progress uint jobsval uint item uint part uint term uint discard uint i int 16
+  set interaction call key 2 row call str 1 utf8 "interaction"
+  set reqid call key 2 row call str 1 utf8 "request"
+  set action call key 2 row call str 1 utf8 "action"
+  set body call ui_default 2 call key 2 row call str 1 utf8 "body" call str 1 utf8 ""
+  set speaker call str 1 utf8 "RelAI"
+  set roleval call str 1 utf8 "incoming"
+  if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Submission" 3
+    set speaker call str 1 utf8 "You"
+    set roleval call str 1 utf8 "outgoing"
+    if lt 0 call size 1 call key 2 row call str 1 utf8 "attachments" 2
+      if lt 0 call size 1 body 1
+        set body call cat 2 body call str 1 utf8 "\n\n"
+      0
+      set body call cat 2 call cat 2 body call str 1 utf8 "Attached · " call key 2 row call str 1 utf8 "attachments"
+    0
+  0
+  if lt 0 call size 1 call key 2 row call str 1 utf8 "choices" 1
+    set body call cat 2 call cat 2 body call str 1 utf8 "\n\n" call key 2 row call str 1 utf8 "choices"
+  0
+  set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"detail\",\"role\":\"$1\",\"label\":\"$2\",\"value\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "text" roleval speaker body
+  set i 0
+  while lt i call size 1 call key 2 row call str 1 utf8 "parts" 4
+    set part call nth 2 call key 2 row call str 1 utf8 "parts" i
+    set term call key 2 part call str 1 utf8 "term"
+    if not call same 2 term 0u 1
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "term" call str 1 utf8 "/" call encode 1 call integer 1 i call cat 2 call key 2 part call str 1 utf8 "text" call str 1 utf8 " · definition" call shape 2 call str 1 utf8 "{\"action\":\"term\",\"ref\":\"$0\"}" call append 2 call arr 0 term call shape 2 call str 1 utf8 "{\"role\":\"quiet\"}" call arr 0
+    0
+    next i
+  if call same 2 interaction call str 1 utf8 "reply" 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "reply" call str 1 utf8 "Reply" call shape 2 call str 1 utf8 "{\"action\":\"nav\",\"patch\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"view\":\"relay\",\"reply\":\"$0\",\"steer\":null,\"follow\":null,\"fresh\":null}" call append 2 call arr 0 action call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":94}" call arr 0
+  0
+  if or call same 2 interaction call str 1 utf8 "review" call same 2 interaction call str 1 utf8 "accept" 3
+    set meta call str 1 utf8 "Accept answer"
+    if call same 2 interaction call str 1 utf8 "review" 1
+      set meta call str 1 utf8 "Approve findings"
+    0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "accept" meta call shape 2 call str 1 utf8 "{\"action\":\"command\",\"spec\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Accept\",\"op\":\"control\",\"fixed\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"op\":\"accept\",\"action\":\"$0\"}" call append 2 call arr 0 action call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"width\":150}" call arr 0
+  0
+  if call same 2 interaction call str 1 utf8 "follow" 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "follow" call str 1 utf8 "Follow up" call shape 2 call str 1 utf8 "{\"action\":\"nav\",\"patch\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"view\":\"relay\",\"reply\":null,\"steer\":null,\"follow\":\"$0\",\"fresh\":null}" call append 2 call arr 0 action call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":105}" call arr 0
+  0
+  if call same 2 call key 2 row call str 1 utf8 "current_prompt" call integer 1 1 8
+    set progress call key 2 call nth 2 call query 2 call asset 1 call str 1 utf8 "chat_progress.sql" call append 2 call append 2 call arr 0 reqid pid 0 call str 1 utf8 "status"
+    if not call same 2 progress 0u 1
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "status" call str 1 utf8 "label" progress call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    0
+    set jobsval call query 2 call str 1 utf8 "SELECT id,CASE WHEN EXISTS(SELECT 1 FROM attempts a WHERE a.id=jobs.attempt AND a.state='uncertain') THEN 'uncertain' ELSE state END AS state FROM jobs WHERE request=? AND revision=(SELECT revision FROM requests WHERE id=jobs.request) AND state IN ('held','uncertain') ORDER BY rowid" call append 2 call arr 0 reqid
+    set i 0
+    while lt i call size 1 jobsval 5
+      set item call nth 2 jobsval i
+      set keyval call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id"
+      if call same 2 call key 2 item call str 1 utf8 "state" call str 1 utf8 "uncertain" 1
+        set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 keyval call str 1 utf8 "/" call str 1 utf8 "uncertain" call str 1 utf8 "label" call str 1 utf8 "Delivery could not be confirmed. Retrying may send the message again." call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+      0
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 keyval call str 1 utf8 "/" call str 1 utf8 "retry" call str 1 utf8 "Retry delivery" call shape 2 call str 1 utf8 "{\"action\":\"command\",\"spec\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Retry delivery\",\"op\":\"control\",\"fixed\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"op\":\"retry\",\"job\":\"$0\"}" call append 2 call arr 0 call key 2 item call str 1 utf8 "id" call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":130}" call arr 0
+      next i
+    set keyval call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "manage"
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 keyval call str 1 utf8 "Request options" call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 keyval call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":145,\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "false"
+    if call same 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "true" 4
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "update" call str 1 utf8 "Update request" call shape 2 call str 1 utf8 "{\"action\":\"nav\",\"patch\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"view\":\"relay\",\"reply\":null,\"steer\":\"$0\",\"follow\":null,\"fresh\":null}" call append 2 call arr 0 reqid call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":140,\"row\":\"$0\"}" call append 2 call arr 0 keyval
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "stop" call str 1 utf8 "Stop request" call shape 2 call str 1 utf8 "{\"action\":\"command\",\"spec\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Stop request\",\"op\":\"control\",\"fixed\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"op\":\"stop\",\"request\":\"$0\"}" call append 2 call arr 0 reqid call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":120,\"row\":\"$0\"}" call append 2 call arr 0 keyval
+      set i 0
+      while lt i call size 1 jobsval 3
+        set item call nth 2 jobsval i
+        set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "replace" call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call str 1 utf8 "Start a fresh attempt" call shape 2 call str 1 utf8 "{\"action\":\"command\",\"spec\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Start a fresh attempt\",\"op\":\"control\",\"fixed\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"op\":\"replace\",\"job\":\"$0\"}" call append 2 call arr 0 call key 2 item call str 1 utf8 "id" call shape 2 call str 1 utf8 "{\"role\":\"quiet\"}" call arr 0
+        next i
+    0
+  0
+  ret 0u
+
+fn chat_transcript 3 state uint pid uint spec uint uint do 5 rowsval uint row uint base uint discard uint i int 10
+  set rowsval call key 2 spec call str 1 utf8 "messages"
+  set base call cat 2 call cat 2 pid call str 1 utf8 "/" call str 1 utf8 "chat"
+  if eq 0 call size 1 rowsval 2
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "empty" call str 1 utf8 "heading" call str 1 utf8 "What would you like to work on?" call obj 0
+    ret 0u
+  0
+  set row call nth 2 rowsval 0
+  if call same 2 call key 2 row call str 1 utf8 "earlier" call integer 1 1 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "older" call str 1 utf8 "Earlier messages" call shape 2 call str 1 utf8 "{\"action\":\"nav\",\"patch\":{\"view\":\"relay\",\"older\":\"$0\",\"newer\":null}}" call append 2 call arr 0 call key 2 row call str 1 utf8 "oldest" call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":155}" call arr 0
+  0
+  set i 0
+  while lt i call size 1 rowsval 3
+    set row call nth 2 rowsval i
+    set discard call chat_message 4 state pid row call cat 2 call cat 2 base call str 1 utf8 "/" call encode 1 call key 2 row call str 1 utf8 "cursor"
+    next i
+  if call same 2 call key 2 row call str 1 utf8 "later" call integer 1 1 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "newer" call str 1 utf8 "Newer messages" call shape 2 call str 1 utf8 "{\"action\":\"nav\",\"patch\":{\"view\":\"relay\",\"older\":null,\"newer\":\"$0\"}}" call append 2 call arr 0 call key 2 row call str 1 utf8 "newest" call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":155,\"row\":\"$0\"}" call append 2 call arr 0 base
+  0
+  if or not call same 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "older" 0u not call same 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "newer" 0u 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "latest" call str 1 utf8 "Jump to latest" call decode 1 call str 1 utf8 "{\"action\":\"nav\",\"patch\":{\"view\":\"relay\",\"older\":null,\"newer\":null}}" call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":140,\"row\":\"$0\"}" call append 2 call arr 0 base
+  0
+  ret 0u

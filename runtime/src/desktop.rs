@@ -324,6 +324,11 @@ mod tests {
                 .iter()
                 .any(|c| c["id"] == composer && c["value"] == "🙂\r\nhello.")
         );
+        assert!(
+            controls
+                .iter()
+                .any(|c| c["id"] == "status" && c["area"] == "composer")
+        );
         assert!(controls.iter().any(|c| c["label"] == "Remove manual.md"));
         assert!(!controls.iter().any(|c| c["label"] == "Remove private.txt"));
         assert!(
@@ -335,8 +340,13 @@ mod tests {
         fluxr_win32::validate_frame(&frame)?;
         let submit = desktop.frame["default"].clone();
         desktop.process(json!({"id":submit,"type":"click","serial":5}))?;
-        let event = desktop.step("view", json!({}))?;
-        assert!(event.to_string().contains("Submission"));
+        let transcript = desktop.frame["controls"].as_array().unwrap();
+        assert!(
+            transcript
+                .iter()
+                .any(|c| c["role"] == "outgoing"
+                    && c["value"] == "🙂\nhello.\n\nAttached · manual.md")
+        );
         assert!(!desktop.frame.to_string().contains("Remove manual.md"));
         Ok(())
     }

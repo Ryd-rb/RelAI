@@ -10,9 +10,13 @@ Install Git, Rust with the MSVC build tools, PowerShell 7, and Codex CLI. Sign i
 pwsh -File .\Start-RelAI.ps1
 ```
 
-The launcher opens the native RelAI window. Select **Choose folder…** and pick an existing project, or use **Enter folder path** to paste its path. The sidebar shows your projects and their views. Use **Send** or **Ctrl+Enter** to submit. The composer accepts file drops and the native file picker. The launcher starts a capability-token-protected Codex App Server on loopback. RelAI checks that Codex reports a ChatGPT account before each subscription turn. Codex owns account credentials. Each attempt starts a fresh ephemeral thread with its sealed model, reasoning effort, input, and output schema. A pending direct model result appears with an **Accept result** control.
+Select **Choose folder…** to open an existing project. Each project has its own chat and draft. Press **Enter** to send and **Shift+Enter** for a new line. **Ctrl+Enter**, **Send**, file drops, and the file picker also work. The composer stays in reach as you scroll through the conversation. **Earlier messages** opens the preceding page of history.
 
-A project can select a different provider for each role under **Models**. Set the provider environment variables before starting RelAI. The application records a job error when the selected deployment rejects its model or input.
+RelAI shows your messages, its questions, and its answers in the chat. The composer names the question it will answer when one is open. Use **Reply** to choose between questions. Once the latest request is complete, a follow-up includes the selected request and its answer as context. **New topic** keeps the draft and clears that context. Use **Accept answer** to approve a direct result. **Request options** lets you update or stop work. Open **Activity** for delivery records and diagnostics.
+
+The launcher starts a capability-token-protected Codex App Server on loopback and checks for a ChatGPT sign-in before each subscription turn. Codex owns the credentials. Each attempt opens a fresh ephemeral thread with its sealed input, model, reasoning effort, and output schema.
+
+Under **Models**, choose a role to see its effective model, provider, reasoning effort, and preset source. Save an override for this project or for all projects. Set the provider environment variables before starting RelAI. Under **Tools**, search by name or description and select a result to prepare its arguments.
 
 | Provider | Configuration | Wire protocol |
 |---|---|---|
@@ -33,7 +37,7 @@ The first command checks formatting, runs strict Clippy, and executes the offlin
 
 ## Application and runtime
 
-The source under `app/` contains the checked FluxR relay, scheduler, provider adapters, dictionary, tools, and view definitions. The application manifest declares public commands, provider destinations, and permitted continuations. The host under `runtime/` supplies SQLite, the portable interpreter, operating-system services, codecs, and HTTP/JSON-RPC transport. The checked desktop modules turn dashboard data into keyed control descriptions and handle edits, navigation, and command results. The reusable FluxR Win32 library creates the native controls, handles Windows messages, and reuses controls across updates. The window and controller run on separate threads. [FluxR native window contract](https://github.com/Ryd-rb/FluxR-lang/blob/f436488eb81ad9193be3810116a8128ce40e6a2b/docs/native-windows-ui.md) User-authored tools execute in a separate bounded portable invocation with no native imports.
+The source under `app/` contains the checked FluxR relay, scheduler, provider adapters, dictionary, tools, and view definitions. The application manifest declares public commands, provider destinations, and permitted continuations. The host under `runtime/` supplies SQLite, the portable interpreter, operating-system services, codecs, and HTTP/JSON-RPC transport. The checked desktop modules turn dashboard data into keyed control descriptions and handle edits, navigation, and command results. The reusable FluxR Win32 library creates the native controls, handles Windows messages, and reuses controls across updates. The window and controller run on separate threads. [FluxR native window contract](https://github.com/Ryd-rb/FluxR-lang/blob/b7d560e1613c20cb5017631d6728fb8a6a648186/docs/native-windows-ui.md) User-authored tools execute in a separate bounded portable invocation with no native imports.
 
 Tools use stable dictionary entries. Promoting a qualified version checks the expected current default and its capability. It creates a new binding revision and preserves human-edited wording. A project's owner can review proposed wording changes in **Dictionary**. Changing a definition leaves executable versions under registry control.
 

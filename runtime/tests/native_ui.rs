@@ -152,7 +152,7 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
         )
         .unwrap();
     ui.apply(selected);
-    assert_eq!(ui.frame["layout"], "workspace");
+    assert_eq!(ui.frame["layout"], "conversation");
     assert_eq!(ui.control("Relay", "button")["role"], "selected");
     assert_eq!(ui.control("project", "button")["role"], "selected");
     assert_eq!(ui.control("project", "button")["side"], true);
@@ -162,7 +162,7 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
     );
     assert_eq!(ui.control("Send", "button")["role"], "primary");
     assert!(
-        !ui.control("Relay", "heading")["side"]
+        !ui.control("project", "heading")["side"]
             .as_bool()
             .unwrap_or(false)
     );
@@ -175,6 +175,14 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
             .iter()
             .any(|c| c["label"] == "Edit preset" && c["kind"] == "heading")
     );
+    assert_eq!(ui.control("Model ID", "input")["value"], "gpt-6.2-sol");
+    ui.change("Role", "select", json!({"value":"reviewer"}));
+    assert_eq!(ui.control("Reasoning effort", "select")["value"], "high");
+    ui.change("Model ID", "input", json!({"value":"gpt-6.1-sol"}));
+    ui.click("Save preset");
+    assert_eq!(ui.control("gpt-6.1-sol", "heading")["id"], "models/active");
+    ui.change("Role", "select", json!({"value":"planner"}));
+    assert_eq!(ui.control("Model ID", "input")["value"], "gpt-6.2-sol");
     ui.click("Dictionary");
     let group = ui.control("Manage dictionaries", "button");
     assert_eq!(group["expanded"], false);
@@ -200,7 +208,7 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
     ui.click("Open project");
     ui.control("Your projects", "label");
     ui.click("project");
-    assert_eq!(ui.frame["layout"], "workspace");
+    assert_eq!(ui.frame["layout"], "conversation");
 }
 
 #[test]
@@ -383,51 +391,43 @@ fn graph_filter_pause_zoom_comparison_and_old_snapshot_read_retained_content() {
 fn tools_fold_preserves_typed_json_and_dispatches_exact_data() {
     let mut ui = Desktop::open();
     ui.click("Tools");
-    assert!(
-        !ui.controls()
-            .iter()
-            .any(|c| c["label"] == "Search arguments")
-    );
-    ui.click("Find and run a tool");
-    ui.change(
-        "Search arguments",
-        "multiline",
-        json!({"value":"{\"query\":\"dictionary\",\"limit\":3}"}),
-    );
-    ui.click("Find and run a tool");
-    assert!(
-        !ui.controls()
-            .iter()
-            .any(|c| c["label"] == "Search arguments")
-    );
-    ui.click("Find and run a tool");
-    assert_eq!(
-        ui.control("Search arguments", "multiline")["value"],
-        "{\"query\":\"dictionary\",\"limit\":3}"
-    );
+    assert!(!ui.controls().iter().any(|c| c["label"] == "Tool ID"));
+    ui.change("Search tools", "input", json!({"value":"project.info"}));
     let request = ui.event(ui.control("Find tools", "button"), json!({}));
     assert_eq!(
         request["request"]["input"]["arguments"],
-        json!({"query":"dictionary","limit":3})
+        json!({"query":"project.info"})
     );
     assert_eq!(request["request"]["input"]["tool"], "tool.find");
     ui.apply(request);
-    assert!(
-        ui.state["outputs"]
-            .as_object()
-            .unwrap()
-            .values()
-            .any(|v| v["tool"] == "tool.find")
-    );
-    ui.change("Search arguments", "multiline", json!({"value":"{broken"}));
-    let button = ui.control("Find tools", "button");
+    let matches = ui.control("Matching tools", "list");
+    let selected = matches["choices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["label"].as_str().unwrap().starts_with("project.info "))
+        .unwrap()["value"]
+        .clone();
+    let select = ui.event(matches, json!({"value":selected}));
+    assert!(select["request"].is_null());
+    ui.apply(select);
+    assert_eq!(ui.control("Tool ID", "input")["value"], "project.info");
+    let run = ui.control("Run tool", "button");
+    let scope = run["event"]["scope"].clone();
+    let args = ui.find(|c| c["label"] == "Arguments" && c["event"]["scope"] == scope);
+    let invalid = ui.event(args.clone(), json!({"value":"{broken"}));
+    ui.apply(invalid);
+    ui.click("Run a tool");
+    assert!(!ui.controls().iter().any(|c| c["label"] == "Tool ID"));
+    ui.click("Run a tool");
+    assert_eq!(ui.find(|c| c["id"] == args["id"])["value"], "{broken");
     let rejected = ui.app.invoke(
         "desktop_event",
-        json!({"state":ui.state,"project":ui.view["project"],"event":button["event"],"input":{}}),
+        json!({"state":ui.state,"project":ui.view["project"],"event":run["event"],"input":{}}),
     );
     assert!(
         rejected.is_err(),
-        "Malformed JSON must fail before dispatch"
+        "Malformed arguments must fail before dispatch"
     );
     ui.click("Tool versions");
     let promote = ui.control("Promote a version", "button");
@@ -443,6 +443,123 @@ fn tools_fold_preserves_typed_json_and_dispatches_exact_data() {
     assert_eq!(request["request"]["input"]["nested"], json!({"flag":true}));
     assert_eq!(request["request"]["input"]["count"], 2);
     assert!(request["request"]["input"]["project"].is_string());
+}
+
+#[test]
+fn chat_pages_keep_durable_messages_visible_across_internal_traffic() {
+    let mut ui = Desktop::open();
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    let project = ui.view["project"].as_str().unwrap().to_owned();
+    for i in 0..29 {
+        let request = format!("request-{i}");
+        let message = format!("Message {i}");
+        db.execute(
+            "INSERT INTO requests (id,project,state,intent) VALUES(?,?,'completed',?)",
+            (&request, &project, &message),
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO events (project,kind,payload) VALUES(?,'Submission',?)",
+            (
+                &project,
+                json!({"request":request,"submission":request,"text":message}).to_string(),
+            ),
+        )
+        .unwrap();
+    }
+    db.execute("WITH RECURSIVE s(n) AS (VALUES(1) UNION ALL SELECT n+1 FROM s WHERE n<150) INSERT INTO events(project,kind,payload) SELECT ?,'Internal trace',json_object('sequence',n) FROM s",[&project]).unwrap();
+    ui.render(true);
+    assert_eq!(ui.frame["follow_tail"], true);
+    assert_eq!(
+        ui.frame["composer"],
+        ui.control("Message", "multiline")["id"]
+    );
+    for label in ["Send", "Attach files"] {
+        assert_eq!(ui.control(label, "button")["area"], "composer");
+    }
+    let transcript = |ui: &Desktop| {
+        ui.controls()
+            .iter()
+            .filter(|c| c["role"] == "outgoing")
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let page = transcript(&ui);
+    assert_eq!(page.len(), 24);
+    assert_eq!(page[0]["value"], "Message 5");
+    assert_eq!(page[23]["value"], "Message 28");
+    assert!(!ui.frame.to_string().contains("Internal trace"));
+    ui.type_message("Unsent draft");
+    ui.click("Earlier messages");
+    assert_eq!(ui.frame["follow_tail"], false);
+    let first = transcript(&ui);
+    assert_eq!(first.len(), 5);
+    assert_eq!(first[0]["value"], "Message 0");
+    ui.invoke(
+        "submit",
+        json!({"key":"new","text":"A new message","attachments":[]}),
+    );
+    ui.render(true);
+    assert_eq!(transcript(&ui), first);
+    ui.click("Newer messages");
+    assert_eq!(transcript(&ui), page);
+    ui.click("Jump to latest");
+    assert_eq!(transcript(&ui).last().unwrap()["value"], "A new message");
+    ui.click("Activity");
+    ui.control("Internal trace", "label");
+    ui.click("Relay");
+    assert_eq!(ui.control("Message", "multiline")["value"], "Unsent draft");
+}
+
+#[test]
+fn a_question_arriving_while_typing_cannot_redirect_the_draft() {
+    let mut ui = Desktop::open();
+    let project = ui.view["project"].as_str().unwrap().to_owned();
+    let req = ui.invoke(
+        "submit",
+        json!({"key":"first","text":"Please check","attachments":[]}),
+    );
+    ui.render(true);
+    ui.type_message("Already composing");
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    let q = json!({"question":"Which folder?","choices":["One","Two"]});
+    db.execute("INSERT INTO questions(id,request,revision,session,role,body) VALUES('question',?,1,'session','planner',?)",(req["request"].as_str().unwrap(),q.to_string())).unwrap();
+    db.execute(
+        "INSERT INTO events(project,kind,payload) VALUES(?,'ASK',?)",
+        (
+            &project,
+            json!({"action":"question","request":req["request"],"payload":q}).to_string(),
+        ),
+    )
+    .unwrap();
+    ui.render(true);
+    let send = ui.event(ui.control("Send", "button"), json!({}));
+    assert!(send["request"]["input"]["reply"].is_null());
+    ui.click("Reply");
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "Already composing"
+    );
+    assert_eq!(
+        ui.event(ui.control("Send", "button"), json!({}))["request"]["input"]["reply"],
+        "question"
+    );
+    ui.click("New topic");
+    assert!(
+        ui.event(ui.control("Send", "button"), json!({}))["request"]["input"]["reply"].is_null()
+    );
+    ui.click("Reply");
+    ui.type_message("Two");
+    ui.click("Send");
+    assert!(!ui.controls().iter().any(|c| c["label"] == "Reply"));
+    assert!(
+        ui.app
+            .invoke(
+                "submit",
+                json!({"project":project,"key":"another","text":"One","reply":"question"})
+            )
+            .is_err()
+    );
 }
 
 #[test]
@@ -479,9 +596,9 @@ fn large_history_and_graph_comparison_remain_browsable() {
     ui.view = json!({"project":"project","subtitle":"Project relay","components":[{"type":"feed","label":"Relay","items":cards}]});
     ui.render(false);
     ui.find(|c| c["value"] == "Message 99");
-    ui.click("Older messages");
+    ui.click("Earlier events");
     ui.find(|c| c["value"] == "Message 87");
-    ui.click("Newer messages");
+    ui.click("Newer events");
     ui.find(|c| c["value"] == "Message 99");
     let edges: Vec<_> = (0..512)
         .map(|n| json!({"source":"source","target":format!("target-{n}"),"name":"call"}))

@@ -1,6 +1,6 @@
 fluxr 1
 
-pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval uint actionval uint scope uint name uint spec uint v uint stack uint keyval uint fixed uint before uint draft uint discard uint 34
+pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval uint actionval uint scope uint name uint spec uint v uint stack uint keyval uint fixed uint before uint draft uint discard uint 35
   set state call key 2 arg call str 1 utf8 "state"
   set pid call key 2 arg call str 1 utf8 "project"
   set event call key 2 arg call str 1 utf8 "event"
@@ -22,12 +22,29 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     set spec call key 2 event call str 1 utf8 "spec"
     ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call key 2 spec call str 1 utf8 "op" call ui_merge 2 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid call key 2 spec call str 1 utf8 "fixed" event
   0
+  if call same 2 actionval call str 1 utf8 "tool_choice" 9
+    set state call ui_draft_set 4 state scope call str 1 utf8 "$tool" v
+    set v call decode 1 v
+    set spec call decode 1 call str 1 utf8 "{\"op\":\"tool_run\",\"label\":\"Run tool\",\"fixed\":{}}"
+    if not call same 2 call key 2 v call str 1 utf8 "version" 0u 1
+      set spec call put 3 spec call str 1 utf8 "label" call str 1 utf8 "Run an exact registered version"
+    0
+    set scope call ui_form_key 2 pid spec
+    set state call ui_draft_set 4 state scope call str 1 utf8 "tool" call key 2 v call str 1 utf8 "tool"
+    set state call ui_draft_set 4 state scope call str 1 utf8 "version" call key 2 v call str 1 utf8 "version"
+    set state call ui_set_map 4 state call str 1 utf8 "folds" call cat 2 call cat 2 pid call str 1 utf8 "/" call str 1 utf8 "tools/run-tools" call decode 1 call str 1 utf8 "true"
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "arguments"
+  0
   if call same 2 actionval call str 1 utf8 "project_tab" 2
     set state call ui_nav 2 state call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"view\":\"relay\"}" call append 2 call arr 0 v
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
   0
-  if call same 2 actionval call str 1 utf8 "nav" 2
-    set state call ui_nav 2 state call key 2 event call str 1 utf8 "patch"
+  if call same 2 actionval call str 1 utf8 "nav" 4
+    set fixed call ui_merge 2 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid call key 2 event call str 1 utf8 "patch"
+    set state call ui_nav 2 state fixed
+    if or call same 2 call key 2 fixed call str 1 utf8 "fresh" call decode 1 call str 1 utf8 "true" or not call same 2 call key 2 fixed call str 1 utf8 "reply" 0u or not call same 2 call key 2 fixed call str 1 utf8 "steer" 0u not call same 2 call key 2 fixed call str 1 utf8 "follow" 0u 1
+      ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 call ui_form_key 2 pid call decode 1 call str 1 utf8 "{\"draft\":true}" call str 1 utf8 "/" call str 1 utf8 "text"
+    0
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
   0
   if call same 2 actionval call str 1 utf8 "dock" 2
@@ -134,7 +151,7 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
   0
   ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
 
-pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint scope uint name uint pid uint result uint v uint bag uint spec uint patch uint keysval uint k uint stack uint i int 20
+pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint scope uint name uint pid uint result uint v uint bag uint spec uint patch uint keysval uint k uint stack uint i int 21
   set state call key 2 arg call str 1 utf8 "state"
   set event call key 2 arg call str 1 utf8 "after"
   set pid call key 2 arg call str 1 utf8 "project"
@@ -155,7 +172,10 @@ pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint sc
     0
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
-  if call same 2 actionval call str 1 utf8 "files" 3
+  if call same 2 actionval call str 1 utf8 "files" 4
+    if not call same 2 call key 2 event call str 1 utf8 "destination" 0u 1
+      set state call ui_draft_set 4 state scope call str 1 utf8 "$destination" call key 2 event call str 1 utf8 "destination"
+    0
     set bag call ui_default 2 call key 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope name call arr 0
     set state call ui_draft_set 4 state scope name call append 2 bag call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"name\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 result call str 1 utf8 "id" call key 2 result call str 1 utf8 "display_name"
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
@@ -175,12 +195,16 @@ pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint sc
     ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "term_view" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"ref\":\"$1\"}" call append 2 call append 2 call arr 0 pid result call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"definition\"}" call arr 0 call obj 0
   0
   set spec call key 2 event call str 1 utf8 "spec"
+  if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 1
+    set state call ui_set_map 4 state call str 1 utf8 "drafts" scope 0u
+  0
   if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "open_project" 1
     set state call put 3 state call str 1 utf8 "manualFolder" call decode 1 call str 1 utf8 "false"
   0
-  if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 2
+  if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 3
     set state call ui_set_map 4 state call str 1 utf8 "drafts" scope 0u
-    set state call put 3 state call str 1 utf8 "nav" call ui_merge 2 call key 2 state call str 1 utf8 "nav" call shape 2 call str 1 utf8 "{\"reply\":null,\"steer\":null}" call arr 0
+    set state call put 3 state call str 1 utf8 "nav" call ui_merge 2 call key 2 state call str 1 utf8 "nav" call shape 2 call str 1 utf8 "{\"reply\":null,\"steer\":null,\"follow\":null,\"fresh\":null,\"older\":null,\"newer\":null}" call arr 0
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "text"
   0
   if call same 2 call key 2 spec call str 1 utf8 "showResult" call decode 1 call str 1 utf8 "true" 1
     set state call ui_set_map 4 state call str 1 utf8 "outputs" scope result

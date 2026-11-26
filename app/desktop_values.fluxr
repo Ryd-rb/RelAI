@@ -17,11 +17,14 @@ fn ui_set_map 4 state uint name uint k uint v uint uint do 0  1
 fn ui_choices 1 items uint uint do 0  1
   ret call query 2 call str 1 utf8 "SELECT CASE type WHEN 'object' THEN json_extract(value,'$.label') ELSE value END AS label,CASE type WHEN 'object' THEN json_extract(value,'$.value') ELSE value END AS value FROM json_each(?) ORDER BY CAST(key AS INTEGER)" call append 2 call arr 0 items
 
-fn ui_field_value 2 fieldval uint draft uint uint do 2 kind uint v uint 7
+fn ui_field_value 2 fieldval uint draft uint uint do 2 kind uint v uint 8
   set kind call key 2 fieldval call str 1 utf8 "type"
   set v call key 2 draft call key 2 fieldval call str 1 utf8 "name"
   if not call same 2 v 0u 1
     ret v
+  0
+  if not call same 2 call key 2 fieldval call str 1 utf8 "initial" 0u 1
+    ret call key 2 fieldval call str 1 utf8 "initial"
   0
   if call same 2 kind call str 1 utf8 "select" 1
     ret call key 2 call nth 2 call ui_choices 1 call key 2 fieldval call str 1 utf8 "choices" 0 call str 1 utf8 "value"
@@ -38,5 +41,8 @@ fn ui_draft_set 4 state uint scope uint name uint v uint uint do 1 bag uint 2
   set bag call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
   ret call ui_set_map 4 state call str 1 utf8 "drafts" scope call put 3 bag name v
 
-fn ui_form_key 2 pid uint spec uint uint do 0  1
+fn ui_form_key 2 pid uint spec uint uint do 0  2
+  if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 1
+    ret call hash 1 call encode 1 call append 2 call append 2 call arr 0 pid call str 1 utf8 "relay-composer"
+  0
   ret call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 spec call str 1 utf8 "op" call key 2 spec call str 1 utf8 "label" call key 2 spec call str 1 utf8 "fixed"

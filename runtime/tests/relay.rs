@@ -132,6 +132,93 @@ fn submission_recovery_retries_and_single_improvement() {
         .unwrap()
     );
 }
+
+#[test]
+fn a_chat_follow_up_uses_only_the_selected_exchange_and_preserves_the_new_prompt() {
+    let temp = tempfile::tempdir().unwrap();
+    let folder = temp.path().join("first");
+    let other = temp.path().join("second");
+    fs::create_dir(&folder).unwrap();
+    fs::create_dir(&other).unwrap();
+    let data = temp.path().join("state");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let project = app.invoke("open_project", json!({"root":folder})).unwrap()["id"].clone();
+    let second = app.invoke("open_project", json!({"root":other})).unwrap()["id"].clone();
+    app.invoke(
+        "submit",
+        json!({"project":project,"text":"Colour?","key":"first","attachments":[]}),
+    )
+    .unwrap();
+    let job = next(&mut app);
+    deliver(&mut app, &job, intake(json!([result("final", "Blue.")]), 7)).unwrap();
+    let render = |app: &mut App| {
+        let view = app.invoke("dashboard", json!({"project":project})).unwrap();
+        app.invoke("desktop_frame", json!({"view":view,"state":{}}))
+            .unwrap()
+    };
+    let frame = render(&mut app);
+    let accept = frame["controls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["label"] == "Accept answer")
+        .unwrap();
+    let mut args = accept["event"]["spec"]["fixed"].clone();
+    let action = args["action"].clone();
+    args["project"] = project.clone();
+    app.invoke("control", args).unwrap();
+    let improvement = next(&mut app);
+    let mut report = result("report", "internal workflow note");
+    report["outcome"] = json!("no_change");
+    deliver(&mut app, &improvement, envelope(json!([report]))).unwrap();
+    drop(app);
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let frame = render(&mut app);
+    let controls = frame["controls"].as_array().unwrap();
+    assert_eq!(
+        controls
+            .iter()
+            .filter(|c| c["role"] == "incoming" && c["value"] == "Blue.")
+            .count(),
+        1
+    );
+    assert!(!frame.to_string().contains("internal workflow note"));
+    assert!(!controls.iter().any(|c| c["label"] == "Accept answer"));
+    let send = controls.iter().find(|c| c["label"] == "Send").unwrap();
+    assert_eq!(
+        send["event"]["spec"]["destination"]["bind"]["follow"],
+        action
+    );
+    let text = "Why that one?\n🙂";
+    let mut args =
+        json!({"project":second,"text":text,"follow":action,"key":"follow","attachments":[]});
+    assert!(app.invoke("submit", args.clone()).is_err());
+    args["project"] = project;
+    let submitted = app.invoke("submit", args).unwrap();
+    let job = next(&mut app);
+    let sealed = fs::read_to_string(
+        data.join("turns")
+            .join(job["job"].as_str().unwrap())
+            .join("input.json"),
+    )
+    .unwrap();
+    assert!(
+        sealed.contains("previous_exchange")
+            && sealed.contains("Colour?")
+            && sealed.contains("Blue.")
+    );
+    assert!(!sealed.contains("internal workflow note"));
+    assert_eq!(
+        fs::read_to_string(
+            data.join("submissions")
+                .join(submitted["id"].as_str().unwrap())
+                .join("PROMPT.txt")
+        )
+        .unwrap(),
+        text
+    );
+}
+
 #[test]
 fn two_workers_require_separate_receipts_before_review() {
     let t = tempfile::tempdir().unwrap();
@@ -309,6 +396,18 @@ fn a_named_question_survives_restart_and_can_be_reviewed_as_waiting() {
     let review = next(&mut app);
     let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
     let (rid,q):(String,String)=sql.query_row("SELECT rv.id,q.id FROM reviews rv JOIN questions q ON rv.request=q.request WHERE rv.job=?",[review["job"].as_str().unwrap()],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    let view = app.invoke("dashboard", json!({"project":p})).unwrap();
+    let frame = app
+        .invoke("desktop_frame", json!({"view":view,"state":{}}))
+        .unwrap();
+    let controls = frame["controls"].as_array().unwrap();
+    assert!(
+        controls
+            .iter()
+            .any(|c| c["role"] == "incoming" && c["value"] == "Include examples?\n\nYes · No")
+    );
+    let send = controls.iter().find(|c| c["label"] == "Send").unwrap();
+    assert_eq!(send["event"]["spec"]["destination"]["bind"]["reply"], q);
     let mut response = envelope(json!([]));
     response["decision"] = json!("wait");
     response["review_id"] = json!(rid);

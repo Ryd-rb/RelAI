@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS presets(scope TEXT NOT NULL,role TEXT NOT NULL,provid
 CREATE TABLE IF NOT EXISTS artifacts(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,meta TEXT NOT NULL,encoded TEXT NOT NULL,UNIQUE(project,id));
 CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,revision INTEGER NOT NULL DEFAULT 1,state TEXT NOT NULL DEFAULT 'open',intent TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS submissions(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,request TEXT NOT NULL REFERENCES requests,key TEXT NOT NULL,hash TEXT NOT NULL,content TEXT NOT NULL,UNIQUE(project,key));
+CREATE INDEX IF NOT EXISTS submissions_request ON submissions(request);
+CREATE INDEX IF NOT EXISTS chat_cursor ON events(project,cursor) WHERE kind IN ('Submission','ASK','RESULT','Final result','Request stopped');
 CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY,content TEXT NOT NULL,digest TEXT NOT NULL,verified INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,request TEXT NOT NULL REFERENCES requests,revision INTEGER NOT NULL,session TEXT NOT NULL,role TEXT NOT NULL,kind TEXT NOT NULL,input TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'queued',seal TEXT,attempt TEXT,receipt TEXT,reason TEXT);
 CREATE INDEX IF NOT EXISTS queue ON jobs(state,role,session);

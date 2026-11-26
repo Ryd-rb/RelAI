@@ -1,0 +1,7 @@
+fluxr 1
+
+pub desktop_file 1 arg uint uint do 3 event uint extension uint mime uint 4
+  set event call key 2 arg call str 1 utf8 "after"
+  set extension call lower 1 call key 2 arg call str 1 utf8 "extension"
+  set mime call ui_default 2 call key 2 call decode 1 call str 1 utf8 "{\"md\":\"text/markdown\",\"markdown\":\"text/markdown\",\"json\":\"application/json\",\"csv\":\"text/csv\",\"png\":\"image/png\",\"jpg\":\"image/jpeg\",\"jpeg\":\"image/jpeg\",\"pdf\":\"application/pdf\"}" extension call str 1 utf8 "text/plain"
+  ret call shape 2 call str 1 utf8 "{\"op\":\"$0\",\"input\":{\"project\":\"$1\",\"name\":\"$2\",\"mime\":\"$3\"},\"after\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 event call str 1 utf8 "op" call key 2 arg call str 1 utf8 "project" call key 2 arg call str 1 utf8 "name" mime event

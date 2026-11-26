@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "fluxr"
 version = "0.1.0"
-source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=62e412b1b7aa34cad1c8472d7f974e0bfc111552#62e412b1b7aa34cad1c8472d7f974e0bfc111552"
+source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=d527eb3c1bf544bfdd008205b637babc8f22b2fd#d527eb3c1bf544bfdd008205b637babc8f22b2fd"
 dependencies = [
  "fluxr-entry",
  "serde",
@@ -692,6 +692,7 @@ dependencies = [
  "diffy",
  "flate2",
  "fluxr",
+ "fluxr-win32",
  "fs2",
  "futures-util",
  "gix",
@@ -726,7 +727,18 @@ dependencies = [
 [[package]]
 name = "fluxr-entry"
 version = "0.1.0"
-source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=62e412b1b7aa34cad1c8472d7f974e0bfc111552#62e412b1b7aa34cad1c8472d7f974e0bfc111552"
+source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=d527eb3c1bf544bfdd008205b637babc8f22b2fd#d527eb3c1bf544bfdd008205b637babc8f22b2fd"
+
+[[package]]
+name = "fluxr-win32"
+version = "0.1.0"
+source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=d527eb3c1bf544bfdd008205b637babc8f22b2fd#d527eb3c1bf544bfdd008205b637babc8f22b2fd"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "windows-sys 0.52.0",
+]
 
 [[package]]
 name = "fnv"

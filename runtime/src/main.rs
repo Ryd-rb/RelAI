@@ -1,11 +1,11 @@
+#[cfg(windows)]
+mod desktop;
 use anyhow::{Context, Result};
 use axum::{
     Json, Router,
-    body::Body,
     extract::{DefaultBodyLimit, Path, State},
-    http::{HeaderMap, Response, StatusCode},
-    response::{Html, IntoResponse},
-    routing::{get, post},
+    http::{HeaderMap, StatusCode},
+    routing::post,
 };
 use fluxr_app_host::{App, transport};
 use serde_json::{Value, json};
@@ -87,39 +87,23 @@ async fn invoke(app: Arc<Mutex<App>>, name: &str, input: Value) -> Result<Value>
     }
     Ok(v)
 }
-async fn asset(
-    State(s): State<Server>,
-    Path(name): Path<String>,
-) -> Result<Response<Body>, StatusCode> {
-    if name == "client.js" {
-        return Ok(Response::builder()
-            .header("content-type", "text/javascript; charset=utf-8")
-            .body(Body::from(include_str!("client.js")))
-            .unwrap());
-    }
-    let app = s.app.lock().unwrap();
-    let content = app.metadata()["assets"]
-        .get(&name)
-        .ok_or(StatusCode::NOT_FOUND)?;
-    let bytes = fluxr_app_host::read(&app.bundle.join(&name)).map_err(|_| StatusCode::NOT_FOUND)?;
-    Ok(Response::builder()
-        .header("content-type", content.as_str().unwrap())
-        .header("x-content-type-options", "nosniff")
-        .body(Body::from(bytes))
-        .unwrap())
-}
-async fn work(s: Server) {
+async fn work(app: Arc<Mutex<App>>, changed: Option<std::sync::mpsc::Sender<Value>>) {
     let slots = Arc::new(tokio::sync::Semaphore::new(3));
     loop {
         let permit = slots.clone().acquire_owned().await.unwrap();
         let next = {
-            let mut a = s.app.lock().unwrap();
-            a.invoke("poll", Value::Null)
-                .map(|v| (v, a.metadata().clone()))
+            let mut a = app.lock().unwrap();
+            let before = a.change_count();
+            let job = a.invoke("poll", Value::Null);
+            if before != a.change_count() {
+                notify(&changed);
+            }
+            job.map(|v| (v, a.metadata().clone()))
         };
         match next {
             Ok((v, config)) if !v.is_null() => {
-                let app = s.app.clone();
+                let app = app.clone();
+                let changed = changed.clone();
                 tokio::spawn(async move {
                     let _slot = permit;
                     if let Some(export) = v["local"].as_str() {
@@ -148,6 +132,7 @@ async fn work(s: Server) {
                                 json!({"job":v["job"],"state":v["state"],"error":format!("{e:#}")}),
                             );
                         }
+                        notify(&changed);
                         return;
                     }
                     let result = transport::exchange(&v["transport"], &config).await;
@@ -164,6 +149,7 @@ async fn work(s: Server) {
                             json!({"job":v["job"],"attempt":v["attempt"],"error":format!("{e:#}")}),
                         );
                     }
+                    notify(&changed);
                 });
             }
             result => {
@@ -176,34 +162,45 @@ async fn work(s: Server) {
         }
     }
 }
+fn notify(channel: &Option<std::sync::mpsc::Sender<Value>>) {
+    if let Some(tx) = channel {
+        let _ = tx.send(json!({"type":"refresh"}));
+    }
+}
 #[tokio::main]
 async fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
     let bundle = PathBuf::from(
         args.next()
-            .context("Usage: fluxr-app-host BUNDLE DATA [PORT]")?,
+            .context("Usage: fluxr-app-host BUNDLE DATA [--headless [PORT]]")?,
     );
     let data = PathBuf::from(args.next().context("Missing data directory")?);
-    let port: u16 = args.next().as_deref().unwrap_or("0").parse()?;
-    let app = App::open(&bundle, &data)?;
+    let mode = args.next();
+    let app = Arc::new(Mutex::new(App::open(&bundle, &data)?));
+    let port: u16 = match mode.as_deref() {
+        None => {
+            #[cfg(windows)]
+            return desktop::run(app);
+            #[cfg(not(windows))]
+            anyhow::bail!("Native desktop requires Windows. Use --headless for the local API.");
+        }
+        Some("--headless") => args.next().as_deref().unwrap_or("0").parse()?,
+        Some(port) => port.parse()?,
+    };
+    anyhow::ensure!(args.next().is_none(), "Unexpected argument");
     let socket = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
     let origin = format!("http://{}", socket.local_addr()?);
     let state = Server {
-        app: Arc::new(Mutex::new(app)),
+        app: app.clone(),
         token: uuid::Uuid::new_v4().simple().to_string(),
         origin: origin.clone(),
     };
     println!("Open {origin}/#{}", state.token);
+    tokio::spawn(work(app, None));
     let app = Router::new()
-        .route(
-            "/",
-            get(|| async { Html(include_str!("shell.html")).into_response() }),
-        )
-        .route("/assets/{name}", get(asset))
         .route("/api/{name}", post(command))
         .layer(DefaultBodyLimit::max(18 * 1024 * 1024))
-        .with_state(state.clone());
-    tokio::spawn(work(state));
+        .with_state(state);
     axum::serve(socket, app).await?;
     Ok(())
 }

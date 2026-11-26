@@ -1,0 +1,22 @@
+fluxr 1
+
+fn ui_pager 5 state uint name uint countval uint newer uint older uint uint do 4 pageval uint discard uint n int p int 7
+  set n call number 1 countval
+  set p call number 1 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "pages" name call integer 1 0
+  if le n 12 1
+    ret call integer 1 0
+  0
+  if le n mul p 12 1
+    set p div sub n 1 12
+  0
+  if lt 0 p 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 name call str 1 utf8 "/" call str 1 utf8 "previous" newer call shape 2 call str 1 utf8 "{\"action\":\"page\",\"key\":\"$0\",\"page\":\"$1\"}" call append 2 call append 2 call arr 0 name call integer 1 sub p 1 call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 name
+  0
+  if lt mul add p 1 12 n 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 name call str 1 utf8 "/" call str 1 utf8 "next" older call shape 2 call str 1 utf8 "{\"action\":\"page\",\"key\":\"$0\",\"page\":\"$1\"}" call append 2 call append 2 call arr 0 name call integer 1 add p 1 call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 name
+  0
+  ret call integer 1 mul p 12
+
+fn ui_page_items 5 state uint name uint items uint newer uint older uint uint do 1 offsetval uint 2
+  set offsetval call ui_pager 5 state name call integer 1 call size 1 items newer older
+  ret call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT json_group_array(json(value)) AS \"items:json\" FROM (SELECT value FROM json_each(?) LIMIT 12 OFFSET ?)" call append 2 call append 2 call arr 0 items offsetval 0 call str 1 utf8 "items"

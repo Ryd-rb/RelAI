@@ -20,6 +20,7 @@ async fn loopback_api_checks_credentials_origin_and_host_before_project_access()
     let child = Command::new(env!("CARGO_BIN_EXE_fluxr-app-host"))
         .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"))
         .arg(root.path().join("db"))
+        .arg("--headless")
         .stdout(Stdio::piped())
         .spawn()
         .unwrap();
@@ -35,6 +36,16 @@ async fn loopback_api_checks_credentials_origin_and_host_before_project_access()
         .split_once("/#")
         .unwrap();
     let c = reqwest::Client::new();
+    for path in ["/", "/assets/client.js", "/assets/style.css"] {
+        assert_eq!(
+            c.get(format!("{origin}{path}"))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            404
+        );
+    }
     let url = format!("{origin}/api/open_project");
     let request = || c.post(&url).json(&json!({"root":working}));
     assert_eq!(request().send().await.unwrap().status(), 403);

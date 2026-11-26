@@ -125,6 +125,7 @@ async fn authorized_https_push_and_fetch_interoperate_with_git_and_refuse_stale_
             .env("RELAI_GIT_CA_FILE", &pem)
             .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"))
             .arg(tmp.path().join("state"))
+            .arg("--headless")
             .stdout(Stdio::piped())
             .spawn()?,
     )?;

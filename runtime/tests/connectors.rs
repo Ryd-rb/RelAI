@@ -48,6 +48,7 @@ async fn named_connector_captures_bytes_and_consumes_an_exact_write_grant_once()
         Command::new(env!("CARGO_BIN_EXE_fluxr-app-host"))
             .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"))
             .arg(temp.path().join("state"))
+            .arg("--headless")
             .stdout(Stdio::piped())
             .spawn()
             .unwrap(),

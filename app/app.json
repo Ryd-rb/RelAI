@@ -38,7 +38,15 @@
     "definitions.fluxr",
     "tool_terms.fluxr",
     "source_access.fluxr",
-    "proposals.fluxr"
+    "proposals.fluxr",
+    "desktop_values.fluxr",
+    "desktop_forms.fluxr",
+    "desktop_panels.fluxr",
+    "desktop_edits.fluxr",
+    "desktop_events.fluxr",
+    "desktop_frame.fluxr",
+    "desktop_files.fluxr",
+    "desktop_pages.fluxr"
   ],
   "public": [
     "open_project",
@@ -92,10 +100,6 @@
     "source_access",
     "review_definition"
   ],
-  "assets": {
-    "client.js": "text/javascript; charset=utf-8",
-    "style.css": "text/css; charset=utf-8"
-  },
   "destinations": {
     "codex": {
       "transport": "websocket",
@@ -259,5 +263,12 @@
       "page": "worktree_pending",
       "apply": "worktree_recover"
     }
-  ]
+  ],
+  "desktop": {
+    "view": "dashboard",
+    "frame": "desktop_frame",
+    "event": "desktop_event",
+    "result": "desktop_result",
+    "file": "desktop_file"
+  }
 }

@@ -1,0 +1,69 @@
+fluxr 1
+
+fn ui_shift_markers 4 markers uint start uint oldend uint newend uint uint do 0  1
+  ret call query 2 call str 1 utf8 "SELECT CASE WHEN value->>'$.end'<=?2 THEN value->>'$.start' ELSE value->>'$.start'+?4-?3 END AS start,CASE WHEN value->>'$.end'<=?2 THEN value->>'$.end' ELSE value->>'$.end'+?4-?3 END AS end,value->'$.ref' AS \"ref:json\" FROM json_each(?1) WHERE value->>'$.end'<=?2 OR value->>'$.start'>=?3 ORDER BY start" call append 2 call append 2 call append 2 call append 2 call arr 0 markers start oldend newend
+
+fn ui_edit 4 state uint pid uint event uint inputval uint uint do 9 scope uint name uint draft uint v uint old uint span uint hits uint previous uint caret uint 19
+  set scope call key 2 event call str 1 utf8 "scope"
+  set name call key 2 event call str 1 utf8 "name"
+  set draft call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
+  set v call key 2 inputval call str 1 utf8 "value"
+  set old call ui_default 2 call key 2 draft name call str 1 utf8 ""
+  set draft call put 3 draft name v
+  if not call same 2 call key 2 call key 2 event call str 1 utf8 "completion" call str 1 utf8 "field" name 2
+    set state call ui_set_map 4 state call str 1 utf8 "drafts" scope draft
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
+  0
+  set caret call key 2 inputval call str 1 utf8 "end"
+  if not call same 2 caret call key 2 inputval call str 1 utf8 "start" 1
+    set caret 0u
+  0
+  set span call edit_span 3 old v caret
+  set previous call key 2 draft call str 1 utf8 "$suggestions"
+  set draft call put 3 draft call str 1 utf8 "$span" span
+  set draft call put 3 draft call str 1 utf8 "$markers" call ui_shift_markers 4 call key 2 draft call str 1 utf8 "$markers" call key 2 span call str 1 utf8 "start" call key 2 span call str 1 utf8 "old_end" call key 2 span call str 1 utf8 "new_end"
+  set hits call arr 0
+  if not call same 2 call key 2 span call str 1 utf8 "prefix" 0u 1
+    set hits call suggest_terms 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"prefix\":\"$1\"}" call append 2 call append 2 call arr 0 pid call key 2 span call str 1 utf8 "prefix"
+  0
+  set draft call put 3 draft call str 1 utf8 "$suggestions" hits
+  set state call ui_set_map 4 state call str 1 utf8 "drafts" scope draft
+  if call same 2 call ui_default 2 previous call arr 0 hits 1
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
+  0
+  ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+
+fn ui_complete 2 state uint event uint uint do 12 scope uint name uint draft uint span uint body uint hit uint word uint start uint stop uint endval uint markers uint discard uint 19
+  set scope call key 2 event call str 1 utf8 "scope"
+  set name call key 2 event call str 1 utf8 "name"
+  set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
+  set span call key 2 draft call str 1 utf8 "$span"
+  set hit call key 2 event call str 1 utf8 "hit"
+  set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS present FROM json_each(?) WHERE value->>'$.id'=? AND value->>'$.revision'=?" call append 2 call append 2 call append 2 call arr 0 call key 2 draft call str 1 utf8 "$suggestions" call key 2 hit call str 1 utf8 "id" call key 2 hit call str 1 utf8 "revision" 0 0u call str 1 utf8 "Term suggestion expired"
+  set body call key 2 draft name
+  set word call key 2 hit call str 1 utf8 "name"
+  set start call key 2 span call str 1 utf8 "word_start"
+  set stop call key 2 span call str 1 utf8 "word_end"
+  set endval call integer 1 add call number 1 start call size 1 word
+  set body call cat 2 call cat 2 call slice 3 body 0 call number 1 start word call slice 3 body call number 1 stop call size 1 body
+  set draft call put 3 draft name body
+  set markers call ui_shift_markers 4 call key 2 draft call str 1 utf8 "$markers" start stop endval
+  set markers call append 2 markers call shape 2 call str 1 utf8 "{\"start\":\"$0\",\"end\":\"$1\",\"ref\":{\"id\":\"$2\",\"revision\":\"$3\",\"dictionary_id\":\"$4\"}}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 start endval call key 2 hit call str 1 utf8 "id" call key 2 hit call str 1 utf8 "revision" call key 2 hit call str 1 utf8 "dictionary_id"
+  set draft call put 3 draft call str 1 utf8 "$markers" call query 2 call str 1 utf8 "SELECT value->>'$.start' AS start,value->>'$.end' AS end,value->'$.ref' AS \"ref:json\" FROM json_each(?) ORDER BY start" call append 2 call arr 0 markers
+  set draft call put 3 draft call str 1 utf8 "$suggestions" call arr 0
+  set state call ui_set_map 4 state call str 1 utf8 "drafts" scope draft
+  ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\",\"selection\":{\"id\":\"$0\",\"start\":\"$1\",\"end\":\"$1\"}}" call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" name endval
+
+fn ui_nav 2 state uint patch uint uint do 1 navval uint 5
+  set navval call ui_default 2 call key 2 state call str 1 utf8 "nav" call obj 0
+  if and not call same 2 call key 2 patch call str 1 utf8 "project" 0u not call same 2 call key 2 patch call str 1 utf8 "project" call key 2 navval call str 1 utf8 "project" 3
+    set navval call obj 0
+    set state call put 3 state call str 1 utf8 "filter" 0u
+    set state call put 3 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "false"
+  0
+  if or not call same 2 call key 2 patch call str 1 utf8 "snapshot" call key 2 navval call str 1 utf8 "snapshot" not call same 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 "graph" 2
+    set state call put 3 state call str 1 utf8 "layers" 0u
+    set state call put 3 state call str 1 utf8 "before" 0u
+  0
+  set state call put 3 state call str 1 utf8 "status" 0u
+  ret call put 3 state call str 1 utf8 "nav" call ui_merge 2 navval patch

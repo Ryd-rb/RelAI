@@ -2,7 +2,7 @@
 name = "fluxr-app-host"
 version = "0.1.0"
 edition = "2024"
-description = "Loopback application host for checked FluxR modules"
+description = "Native desktop and loopback API host for checked FluxR modules"
 
 [dependencies]
 regex = "1"
@@ -29,7 +29,7 @@ notify = "8.2"
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
-fluxr = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "62e412b1b7aa34cad1c8472d7f974e0bfc111552", default-features = false }
+fluxr = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "d527eb3c1bf544bfdd008205b637babc8f22b2fd", default-features = false }
 fs2 = "0.4"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls","json","stream"] }
@@ -45,5 +45,6 @@ uuid = { version = "1", features = ["v4"] }
 rcgen = "0.13"
 
 [target.'cfg(windows)'.dependencies]
+fluxr-win32 = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "d527eb3c1bf544bfdd008205b637babc8f22b2fd" }
 rfd = { version = "0.17", default-features = false }
 windows-sys = { version = "0.61", features = ["Win32_Foundation","Win32_Storage_FileSystem","Win32_Security","Win32_System_IO"] }

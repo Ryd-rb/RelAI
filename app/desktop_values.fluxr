@@ -1,0 +1,42 @@
+fluxr 1
+
+fn ui_emit 1 v uint uint ret host ui_emit uint 1 uint v
+fn ui_collect 0 uint ret host ui_collect uint 0
+fn ui_merge 2 a uint b uint uint ret host merge_records uint 2 uint a uint b
+fn ui_show 1 a uint uint ret host display_value uint 1 uint a
+fn edit_span 3 old uint body uint caret uint uint ret host edit_span uint 3 uint old uint body uint caret
+fn ui_default 2 v uint fallback uint uint do 0  2
+  if call same 2 v 0u 1
+    ret fallback
+  0
+  ret v
+
+fn ui_set_map 4 state uint name uint k uint v uint uint do 0  1
+  ret call put 3 state name call put 3 call ui_default 2 call key 2 state name call obj 0 k v
+
+fn ui_choices 1 items uint uint do 0  1
+  ret call query 2 call str 1 utf8 "SELECT CASE type WHEN 'object' THEN json_extract(value,'$.label') ELSE value END AS label,CASE type WHEN 'object' THEN json_extract(value,'$.value') ELSE value END AS value FROM json_each(?) ORDER BY CAST(key AS INTEGER)" call append 2 call arr 0 items
+
+fn ui_field_value 2 fieldval uint draft uint uint do 2 kind uint v uint 7
+  set kind call key 2 fieldval call str 1 utf8 "type"
+  set v call key 2 draft call key 2 fieldval call str 1 utf8 "name"
+  if not call same 2 v 0u 1
+    ret v
+  0
+  if call same 2 kind call str 1 utf8 "select" 1
+    ret call key 2 call nth 2 call ui_choices 1 call key 2 fieldval call str 1 utf8 "choices" 0 call str 1 utf8 "value"
+  0
+  if or call same 2 kind call str 1 utf8 "multi" call same 2 kind call str 1 utf8 "files" 1
+    ret call arr 0
+  0
+  if call same 2 kind call str 1 utf8 "boolean" 1
+    ret call decode 1 call str 1 utf8 "false"
+  0
+  ret call str 1 utf8 ""
+
+fn ui_draft_set 4 state uint scope uint name uint v uint uint do 1 bag uint 2
+  set bag call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
+  ret call ui_set_map 4 state call str 1 utf8 "drafts" scope call put 3 bag name v
+
+fn ui_form_key 2 pid uint spec uint uint do 0  1
+  ret call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 spec call str 1 utf8 "op" call key 2 spec call str 1 utf8 "label" call key 2 spec call str 1 utf8 "fixed"

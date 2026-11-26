@@ -11,6 +11,7 @@ mod selection;
 pub mod smart_http;
 mod syntax;
 pub mod transport;
+mod ui_values;
 mod watch;
 mod worktrees;
 use anyhow::{Context, Result, bail, ensure};
@@ -88,6 +89,29 @@ fn check_file_handle(file: &fs::File, _: &Path) -> Result<()> {
     use std::os::unix::fs::MetadataExt;
     ensure!(file.metadata()?.nlink() == 1, "Unexpected hard-linked file");
     Ok(())
+}
+
+/// Read a file explicitly selected by the desktop user using the same identity,
+/// alias and private-directory checks as other host-path reads.
+pub fn selected_file(path: &Path, private: &Path) -> Result<Value> {
+    ensure!(
+        fs::metadata(path)?.len() <= 8 * 1024 * 1024,
+        "Attachment exceeds 8 MiB"
+    );
+    let selected = selection::source(
+        private.to_str().context("Invalid data path")?,
+        path.to_str().context("Invalid file path")?,
+        true,
+        private,
+    )?;
+    ensure!(
+        selected["kind"] == "file"
+            && selected["size"]
+                .as_u64()
+                .is_some_and(|n| n <= 8 * 1024 * 1024),
+        "Select a file of at most 8 MiB"
+    );
+    Ok(selected["base64"].clone())
 }
 
 pub fn text(v: &Value) -> Result<&str> {
@@ -373,6 +397,9 @@ impl App {
         }
         Ok(app)
     }
+    pub fn change_count(&self) -> u64 {
+        self.db.total_changes()
+    }
     pub fn metadata(&self) -> &Value {
         &self.config
     }
@@ -438,6 +465,7 @@ impl App {
             let host = Bindings {
                 live: &self.live,
                 arena: Mutex::new(arena),
+                controls: Mutex::new(Vec::new()),
                 db: Mutex::new(&mut self.db),
                 data: &self.data,
                 bundle: &self.bundle,
@@ -504,6 +532,7 @@ impl Arena {
 struct Bindings<'a> {
     live: &'a Mutex<watch::LiveSources>,
     arena: Mutex<Arena>,
+    controls: Mutex<Vec<Value>>,
     db: Mutex<&'a mut Connection>,
     data: &'a Path,
     bundle: &'a Path,
@@ -525,6 +554,20 @@ impl Bindings<'_> {
         let mut arena = self.arena.lock().unwrap();
         let get = |i: usize| arena.get(args.get(i).context("Missing argument")?);
         let v = match name {
+            "ui_emit" => {
+                let widget = get(0)?;
+                let mut controls = self.controls.lock().unwrap();
+                ensure!(controls.len() < 2048, "Native control limit");
+                controls.push(widget.clone());
+                return Ok(Vm::U64(0));
+            }
+            "ui_collect" => Value::Array(std::mem::take(&mut *self.controls.lock().unwrap())),
+            "merge_records" => ui_values::merged(get(0)?, get(1)?)?,
+            "display_value" => match get(0)? {
+                Value::String(s) => Value::String(s.clone()),
+                v => json!(serde_json::to_string_pretty(v)?),
+            },
+            "edit_span" => ui_values::edit_span(text(get(0)?)?, text(get(1)?)?, get(2)?)?,
             "text" => json!(string(&args[0])?),
             "parse" => serde_json::from_str(text(get(0)?)?)?,
             "stringify" => json!(serde_json::to_string(get(0)?)?),

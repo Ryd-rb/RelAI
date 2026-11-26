@@ -2,14 +2,15 @@
 param(
     [string]$Data = (Join-Path $env:LOCALAPPDATA 'RelAI'),
     [int]$Port = 0,
+    [switch]$Headless,
     [switch]$ExternalProvider,
     [switch]$CheckProvider
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
 $manifest = Join-Path $root 'Cargo.toml'
-$exe = Join-Path $root 'target/debug/fluxr-app-host.exe'
-cargo build --locked --manifest-path $manifest
+$exe = Join-Path $root 'target/release/fluxr-app-host.exe'
+cargo build --release --locked --manifest-path $manifest
 if ($LASTEXITCODE -ne 0) { throw 'FluxR host build failed.' }
 $service = $null
 $sessionDir = $null
@@ -37,8 +38,9 @@ try {
         }
         if(!$ready -or $service.HasExited){throw 'Codex App Server did not become ready.'}
     }
-    if($CheckProvider){cargo test --manifest-path $manifest --locked --test codex_live -- --ignored --nocapture}
-    else { & $exe (Join-Path $root 'app') $Data $Port }
+    if($CheckProvider){cargo test --release --manifest-path $manifest --locked --test codex_live -- --ignored --nocapture}
+    elseif ($Headless -or $PSBoundParameters.ContainsKey('Port')) { & $exe (Join-Path $root 'app') $Data --headless $Port }
+    else { & $exe (Join-Path $root 'app') $Data }
     if ($LASTEXITCODE -ne 0) { throw 'RelAI exited with an error.' }
 } finally {
     if ($service -and !$service.HasExited) { $service.Kill(); $service.WaitForExit() }

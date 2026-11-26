@@ -1,0 +1,86 @@
+fluxr 1
+
+fn ui_form 3 state uint pid uint spec uint uint do 15 scope uint fields uint draft uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint discard uint i int j int 8
+  set scope call ui_form_key 2 pid spec
+  set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
+  set fields call key 2 spec call str 1 utf8 "fields"
+  set i 0
+  while lt i call size 1 fields 8
+    set fieldval call nth 2 fields i
+    set kind call key 2 fieldval call str 1 utf8 "type"
+    set name call key 2 fieldval call str 1 utf8 "name"
+    set base call cat 2 call cat 2 scope call str 1 utf8 "/" name
+    set v call ui_field_value 2 fieldval draft
+    set event call shape 2 call str 1 utf8 "{\"action\":\"field\",\"scope\":\"$0\",\"name\":\"$1\",\"completion\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 spec call str 1 utf8 "completion"
+    if call same 2 kind call str 1 utf8 "files" 3
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 base call key 2 fieldval call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"files\",\"scope\":\"$0\",\"name\":\"$1\",\"op\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 fieldval call str 1 utf8 "op" call obj 0
+      set j 0
+      while lt j call size 1 v 3
+        set item call nth 2 v j
+        set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call cat 2 call str 1 utf8 "Remove " call key 2 item call str 1 utf8 "name" call shape 2 call str 1 utf8 "{\"action\":\"remove\",\"scope\":\"$0\",\"name\":\"$1\",\"id\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 item call str 1 utf8 "id" call obj 0
+        next j
+    4
+      set widget call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT CASE ? WHEN 'textarea' THEN 'multiline' WHEN 'json' THEN 'multiline' WHEN 'boolean' THEN 'check' WHEN 'select' THEN 'select' WHEN 'multi' THEN 'multi' ELSE 'input' END AS widget" call append 2 call arr 0 kind 0 call str 1 utf8 "widget"
+      set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"label\":\"$1\",\"kind\":\"$2\",\"value\":\"$3\",\"choices\":\"$4\",\"event\":\"$5\",\"lines\":4}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 base call key 2 fieldval call str 1 utf8 "label" widget v call ui_choices 1 call key 2 fieldval call str 1 utf8 "choices" event
+      if call same 2 kind call str 1 utf8 "folder" 1
+        set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "browse" call str 1 utf8 "Browse for folder" call shape 2 call str 1 utf8 "{\"action\":\"folder\",\"scope\":\"$0\",\"name\":\"$1\"}" call append 2 call append 2 call arr 0 scope name call obj 0
+      0
+      if call same 2 call key 2 call key 2 spec call str 1 utf8 "completion" call str 1 utf8 "field" name 4
+        set matches call key 2 draft call str 1 utf8 "$suggestions"
+        if lt 0 call size 1 matches 1
+          set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "description" call str 1 utf8 "label" call key 2 call nth 2 matches 0 call str 1 utf8 "description" call obj 0
+        0
+        set j 0
+        while lt j call size 1 matches 3
+          set item call nth 2 matches j
+          set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call cat 2 call cat 2 call cat 2 call cat 2 call key 2 item call str 1 utf8 "name" call str 1 utf8 " · " call key 2 item call str 1 utf8 "kind" call str 1 utf8 " · " call key 2 item call str 1 utf8 "dictionary_name" call shape 2 call str 1 utf8 "{\"action\":\"complete\",\"scope\":\"$0\",\"name\":\"$1\",\"hit\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name item call obj 0
+          next j
+      0
+    next i
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit" call key 2 spec call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"submit\",\"scope\":\"$0\",\"spec\":\"$1\"}" call append 2 call append 2 call arr 0 scope spec call obj 0
+  if not call same 2 call key 2 call key 2 state call str 1 utf8 "outputs" scope 0u 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "output" call str 1 utf8 "detail" call ui_show 1 call key 2 call key 2 state call str 1 utf8 "outputs" scope call obj 0
+  0
+  ret scope
+
+fn ui_submit 3 state uint pid uint event uint uint do 12 scope uint spec uint draft uint args uint fields uint fieldval uint v uint name uint kind uint keyval uint discard uint i int 11
+  set scope call key 2 event call str 1 utf8 "scope"
+  set spec call key 2 event call str 1 utf8 "spec"
+  set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
+  set args call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid
+  set fields call key 2 spec call str 1 utf8 "fields"
+  set i 0
+  while lt i call size 1 fields 9
+    set fieldval call nth 2 fields i
+    set name call key 2 fieldval call str 1 utf8 "name"
+    set kind call key 2 fieldval call str 1 utf8 "type"
+    set v call ui_field_value 2 fieldval draft
+    if call same 2 call key 2 fieldval call str 1 utf8 "required" call decode 1 call str 1 utf8 "true" 1
+      set discard call require 2 not call same 2 v call str 1 utf8 "" call str 1 utf8 "Please fill in all required fields"
+    0
+    if call same 2 kind call str 1 utf8 "json" 2
+      if call same 2 v call str 1 utf8 "" 1
+        set v call str 1 utf8 "{}"
+      0
+      set v call decode 1 v
+    0
+    if call same 2 kind call str 1 utf8 "files" 1
+      set v call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT json_group_array(value->>'$.id') AS \"ids:json\" FROM json_each(?)" call append 2 call arr 0 v 0 call str 1 utf8 "ids"
+    0
+    set args call put 3 args name v
+    next i
+  if not call same 2 call key 2 spec call str 1 utf8 "completion" 0u 1
+    set args call put 3 args call key 2 call key 2 spec call str 1 utf8 "completion" call str 1 utf8 "markers" call ui_default 2 call key 2 draft call str 1 utf8 "$markers" call arr 0
+  0
+  if not call same 2 call key 2 spec call str 1 utf8 "jsonPayload" 0u 1
+    set args call ui_merge 2 call key 2 args call key 2 spec call str 1 utf8 "jsonPayload" call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid
+  0
+  if call same 2 call key 2 spec call str 1 utf8 "idempotent" call decode 1 call str 1 utf8 "true" 3
+    set keyval call key 2 draft call str 1 utf8 "$key"
+    if call same 2 keyval 0u 2
+      set keyval call uid 0
+      set state call ui_draft_set 4 state scope call str 1 utf8 "$key" keyval
+    0
+    set args call put 3 args call str 1 utf8 "key" keyval
+  0
+  ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call key 2 spec call str 1 utf8 "op" call ui_merge 2 args call key 2 spec call str 1 utf8 "fixed" event

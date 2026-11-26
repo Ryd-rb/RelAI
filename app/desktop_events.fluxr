@@ -1,0 +1,182 @@
+fluxr 1
+
+pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval uint actionval uint scope uint name uint spec uint v uint stack uint keyval uint fixed uint before uint draft uint discard uint 32
+  set state call key 2 arg call str 1 utf8 "state"
+  set pid call key 2 arg call str 1 utf8 "project"
+  set event call key 2 arg call str 1 utf8 "event"
+  set inputval call key 2 arg call str 1 utf8 "input"
+  set actionval call key 2 event call str 1 utf8 "action"
+  set scope call key 2 event call str 1 utf8 "scope"
+  set name call key 2 event call str 1 utf8 "name"
+  set v call key 2 inputval call str 1 utf8 "value"
+  if call same 2 actionval call str 1 utf8 "field" 1
+    ret call ui_edit 4 state pid event inputval
+  0
+  if call same 2 actionval call str 1 utf8 "complete" 1
+    ret call ui_complete 2 state event
+  0
+  if call same 2 actionval call str 1 utf8 "submit" 1
+    ret call ui_submit 3 state pid event
+  0
+  if call same 2 actionval call str 1 utf8 "command" 2
+    set spec call key 2 event call str 1 utf8 "spec"
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call key 2 spec call str 1 utf8 "op" call ui_merge 2 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid call key 2 spec call str 1 utf8 "fixed" event
+  0
+  if call same 2 actionval call str 1 utf8 "project_tab" 2
+    set state call ui_nav 2 state call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"view\":\"relay\"}" call append 2 call arr 0 v
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "nav" 2
+    set state call ui_nav 2 state call key 2 event call str 1 utf8 "patch"
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "dock" 2
+    if call same 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true" 1
+      set state call put 3 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "false"
+    1
+      set state call put 3 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true"
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "page" 2
+    set state call ui_set_map 4 state call str 1 utf8 "pages" call key 2 event call str 1 utf8 "key" call key 2 event call str 1 utf8 "page"
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "fold" 3
+    set keyval call key 2 event call str 1 utf8 "key"
+    if call same 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "true" 1
+      set state call ui_set_map 4 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "false"
+    1
+      set state call ui_set_map 4 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "true"
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "folder" 1
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"platform\":\"folder\",\"after\":\"$0\"}" call append 2 call arr 0 event
+  0
+  if call same 2 actionval call str 1 utf8 "files" 1
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"platform\":\"files\",\"after\":\"$0\"}" call append 2 call arr 0 event
+  0
+  if call same 2 actionval call str 1 utf8 "remove" 4
+    set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
+    set v call query 2 call str 1 utf8 "SELECT value->>'$.id' AS id,value->>'$.name' AS name FROM json_each(?) WHERE value->>'$.id'<>?" call append 2 call append 2 call arr 0 call key 2 draft name call key 2 event call str 1 utf8 "id"
+    set state call ui_draft_set 4 state scope name v
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "filter" 2
+    set state call put 3 state call str 1 utf8 "filter" v
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "path" 2
+    set state call ui_nav 2 state call put 3 call key 2 event call str 1 utf8 "patch" call key 2 event call str 1 utf8 "key" v
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "pause" 3
+    if call same 2 call key 2 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "true" 1
+      set state call put 3 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "false"
+    1
+      set state call put 3 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "true"
+    if call same 2 call key 2 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "true" 1
+      ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+    0
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "zoom" 3
+    set v call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT json(max(0.5,min(3.0,CASE ?2 WHEN 0 THEN 1.0 WHEN 1 THEN CAST(?1 AS REAL)*1.2 ELSE CAST(?1 AS REAL)/1.2 END))) AS \"z:json\"" call append 2 call append 2 call arr 0 call encode 1 call ui_default 2 call key 2 state call str 1 utf8 "zoom" call integer 1 1 call key 2 event call str 1 utf8 "step" 0 call str 1 utf8 "z"
+    set state call put 3 state call str 1 utf8 "zoom" v
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if or call same 2 actionval call str 1 utf8 "compare" call same 2 actionval call str 1 utf8 "inspect" 4
+    if call same 2 actionval call str 1 utf8 "compare" 1
+      set state call put 3 state call str 1 utf8 "before" v
+    0
+    set before call key 2 state call str 1 utf8 "before"
+    if call same 2 before call str 1 utf8 "" 1
+      set before 0u
+    0
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "graph_layers" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"snapshot\":\"$1\",\"before\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 pid call key 2 event call str 1 utf8 "snapshot" before call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"layers\"}" call arr 0 call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "term" 4
+    set stack call ui_default 2 call key 2 state call str 1 utf8 "termStack" call arr 0
+    set discard call require 2 lt call size 1 stack 32 call str 1 utf8 "Definition history limit reached"
+    set state call put 3 state call str 1 utf8 "termStack" call append 2 stack call key 2 event call str 1 utf8 "ref"
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "term_view" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"ref\":\"$1\"}" call append 2 call append 2 call arr 0 pid call key 2 event call str 1 utf8 "ref" call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"definition\"}" call arr 0 call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "close_term" 3
+    set state call put 3 state call str 1 utf8 "termStack" call arr 0
+    set state call put 3 state call str 1 utf8 "definition" 0u
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "back_term" 4
+    set stack call key 2 state call str 1 utf8 "termStack"
+    set stack call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT json_remove(?,'$[#-1]') AS \"stack:json\"" call append 2 call arr 0 stack 0 call str 1 utf8 "stack"
+    set state call put 3 state call str 1 utf8 "termStack" stack
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "term_view" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"ref\":\"$1\"}" call append 2 call append 2 call arr 0 pid call nth 2 stack sub call size 1 stack 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"definition\"}" call arr 0 call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "edit_term" 2
+    set state call put 3 state call str 1 utf8 "termText" v
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "save_term" 2
+    set fixed call put 3 call key 2 event call str 1 utf8 "fixed" call str 1 utf8 "definition" call ui_default 2 call key 2 state call str 1 utf8 "termText" call key 2 call key 2 call key 2 state call str 1 utf8 "definition" call str 1 utf8 "entry" call str 1 utf8 "definition"
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "dictionary" fixed call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"saved_term\"}" call arr 0 call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "refresh" 2
+    if and call same 2 call key 2 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "true" call same 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "graph" 1
+      ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
+    0
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
+  0
+  ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
+
+pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint scope uint name uint pid uint result uint v uint bag uint spec uint patch uint keysval uint k uint stack uint i int 18
+  set state call key 2 arg call str 1 utf8 "state"
+  set event call key 2 arg call str 1 utf8 "after"
+  set pid call key 2 arg call str 1 utf8 "project"
+  set result call key 2 arg call str 1 utf8 "result"
+  set actionval call key 2 event call str 1 utf8 "action"
+  set scope call key 2 event call str 1 utf8 "scope"
+  set name call key 2 event call str 1 utf8 "name"
+  set state call put 3 state call str 1 utf8 "status" 0u
+  if call same 2 actionval call str 1 utf8 "folder" 2
+    if not call same 2 call key 2 result call str 1 utf8 "path" 0u 1
+      set state call ui_draft_set 4 state scope name call key 2 result call str 1 utf8 "path"
+    0
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "files" 3
+    set bag call ui_default 2 call key 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope name call arr 0
+    set state call ui_draft_set 4 state scope name call append 2 bag call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"name\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 result call str 1 utf8 "id" call key 2 result call str 1 utf8 "display_name"
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "layers" 2
+    set state call put 3 state call str 1 utf8 "layers" result
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "definition" 3
+    set state call put 3 state call str 1 utf8 "definition" result
+    set state call put 3 state call str 1 utf8 "termText" 0u
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "saved_term" 3
+    set stack call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT json_set(?1,'$[#-1]',json(?2)) AS \"stack:json\"" call append 2 call append 2 call arr 0 call key 2 state call str 1 utf8 "termStack" result 0 call str 1 utf8 "stack"
+    set state call put 3 state call str 1 utf8 "termStack" stack
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "term_view" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"ref\":\"$1\"}" call append 2 call append 2 call arr 0 pid result call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"definition\"}" call arr 0 call obj 0
+  0
+  set spec call key 2 event call str 1 utf8 "spec"
+  if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 2
+    set state call ui_set_map 4 state call str 1 utf8 "drafts" scope 0u
+    set state call put 3 state call str 1 utf8 "nav" call ui_merge 2 call key 2 state call str 1 utf8 "nav" call shape 2 call str 1 utf8 "{\"reply\":null,\"steer\":null}" call arr 0
+  0
+  if call same 2 call key 2 spec call str 1 utf8 "showResult" call decode 1 call str 1 utf8 "true" 1
+    set state call ui_set_map 4 state call str 1 utf8 "outputs" scope result
+  0
+  if not call same 2 call key 2 spec call str 1 utf8 "selectResult" 0u 5
+    set patch call ui_merge 2 call shape 2 call str 1 utf8 "{\"view\":\"relay\"}" call arr 0 call key 2 spec call str 1 utf8 "after"
+    set keysval call keys 1 call key 2 spec call str 1 utf8 "selectResult"
+    set i 0
+    while lt i call size 1 keysval 3
+      set k call nth 2 keysval i
+      set patch call put 3 patch k call key 2 result call key 2 call key 2 spec call str 1 utf8 "selectResult" k
+      next i
+    set state call ui_nav 2 state patch
+  0
+  ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0

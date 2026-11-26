@@ -25,23 +25,26 @@ fn schedule_tool 3 j uint aid uint a uint uint do 6 kind uint op uint args uint 
   set discard call job 6 p call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call str 1 utf8 "tool" body
   ret 0u
 
-fn claim_tool 1 j uint uint do 3 args uint jid uint discard uint 6
+fn claim_tool 1 j uint uint do 4 args uint jid uint discard uint token uint 7
   set jid call key 2 j call str 1 utf8 "id"
   set args call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT input AS \"value:json\" FROM jobs WHERE id=?" call append 2 call arr 0 jid 0 call str 1 utf8 "value"
   if not call selected_source_ok 2 jid call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" 2
     set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason='Selected source access changed' WHERE id=?" call append 2 call arr 0 jid
     ret 0u
   0
-  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='executing' WHERE id=?" call append 2 call arr 0 jid
-  if not call same 2 call key 2 call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" call str 1 utf8 "host_path" 0u 1 ret call shape 2 call str 1 utf8 "{\"local\":\"read_selected_file\",\"job\":\"$0\",\"arguments\":{\"job\":\"$0\"},\"then\":\"tool_done\"}" call append 2 call arr 0 jid 0
-  ret call shape 2 call str 1 utf8 "{\"local\":\"$0\",\"job\":\"$1\",\"arguments\":\"$2\",\"then\":\"tool_done\"}" call append 2 call append 2 call append 2 call arr 0 call key 2 args call str 1 utf8 "operation" jid call key 2 args call str 1 utf8 "arguments"
+  set token call uid 0
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='executing',attempt=? WHERE id=?" call append 2 call append 2 call arr 0 token jid
+  if not call same 2 call key 2 call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" call str 1 utf8 "host_path" 0u 1 ret call shape 2 call str 1 utf8 "{\"local\":\"read_selected_file\",\"job\":\"$0\",\"arguments\":{\"job\":\"$0\"},\"then\":\"tool_done\",\"state\":\"$1\"}" call append 2 call append 2 call arr 0 jid token 0
+  ret call shape 2 call str 1 utf8 "{\"local\":\"$0\",\"job\":\"$1\",\"arguments\":\"$2\",\"then\":\"tool_done\",\"state\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 args call str 1 utf8 "operation" jid call key 2 args call str 1 utf8 "arguments" token
 
-pub tool_done 1 arg uint uint do 6 j uint body uint receipt uint discard uint r uint assignment uint 14
-  set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\",r.revision AS current_revision FROM jobs j JOIN requests r ON r.id=j.request WHERE j.id=? AND j.state='executing'" call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
+pub tool_done 1 arg uint uint do 7 j uint body uint receipt uint discard uint r uint assignment uint batch uint 16
+  set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\" FROM jobs j JOIN requests r ON r.id=j.request AND r.project=j.project AND r.revision=j.revision WHERE j.id=? AND j.state='executing' AND (r.state='open' OR (r.state='completed' AND j.role='workflow_improver'))" call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
   if call same 2 j 0u 1
     ret 0u
   0
-  set discard call require 2 call same 2 call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "current_revision" call str 1 utf8 "Tool job superseded"
+  if and not call same 2 call key 2 arg call str 1 utf8 "state" 0u not call same 2 call key 2 arg call str 1 utf8 "state" call key 2 j call str 1 utf8 "attempt" 1
+    ret 0u
+  0
   set body call key 2 j call str 1 utf8 "body"
   if not call selected_source_ok 2 call key 2 j call str 1 utf8 "id" call key 2 call key 2 body call str 1 utf8 "arguments" call str 1 utf8 "arguments" 2
     set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason='Selected source access changed' WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id"
@@ -61,6 +64,13 @@ pub tool_done 1 arg uint uint do 6 j uint body uint receipt uint discard uint r 
     set discard call record_action 4 j receipt body call str 1 utf8 "evidence"
     set discard call query 2 call str 1 utf8 "UPDATE branches SET report=?,accepted=NULL WHERE id=? AND revision=?" call append 2 call append 2 call append 2 call arr 0 receipt call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "revision"
     ret call review_ready 1 r
+  0
+  set batch call nth 2 call query 2 call asset 1 call str 1 utf8 "tool_batch.sql" call append 2 call arr 0 call key 2 j call str 1 utf8 "id" 0
+  if not call same 2 batch 0u 2
+    if call same 2 call key 2 batch call str 1 utf8 "ready" call integer 1 1 1
+      ret call job 6 call key 2 j call str 1 utf8 "project" r call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call str 1 utf8 "message" call shape 2 call str 1 utf8 "{\"tool_batch_source\":\"$0\",\"tool_receipts\":\"$1\",\"original_assignment\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call key 2 batch call str 1 utf8 "source" call key 2 batch call str 1 utf8 "tool_receipts" call key 2 batch call str 1 utf8 "original_assignment"
+    0
+    ret 0u
   0
   set assignment call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT coalesce(seal->'$.selection.delivery',input) AS \"value:json\" FROM jobs WHERE id=?" call append 2 call arr 0 call key 2 body call str 1 utf8 "source" 0 call str 1 utf8 "value"
   ret call job 6 call key 2 j call str 1 utf8 "project" r call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call str 1 utf8 "message" call shape 2 call str 1 utf8 "{\"tool_receipt\":\"$0\",\"action\":\"$1\",\"original_assignment\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 receipt call key 2 body call str 1 utf8 "action" assignment

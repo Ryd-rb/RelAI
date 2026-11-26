@@ -38,6 +38,7 @@ impl Desktop {
     }
     fn open() -> Self {
         let mut ui = Self::empty();
+        ui.click("Enter folder path");
         ui.change("Existing project folder", "input", json!({"value":ui.root}));
         ui.click("Open project");
         assert!(ui.view["project"].is_string());
@@ -57,6 +58,8 @@ impl Desktop {
                 json!({"view":self.view,"state":self.state}),
             )
             .unwrap();
+        #[cfg(windows)]
+        fluxr_win32::validate_frame(&self.frame).expect("Invalid native frame");
         let mut ids = std::collections::HashSet::new();
         for c in self.controls() {
             assert!(
@@ -120,6 +123,84 @@ impl Desktop {
         input["project"] = self.view["project"].clone();
         self.app.invoke(export, input).unwrap()
     }
+}
+
+#[test]
+fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
+    let mut ui = Desktop::empty();
+    assert_eq!(ui.frame["theme"], "dark");
+    assert_eq!(ui.frame["layout"], "welcome");
+    assert_eq!(ui.control("Open a project", "heading")["role"], "title");
+    let choose = ui.control("Choose folder…", "button");
+    assert_eq!(ui.frame["default"], choose["id"]);
+    assert_eq!(choose["role"], "primary");
+    let effect = ui.event(choose, json!({}));
+    assert_eq!(effect["platform"], "folder");
+    let cancelled = ui
+        .app
+        .invoke(
+            "desktop_result",
+            json!({"state":ui.state,"after":effect["after"],"result":{"path":null}}),
+        )
+        .unwrap();
+    assert!(cancelled.get("request").is_none());
+    let selected = ui
+        .app
+        .invoke(
+            "desktop_result",
+            json!({"state":ui.state,"after":effect["after"],"result":{"path":ui.root}}),
+        )
+        .unwrap();
+    ui.apply(selected);
+    assert_eq!(ui.frame["layout"], "workspace");
+    assert_eq!(ui.control("Relay", "button")["role"], "selected");
+    assert_eq!(ui.control("project", "button")["role"], "selected");
+    assert_eq!(ui.control("project", "button")["side"], true);
+    assert_eq!(
+        ui.control("Send", "button")["row"],
+        ui.control("Attach files", "button")["row"]
+    );
+    assert_eq!(ui.control("Send", "button")["role"], "primary");
+    assert!(
+        !ui.control("Relay", "heading")["side"]
+            .as_bool()
+            .unwrap_or(false)
+    );
+    ui.click("Models");
+    assert_eq!(ui.control("Models", "button")["role"], "selected");
+    assert_eq!(ui.control("Relay", "button")["role"], "nav");
+    assert_eq!(ui.control("Models", "heading")["role"], "title");
+    assert!(
+        ui.controls()
+            .iter()
+            .any(|c| c["label"] == "Edit preset" && c["kind"] == "heading")
+    );
+    ui.click("Dictionary");
+    let group = ui.control("Manage dictionaries", "button");
+    assert_eq!(group["expanded"], false);
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["event"]["spec"]["label"] == "Create dictionary")
+    );
+    ui.click("Manage dictionaries");
+    assert_eq!(
+        ui.control("Manage dictionaries", "button")["expanded"],
+        true
+    );
+    ui.control("Create dictionary", "button");
+    let records = ui.find(|c| {
+        c["label"]
+            .as_str()
+            .is_some_and(|s| s.starts_with("View records ("))
+    });
+    let open = ui.event(records, json!({}));
+    ui.apply(open);
+    assert_eq!(ui.control("Hide records", "button")["expanded"], true);
+    ui.click("Open project");
+    ui.control("Your projects", "label");
+    ui.click("project");
+    assert_eq!(ui.frame["layout"], "workspace");
 }
 
 #[test]
@@ -380,6 +461,7 @@ fn many_project_tabs_keep_each_draft_addressable() {
             .clone();
     }
     ui.render(true);
+    ui.click("Move tabs to top");
     ui.click("Move tabs to left");
     let switch = ui.control("Active project", "select");
     assert_eq!(switch["choices"].as_array().unwrap().len(), 8);
@@ -425,10 +507,12 @@ fn native_project_navigation_preserves_composer_and_dispatches_exact_unicode() {
         "Checked application open to first desktop frame {:?}",
         start.elapsed()
     );
+    ui.click("Enter folder path");
     ui.change("Existing project folder", "input", json!({"value":ui.root}));
     ui.click("Open project");
     let pid = ui.state["nav"]["project"].clone();
     assert!(pid.is_string());
+    ui.click("Move tabs to top");
     ui.click("Move tabs to left");
     assert_eq!(ui.control("Open project", "button")["side"], true);
     let body = "🙂 line\nCafé draft.";

@@ -2,7 +2,7 @@ fluxr 1
 
 fn ui_parts 2 base uint parts uint uint do 5 body uint part uint term uint discard uint i int 5
   set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT group_concat(value->>'$.text','') AS body FROM json_each(?)" call append 2 call arr 0 parts 0 call str 1 utf8 "body"
-  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "text" call str 1 utf8 "detail" call ui_default 2 body call str 1 utf8 "" call obj 0
+  set discard call ui_prose 2 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "text" call ui_default 2 body call str 1 utf8 ""
   set i 0
   while lt i call size 1 parts 4
     set part call nth 2 parts i
@@ -18,15 +18,15 @@ fn ui_definition 1 state uint uint do 6 item uint entry uint dictionary uint fix
   set entry call key 2 item call str 1 utf8 "entry"
   set dictionary call key 2 item call str 1 utf8 "dictionary"
   set refkey call hash 1 call encode 1 call append 2 call append 2 call append 2 call arr 0 call key 2 entry call str 1 utf8 "id" call key 2 entry call str 1 utf8 "revision" call key 2 dictionary call str 1 utf8 "id"
-  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/close" call str 1 utf8 "Close definition" call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"close_term\"}" call arr 0 call obj 0 call obj 0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/close" call str 1 utf8 "Close definition" call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"close_term\"}" call arr 0 call obj 0 call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"term/nav\"}" call arr 0
   if lt 1 call size 1 call key 2 state call str 1 utf8 "termStack" 1
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/back" call str 1 utf8 "Back" call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"back_term\"}" call arr 0 call obj 0 call obj 0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/back" call str 1 utf8 "Back" call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"back_term\"}" call arr 0 call obj 0 call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"term/nav\"}" call arr 0
   0
   if call same 2 call key 2 item call str 1 utf8 "available" call decode 1 call str 1 utf8 "false" 2
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "unavailable" call str 1 utf8 "label" call str 1 utf8 "This definition is unavailable." call obj 0
     ret 0u
   0
-  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/name" call str 1 utf8 "heading" call key 2 entry call str 1 utf8 "name" call obj 0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/name" call str 1 utf8 "heading" call key 2 entry call str 1 utf8 "name" call shape 2 call str 1 utf8 "{\"role\":\"title\"}" call arr 0
   set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/source" call str 1 utf8 "label" call cat 2 call cat 2 call cat 2 call cat 2 call key 2 dictionary call str 1 utf8 "name" call str 1 utf8 " · " call key 2 entry call str 1 utf8 "kind" call str 1 utf8 " · revision " call ui_show 1 call key 2 entry call str 1 utf8 "revision" call obj 0
   set discard call ui_parts 2 call cat 2 call cat 2 refkey call str 1 utf8 "/" call str 1 utf8 "body" call key 2 item call str 1 utf8 "parts"
   if not call same 2 call key 2 dictionary call str 1 utf8 "owner" 0u 5
@@ -34,7 +34,7 @@ fn ui_definition 1 state uint uint do 6 item uint entry uint dictionary uint fix
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "term/enabled" call str 1 utf8 "detail" call cat 2 call str 1 utf8 "Enabled projects · " call ui_default 2 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT group_concat(value->>'$.root', ', ') AS roots FROM json_each(?)" call append 2 call arr 0 call key 2 item call str 1 utf8 "enabled_projects" 0 call str 1 utf8 "roots" call str 1 utf8 "" call obj 0
     set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"$1\",\"kind\":\"multiline\",\"label\":\"Edit owner definition\",\"value\":\"$0\",\"event\":{\"action\":\"edit_term\"}}" call append 2 call append 2 call arr 0 call ui_default 2 call key 2 state call str 1 utf8 "termText" call key 2 entry call str 1 utf8 "definition" call cat 2 call cat 2 refkey call str 1 utf8 "/" call str 1 utf8 "edit"
     set fixed call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"dictionary\":\"$1\",\"op\":\"save\",\"id\":\"$2\",\"revision\":\"$3\",\"name\":\"$4\",\"kind\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 dictionary call str 1 utf8 "owner" call key 2 dictionary call str 1 utf8 "id" call key 2 entry call str 1 utf8 "id" call key 2 entry call str 1 utf8 "revision" call key 2 entry call str 1 utf8 "name" call key 2 entry call str 1 utf8 "kind"
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 refkey call str 1 utf8 "/" call str 1 utf8 "save" call str 1 utf8 "Save revision" call shape 2 call str 1 utf8 "{\"action\":\"save_term\",\"fixed\":\"$0\"}" call append 2 call arr 0 fixed call obj 0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 refkey call str 1 utf8 "/" call str 1 utf8 "save" call str 1 utf8 "Save revision" call shape 2 call str 1 utf8 "{\"action\":\"save_term\",\"fixed\":\"$0\"}" call append 2 call arr 0 fixed call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"width\":152}" call arr 0
   0
   ret 0u
 

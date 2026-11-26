@@ -7,7 +7,7 @@ pub save_term 1 arg uint uint do 2 p uint discard uint 4
   ret call query 2 call str 1 utf8 "INSERT INTO terms VALUES(?,?,?,?,1,'knowledge') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,revision=terms.revision+1" call append 2 call append 2 call append 2 call append 2 call arr 0 call hash 1 call encode 1 call append 2 call append 2 call arr 0 p call key 2 arg call str 1 utf8 "name" p call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "definition"
 
 pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uint tabs uint item uint rowsval uint row uint cards uint content uint contextval uint role uint forms uint eventval uint payloadval uint projectval uint controls uint details uint summary uint viewname uint i int 14
-  set projects call query 2 call str 1 utf8 "SELECT id,root FROM projects ORDER BY rowid" call arr 0
+  set projects call query 2 call str 1 utf8 "WITH names AS (SELECT rowid AS ord,id,root,coalesce(nullif((SELECT value FROM json_each('['||replace(json_quote(rtrim(replace(p.root,char(92),'/'),'/')), '/',char(34)||','||char(34))||']') ORDER BY key DESC LIMIT 1),''),root) AS leaf FROM projects AS p) SELECT id,root,CASE WHEN count(*) OVER (PARTITION BY lower(leaf))=1 THEN leaf ELSE root END AS short FROM names ORDER BY ord" call arr 0
   set pid call key 2 arg call str 1 utf8 "project"
   if call same 2 pid 0u 1
     set pid call key 2 call nth 2 projects 0 call str 1 utf8 "id"
@@ -16,7 +16,7 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
   set i 0
   while lt i call size 1 projects 3
     set row call nth 2 projects i
-    set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"$0\",\"navigate\":{\"project\":\"$1\",\"view\":\"relay\",\"reply\":null,\"steer\":null}}" call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "root" call key 2 row call str 1 utf8 "id"
+    set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"$0\",\"shortLabel\":\"$2\",\"navigate\":{\"project\":\"$1\",\"view\":\"relay\",\"reply\":null,\"steer\":null}}" call append 2 call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "root" call key 2 row call str 1 utf8 "id" call key 2 row call str 1 utf8 "short"
     next i
   set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Open project\",\"navigate\":{\"view\":\"open\"}}" call arr 0
   set components call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"nav\",\"label\":\"Projects\",\"dockable\":true,\"items\":\"$0\"}" call append 2 call arr 0 tabs
@@ -41,7 +41,7 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
     if call same 2 viewname call str 1 utf8 "dictionary" 3
     set components call append 2 components call dictionary_panel 1 pid
     set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"Project definitions\",\"value\":\"$0\"}" call append 2 call arr 0 call query 2 call str 1 utf8 "SELECT name,definition,kind,revision FROM terms WHERE project=? ORDER BY name" call append 2 call arr 0 pid
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Save definition\",\"op\":\"save_term\",\"fields\":[{\"name\":\"name\",\"label\":\"Term\",\"type\":\"text\"},{\"name\":\"definition\",\"label\":\"Definition\",\"type\":\"textarea\"}],\"fixed\":{}}" call arr 0
+    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"fold\",\"label\":\"Add a project term\",\"items\":[{\"type\":\"form\",\"label\":\"Save definition\",\"op\":\"save_term\",\"fields\":[{\"name\":\"name\",\"label\":\"Term\",\"type\":\"text\"},{\"name\":\"definition\",\"label\":\"Definition\",\"type\":\"textarea\"}],\"fixed\":{}}]}" call arr 0
   1
     if call same 2 viewname call str 1 utf8 "tools" 1
     set components call append 2 components call operations_panel 1 pid

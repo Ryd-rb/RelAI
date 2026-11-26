@@ -1,0 +1,72 @@
+fluxr 1
+
+fn ui_display_path 1 rootval uint uint do 0  1
+  ret call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT CASE WHEN substr(?1,1,8)=char(92,92,63,92)||'UNC'||char(92) THEN char(92,92)||substr(?1,9) WHEN substr(?1,1,4)=char(92,92,63,92) THEN substr(?1,5) ELSE ?1 END AS path" call append 2 call arr 0 rootval 0 call str 1 utf8 "path"
+
+fn ui_header 3 state uint view uint pid uint uint do 3 name uint titleval uint discard uint 8
+  if call same 2 pid 0u 4
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "brand" call str 1 utf8 "label" call str 1 utf8 "RelAI" call shape 2 call str 1 utf8 "{\"role\":\"brand\"}" call arr 0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/title" call str 1 utf8 "heading" call str 1 utf8 "Open a project" call shape 2 call str 1 utf8 "{\"role\":\"title\"}" call arr 0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/context" call str 1 utf8 "label" call str 1 utf8 "Choose the local folder you want to work in." call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    ret 0u
+  0
+  if not call same 2 call key 2 state call str 1 utf8 "definition" 0u 2
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "brand" call str 1 utf8 "label" call str 1 utf8 "RelAI" call shape 2 call str 1 utf8 "{\"role\":\"brand\"}" call arr 0
+    ret 0u
+  0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "brand" call str 1 utf8 "label" call str 1 utf8 "RelAI" call shape 2 call str 1 utf8 "{\"role\":\"brand\",\"side\":true}" call arr 0
+  set name call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay"
+  set titleval call ui_default 2 call key 2 call decode 1 call str 1 utf8 "{\"relay\":\"Relay\",\"graph\":\"Project graph\",\"models\":\"Models\",\"dictionary\":\"Dictionary\",\"tools\":\"Tools\",\"file\":\"File\"}" name call str 1 utf8 "Relay"
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/title" call str 1 utf8 "heading" titleval call shape 2 call str 1 utf8 "{\"role\":\"title\"}" call arr 0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/context" call str 1 utf8 "label" call ui_display_path 1 call ui_default 2 call key 2 view call str 1 utf8 "subtitle" call str 1 utf8 "" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+  ret 0u
+
+fn ui_open_form 3 state uint pid uint spec uint uint do 5 scope uint draft uint rowval uint pick uint discard uint 6
+  set scope call ui_form_key 2 pid spec
+  set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
+  set rowval call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions"
+  set pick call shape 2 call str 1 utf8 "{\"action\":\"choose_project\",\"scope\":\"$0\",\"spec\":\"$1\"}" call append 2 call append 2 call arr 0 scope spec
+  if call same 2 call key 2 state call str 1 utf8 "manualFolder" call decode 1 call str 1 utf8 "true" 3
+    set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"input\",\"label\":\"Existing project folder\",\"value\":\"$1\",\"event\":{\"action\":\"field\",\"scope\":\"$2\",\"name\":\"root\"}}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "root" call ui_default 2 call key 2 draft call str 1 utf8 "root" call str 1 utf8 "" scope
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit" call str 1 utf8 "Open project" call shape 2 call str 1 utf8 "{\"action\":\"submit\",\"scope\":\"$0\",\"spec\":\"$1\"}" call append 2 call append 2 call arr 0 scope spec call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"row\":\"$0\",\"width\":148}" call append 2 call arr 0 rowval
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "choose" call str 1 utf8 "Choose folder…" pick call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"$0\",\"width\":148}" call append 2 call arr 0 rowval
+  2
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "choose" call str 1 utf8 "Choose folder…" pick call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"row\":\"$0\",\"width\":168}" call append 2 call arr 0 rowval
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "manual" call str 1 utf8 "Enter folder path" call shape 2 call str 1 utf8 "{\"action\":\"manual_folder\",\"focus\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "root" call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"$0\",\"width\":156}" call append 2 call arr 0 rowval
+  ret scope
+
+fn ui_dock_button 2 state uint base uint uint do 2 labelval uint discard uint 4
+  set labelval call str 1 utf8 "Move tabs to left"
+  if call same 2 call ui_default 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true" call decode 1 call str 1 utf8 "true" 1
+    set labelval call str 1 utf8 "Move tabs to top"
+  0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "dock" labelval call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"dock\"}" call arr 0 call obj 0 call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"side\":true}" call arr 0
+  ret 0u
+
+fn ui_prose 2 base uint body uint uint do 2 linesval uint discard uint 3
+  set linesval call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT min(12,max(1,(length(?1)+71)/72+length(?1)-length(replace(?1,char(10),'')))) AS n" call append 2 call arr 0 body 0 call str 1 utf8 "n"
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 base call str 1 utf8 "detail" body call shape 2 call str 1 utf8 "{\"role\":\"body\",\"lines\":\"$0\"}" call append 2 call arr 0 linesval
+  ret 0u
+
+fn ui_records 4 state uint base uint labelval uint items uint uint do 5 body uint keyval uint captionval uint emptyval uint discard uint 11
+  set emptyval call key 2 call decode 1 call str 1 utf8 "{\"Saved presets\":\"Using the default model presets.\",\"Dictionary links\":\"No dictionaries are linked.\",\"Installed skills\":\"No skills installed.\",\"Project definitions\":\"No project terms yet.\",\"Schedules\":\"No schedules configured.\"}" labelval
+  if call same 2 emptyval 0u 2
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "value" call str 1 utf8 "detail" call ui_show 1 items call obj 0
+    ret 0u
+  0
+  if eq 0 call size 1 items 2
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "empty" call str 1 utf8 "label" emptyval call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    ret 0u
+  0
+  set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT group_concat(line,char(10)) AS body FROM (SELECT CASE ?2 WHEN 'Saved presets' THEN replace(value->>'$.role','_',' ')||'   ·   '||(value->>'$.model')||'   ·   '||(value->>'$.effort')||' effort   ·   '||(value->>'$.provider')||' / '||CASE WHEN value->>'$.scope'='global' THEN 'global' ELSE 'project' END WHEN 'Dictionary links' THEN (value->>'$.name')||'   ·   '||CASE WHEN value->>'$.enabled'=1 THEN 'Enabled' ELSE 'Available' END WHEN 'Installed skills' THEN (value->>'$.name')||'   ·   '||CASE WHEN value->>'$.active'=1 THEN 'Installed' ELSE 'Removed' END WHEN 'Project definitions' THEN (value->>'$.name')||'   ·   '||(value->>'$.definition') ELSE coalesce(value->>'$.name',value->>'$.id',value) END AS line FROM json_each(?1) LIMIT 6)" call append 2 call append 2 call arr 0 items labelval 0 call str 1 utf8 "body"
+  set discard call ui_prose 2 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "summary" call ui_default 2 body call str 1 utf8 ""
+  set keyval call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "records"
+  set captionval call cat 2 call cat 2 call str 1 utf8 "View records (" call ui_show 1 call integer 1 call size 1 items call str 1 utf8 ")"
+  if call same 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "true" 1
+    set captionval call str 1 utf8 "Hide records"
+  0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 keyval captionval call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 keyval call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "false"
+  if call same 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "true" 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "value" call str 1 utf8 "detail" call ui_show 1 items call obj 0
+  0
+  ret 0u

@@ -1,6 +1,6 @@
 fluxr 1
 
-pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval uint actionval uint scope uint name uint spec uint v uint stack uint keyval uint fixed uint before uint draft uint discard uint 32
+pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval uint actionval uint scope uint name uint spec uint v uint stack uint keyval uint fixed uint before uint draft uint discard uint 34
   set state call key 2 arg call str 1 utf8 "state"
   set pid call key 2 arg call str 1 utf8 "project"
   set event call key 2 arg call str 1 utf8 "event"
@@ -31,7 +31,7 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\"}" call append 2 call arr 0 state call obj 0
   0
   if call same 2 actionval call str 1 utf8 "dock" 2
-    if call same 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true" 1
+    if call same 2 call ui_default 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true" call decode 1 call str 1 utf8 "true" 1
       set state call put 3 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "false"
     1
       set state call put 3 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true"
@@ -48,6 +48,13 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     1
       set state call ui_set_map 4 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "true"
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+  0
+  if call same 2 actionval call str 1 utf8 "manual_folder" 2
+    set state call put 3 state call str 1 utf8 "manualFolder" call decode 1 call str 1 utf8 "true"
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\"}" call append 2 call arr 0 call key 2 event call str 1 utf8 "focus"
+  0
+  if call same 2 actionval call str 1 utf8 "choose_project" 1
+    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"platform\":\"folder\",\"after\":\"$0\"}" call append 2 call arr 0 event
   0
   if call same 2 actionval call str 1 utf8 "folder" 1
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"platform\":\"folder\",\"after\":\"$0\"}" call append 2 call arr 0 event
@@ -127,7 +134,7 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
   0
   ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
 
-pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint scope uint name uint pid uint result uint v uint bag uint spec uint patch uint keysval uint k uint stack uint i int 18
+pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint scope uint name uint pid uint result uint v uint bag uint spec uint patch uint keysval uint k uint stack uint i int 20
   set state call key 2 arg call str 1 utf8 "state"
   set event call key 2 arg call str 1 utf8 "after"
   set pid call key 2 arg call str 1 utf8 "project"
@@ -136,6 +143,12 @@ pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint sc
   set scope call key 2 event call str 1 utf8 "scope"
   set name call key 2 event call str 1 utf8 "name"
   set state call put 3 state call str 1 utf8 "status" 0u
+  if call same 2 actionval call str 1 utf8 "choose_project" 2
+    if call same 2 call key 2 result call str 1 utf8 "path" 0u 1
+      ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
+    0
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "open_project" call shape 2 call str 1 utf8 "{\"root\":\"$0\"}" call append 2 call arr 0 call key 2 result call str 1 utf8 "path" call put 3 event call str 1 utf8 "action" call str 1 utf8 "submit"
+  0
   if call same 2 actionval call str 1 utf8 "folder" 2
     if not call same 2 call key 2 result call str 1 utf8 "path" 0u 1
       set state call ui_draft_set 4 state scope name call key 2 result call str 1 utf8 "path"
@@ -162,6 +175,9 @@ pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint sc
     ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "term_view" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"ref\":\"$1\"}" call append 2 call append 2 call arr 0 pid result call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"definition\"}" call arr 0 call obj 0
   0
   set spec call key 2 event call str 1 utf8 "spec"
+  if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "open_project" 1
+    set state call put 3 state call str 1 utf8 "manualFolder" call decode 1 call str 1 utf8 "false"
+  0
   if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 2
     set state call ui_set_map 4 state call str 1 utf8 "drafts" scope 0u
     set state call put 3 state call str 1 utf8 "nav" call ui_merge 2 call key 2 state call str 1 utf8 "nav" call shape 2 call str 1 utf8 "{\"reply\":null,\"steer\":null}" call arr 0

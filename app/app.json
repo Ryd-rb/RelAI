@@ -46,7 +46,8 @@
     "desktop_events.fluxr",
     "desktop_frame.fluxr",
     "desktop_files.fluxr",
-    "desktop_pages.fluxr"
+    "desktop_pages.fluxr",
+    "desktop_workspace.fluxr"
   ],
   "public": [
     "open_project",

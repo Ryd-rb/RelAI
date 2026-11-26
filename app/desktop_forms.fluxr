@@ -1,9 +1,16 @@
 fluxr 1
 
-fn ui_form 3 state uint pid uint spec uint uint do 15 scope uint fields uint draft uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint discard uint i int j int 8
+fn ui_form 3 state uint pid uint spec uint uint do 18 scope uint fields uint draft uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint picker uint props uint styleval uint discard uint i int j int 14
   set scope call ui_form_key 2 pid spec
   set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
   set fields call key 2 spec call str 1 utf8 "fields"
+  set picker 0u
+  if not call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 1
+    if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 1
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "heading" call str 1 utf8 "heading" call str 1 utf8 "Edit preset" call obj 0
+    1
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "heading" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call obj 0
+  0
   set i 0
   while lt i call size 1 fields 8
     set fieldval call nth 2 fields i
@@ -13,15 +20,19 @@ fn ui_form 3 state uint pid uint spec uint uint do 15 scope uint fields uint dra
     set v call ui_field_value 2 fieldval draft
     set event call shape 2 call str 1 utf8 "{\"action\":\"field\",\"scope\":\"$0\",\"name\":\"$1\",\"completion\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 spec call str 1 utf8 "completion"
     if call same 2 kind call str 1 utf8 "files" 3
-      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 base call key 2 fieldval call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"files\",\"scope\":\"$0\",\"name\":\"$1\",\"op\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 fieldval call str 1 utf8 "op" call obj 0
+      set picker call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"label\":\"$1\",\"kind\":\"button\",\"role\":\"quiet\",\"width\":122,\"row\":\"$2\",\"event\":{\"action\":\"files\",\"scope\":\"$3\",\"name\":\"$4\",\"op\":\"$5\"}}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 base call key 2 fieldval call str 1 utf8 "label" call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions" scope name call key 2 fieldval call str 1 utf8 "op"
       set j 0
       while lt j call size 1 v 3
         set item call nth 2 v j
         set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call cat 2 call str 1 utf8 "Remove " call key 2 item call str 1 utf8 "name" call shape 2 call str 1 utf8 "{\"action\":\"remove\",\"scope\":\"$0\",\"name\":\"$1\",\"id\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 item call str 1 utf8 "id" call obj 0
         next j
-    4
+    6
       set widget call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT CASE ? WHEN 'textarea' THEN 'multiline' WHEN 'json' THEN 'multiline' WHEN 'boolean' THEN 'check' WHEN 'select' THEN 'select' WHEN 'multi' THEN 'multi' ELSE 'input' END AS widget" call append 2 call arr 0 kind 0 call str 1 utf8 "widget"
-      set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"label\":\"$1\",\"kind\":\"$2\",\"value\":\"$3\",\"choices\":\"$4\",\"event\":\"$5\",\"lines\":4}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 base call key 2 fieldval call str 1 utf8 "label" widget v call ui_choices 1 call key 2 fieldval call str 1 utf8 "choices" event
+      set props call obj 0
+      if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 1
+        set props call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call encode 1 call integer 1 div i 2
+      0
+      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"label\":\"$1\",\"kind\":\"$2\",\"value\":\"$3\",\"choices\":\"$4\",\"event\":\"$5\",\"lines\":3}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 base call key 2 fieldval call str 1 utf8 "label" widget v call ui_choices 1 call key 2 fieldval call str 1 utf8 "choices" event props
       if call same 2 kind call str 1 utf8 "folder" 1
         set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "browse" call str 1 utf8 "Browse for folder" call shape 2 call str 1 utf8 "{\"action\":\"folder\",\"scope\":\"$0\",\"name\":\"$1\"}" call append 2 call append 2 call arr 0 scope name call obj 0
       0
@@ -37,7 +48,17 @@ fn ui_form 3 state uint pid uint spec uint uint do 15 scope uint fields uint dra
           next j
       0
     next i
-  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit" call key 2 spec call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"submit\",\"scope\":\"$0\",\"spec\":\"$1\"}" call append 2 call append 2 call arr 0 scope spec call obj 0
+  set styleval call obj 0
+  if not call same 2 picker 0u 1
+    set discard call ui_emit 1 picker
+  0
+  if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 1
+    set styleval call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"width\":100,\"row\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions"
+  0
+  if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 1
+    set styleval call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"width\":148}" call arr 0
+  0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit" call key 2 spec call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"submit\",\"scope\":\"$0\",\"spec\":\"$1\"}" call append 2 call append 2 call arr 0 scope spec styleval
   if not call same 2 call key 2 call key 2 state call str 1 utf8 "outputs" scope 0u 1
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "output" call str 1 utf8 "detail" call ui_show 1 call key 2 call key 2 state call str 1 utf8 "outputs" scope call obj 0
   0

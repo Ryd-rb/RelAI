@@ -29,7 +29,7 @@ notify = "8.2"
 anyhow = "1"
 axum = { version = "0.8", features = ["multipart"] }
 base64 = "0.22"
-fluxr = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "d527eb3c1bf544bfdd008205b637babc8f22b2fd", default-features = false }
+fluxr = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "f436488eb81ad9193be3810116a8128ce40e6a2b", default-features = false }
 fs2 = "0.4"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls","json","stream"] }
@@ -45,6 +45,6 @@ uuid = { version = "1", features = ["v4"] }
 rcgen = "0.13"
 
 [target.'cfg(windows)'.dependencies]
-fluxr-win32 = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "d527eb3c1bf544bfdd008205b637babc8f22b2fd" }
+fluxr-win32 = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "f436488eb81ad9193be3810116a8128ce40e6a2b" }
 rfd = { version = "0.17", default-features = false }
 windows-sys = { version = "0.61", features = ["Win32_Foundation","Win32_Storage_FileSystem","Win32_Security","Win32_System_IO"] }

@@ -94,10 +94,21 @@ impl Desktop {
     fn error_frame(&mut self, error: anyhow::Error) -> Value {
         let message = format!("{error:#}");
         self.state["status"] = json!(message);
-        self.render(false,&Value::Null).unwrap_or_else(|render_error| {
-            eprintln!("Desktop render: {render_error:#}");
-            json!({"title":"Application error","controls":[{"id":"error","kind":"detail","value":format!("{message}\n{render_error:#}")}]})
-        })
+        match self.render(false, &Value::Null) {
+            Ok(frame) => frame,
+            Err(render_error) => {
+                eprintln!("Desktop render: {render_error:#}");
+                let detail = format!("{message}\n{render_error:#}");
+                let mut fallback = json!({
+                    "title": "Application error",
+                    "controls": [{"id":"error", "kind":"detail", "value":detail}]
+                });
+                if let Some(theme) = self.frame.get("theme") {
+                    fallback["theme"] = theme.clone();
+                }
+                fallback
+            }
+        }
     }
 
     fn action(&self, op: &Value, args: Value) -> Result<Value> {
@@ -303,7 +314,7 @@ mod tests {
         std::fs::write(&attachment, "captured once")?;
         let private = data.join("private.txt");
         std::fs::write(&private, "private")?;
-        let mut frame = desktop
+        let frame = desktop
             .process(json!({"type":"drop","paths":[attachment,private]}))?
             .unwrap();
         assert_eq!(frame["ack"], 4);
@@ -321,9 +332,7 @@ mod tests {
                 .unwrap()
                 .contains("private.txt")
         );
-        // A closing frame runs the upstream schema validator without showing a window.
-        frame["close"] = json!(true);
-        fluxr_win32::run("RelAI", frame, mpsc::channel().0, mpsc::channel().1)?;
+        fluxr_win32::validate_frame(&frame)?;
         let submit = desktop.frame["default"].clone();
         desktop.process(json!({"id":submit,"type":"click","serial":5}))?;
         let event = desktop.step("view", json!({}))?;

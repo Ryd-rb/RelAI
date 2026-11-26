@@ -1,10 +1,9 @@
 fluxr 1
 
-fn code_nav 3 pid uint toolname uint args uint uint do 12 root uint source uint lang uint tree uint listval uint out uint elementval uint symbol uint path uint digestval uint discard uint i int 15
-  set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
+fn code_nav 3 pid uint toolname uint args uint uint do 11 source uint lang uint tree uint listval uint out uint elementval uint symbol uint path uint digestval uint discard uint i int 14
   set path call key 2 args call str 1 utf8 "path"
   set lang call key 2 args call str 1 utf8 "language"
-  set source call readtext 2 root path
+  set source call key 2 call file_selection 3 pid call str 1 utf8 "fs.read" args call str 1 utf8 "text"
   set tree call syntax 2 lang source
   set digestval call key 2 tree call str 1 utf8 "source_digest"
   if call same 2 toolname call str 1 utf8 "code.diagnostics" 1

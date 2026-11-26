@@ -73,9 +73,10 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
     set discard call require 2 and not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 oldid pid 0 0u not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 newid pid 0 0u call str 1 utf8 "Snapshot unavailable"
     ret call query 2 call str 1 utf8 "WITH a AS(SELECT * FROM inventory WHERE snapshot=?1), b AS(SELECT * FROM inventory WHERE snapshot=?2), paths AS(SELECT path FROM a UNION SELECT path FROM b) SELECT paths.path,a.digest AS old,b.digest AS new,CASE WHEN a.path IS NULL THEN 'added' WHEN b.path IS NULL THEN 'removed' ELSE 'changed' END AS change FROM paths LEFT JOIN a USING(path) LEFT JOIN b USING(path) WHERE a.path IS NULL OR b.path IS NULL OR a.digest IS NOT b.digest OR a.kind IS NOT b.kind ORDER BY paths.path" call append 2 call append 2 call arr 0 oldid newid
   0
-  if call same 2 toolname call str 1 utf8 "artifact.read" 3
+  if call same 2 toolname call str 1 utf8 "artifact.read" 4
     set row call nth 2 call query 2 call str 1 utf8 "SELECT meta AS \"meta:json\",encoded AS base64 FROM artifacts WHERE id=? AND project=?" call append 2 call append 2 call arr 0 call key 2 args call str 1 utf8 "artifact" pid 0
     set discard call require 2 not call same 2 row 0u call str 1 utf8 "Artifact unavailable"
+    if not call same 2 call key 2 args call str 1 utf8 "range" 0u 1 ret call put 3 call file_range 2 call key 2 row call str 1 utf8 "base64" call key 2 args call str 1 utf8 "range" call str 1 utf8 "meta" call key 2 row call str 1 utf8 "meta" 0
     ret row
   0
   if call same 2 toolname call str 1 utf8 "artifact.list" 1
@@ -153,7 +154,7 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
   0
   if call same 2 toolname call str 1 utf8 "plan.update" 3
     set row call nth 2 call query 2 call str 1 utf8 "SELECT revision FROM requests WHERE project=? AND id=? AND state='open'" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request" 0
-    set discard call require 2 call same 2 call key 2 row call str 1 utf8 "revision" call key 2 args call str 1 utf8 "revision" call str 1 utf8 "Request revision conflict"
+    set discard call require 2 and not call same 2 row 0u call same 2 call key 2 row call str 1 utf8 "revision" call key 2 args call str 1 utf8 "revision" call str 1 utf8 "Request revision conflict"
     ret call query 2 call str 1 utf8 "INSERT INTO plans VALUES(?,?,?,?) ON CONFLICT(project,request) DO UPDATE SET revision=excluded.revision,body=excluded.body" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request" call key 2 args call str 1 utf8 "revision" call encode 1 call key 2 args call str 1 utf8 "plan"
   0
   if call same 2 toolname call str 1 utf8 "workflow.propose" 4
@@ -162,10 +163,8 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
     if not call same 2 call key 2 args call str 1 utf8 "version" 0u 1 set discard call query 2 call str 1 utf8 "INSERT INTO candidate_versions VALUES(?,?,?) ON CONFLICT(candidate) DO NOTHING" call append 2 call append 2 call append 2 call arr 0 sid call key 2 args call str 1 utf8 "version" call key 2 args call str 1 utf8 "baseline" 0
     ret call shape 2 call str 1 utf8 "{\"candidate\":\"$0\",\"state\":\"deferred\"}" call append 2 call arr 0 sid
   0
-  if call same 2 toolname call str 1 utf8 "dictionary.propose" 3
-    set sid call uid 0
-    set discard call query 2 call str 1 utf8 "INSERT INTO proposals VALUES(?,?,?,?,?,?,'pending')" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid call key 2 args call str 1 utf8 "entry" call key 2 args call str 1 utf8 "revision" call key 2 args call str 1 utf8 "definition" call key 2 args call str 1 utf8 "source"
-    ret sid
+  if call same 2 toolname call str 1 utf8 "dictionary.propose" 1
+    ret call propose_wording 2 pid args
   0
   if call same 2 toolname call str 1 utf8 "notify.local" 1
     ret call audit 3 pid call str 1 utf8 "Notification" call shape 2 call str 1 utf8 "{\"summary\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "message"

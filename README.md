@@ -29,15 +29,19 @@ pwsh -File .\Test-RelAI.ps1
 pwsh -File .\Start-RelAI.ps1 -CheckProvider
 ```
 
-The first command checks formatting, runs strict Clippy, and executes the offline integration suite. The Git transport fixture uses Python 3 and Git to run a disposable HTTPS reference server on loopback. The second starts the local Codex service and runs a bounded subscription test with a captured text attachment. Anthropic and Qwen integrations have not been exercised against endpoints.
+The first command checks formatting, runs strict Clippy, and executes the offline integration suite. The Git transport fixture uses Python 3 and Git to run a disposable HTTPS reference server on loopback. The second starts the local Codex service and runs a bounded two-turn subscription test. It accepts the verified attachment result, releases the final delivery and checks that the independent improvement session closes. Anthropic and Qwen integrations have not been exercised against endpoints.
 
 ## Application and runtime
 
 The source under `app/` contains the checked FluxR relay, scheduler, provider adapters, dictionary, tools, and view definitions. The application manifest declares public commands, provider destinations, and permitted continuations. The host under `runtime/` supplies SQLite, the portable interpreter, operating-system services, codecs, HTTP/JSON-RPC transport, and a browser renderer. User-authored tools execute in a separate bounded portable invocation with no native imports.
 
+Tools use stable dictionary entries. Promoting a qualified version checks the expected current default and its capability. It creates a new binding revision and preserves human-edited wording. A project's owner can review proposed wording changes in **Dictionary**. Changing a definition leaves executable versions under registry control.
+
 Write tools first produce an immutable proposal. The local user supplies a separate typed grant for its digest. Windows file effects use TxF for supported local volumes. Protected checkout patches currently require a detached HEAD or a loose branch reference. Named HTTP connectors have a fixed destination, method and argument schema. A POST requires an exact operation grant. Schedules and monitors can run selected read tools without a model call.
 
 Git staging consumes selected artifact versions. Commits preserve the existing index and include only selected staged paths. A managed linked worktree is a detached checkout under RelAI's private directory on a compatible NTFS volume. Removal checks ownership, contents, index, metadata and reachability, and retains a commit anchor. Git fetch and push each operate on one registered HTTPS repository and branch. Push requires a fast-forward from the exact approved old tip. The daemon uses an embedded Git implementation. [Git Smart HTTP protocol](https://git-scm.com/docs/gitprotocol-http)
+
+An owner can grant or revoke a live external file for a single request revision and session through **Tools → File changes → Select or revoke a live source**. Supply `op` (`allow`, `list`, or `revoke`), `request`, `revision`, and `host_path` for a file operation. The optional `session` defaults to the project's discriminator. A queued read rechecks the selection before issuing I/O and before admitting its result. A normal attachment captures the submitted bytes and keeps its original host path private.
 
 A skill package can include `relai-skill.json` with pinned `tool_refs` and `tool_drafts`. Installation retains the source, contract and test files. The user can inspect a draft and explicitly propose it through `skill_draft`. Installed packages can also be pinned to a commit and package directory from an approved fetch. [Package admission tests](runtime/tests/project_context.rs)
 

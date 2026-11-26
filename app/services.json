@@ -38,7 +38,7 @@
   "code.references": "Read source-bound language analysis",
   "code.diagnostics": "Read source-bound language analysis",
   "git.diff": "Compare two exact Git commits",
-  "project.semantic_find": "Rank snapshot paths by project terms",
+  "project.semantic_find": "Rank retained text passages and paths by project terms",
   "data.read_query": "Run a scoped parameterized query template",
   "schedule.create": "Authorize a UTC schedule",
   "schedule.cancel": "Cancel the specified schedule revision",

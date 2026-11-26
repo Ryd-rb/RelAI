@@ -152,46 +152,114 @@ pub fn fill(value: &Value, args: &[Value]) -> Result<Value> {
         _ => value.clone(),
     })
 }
-pub fn validate(s: &Value, v: &Value) -> Result<()> {
-    if let Some(options) = s["anyOf"].as_array() {
+/// Check the bounded inline schema vocabulary used by protocol and connector contracts.
+pub fn validate(schema: &Value, value: &Value) -> Result<()> {
+    let fields = schema.as_object().context("Expected an inline schema")?;
+    for keyword in fields.keys() {
         ensure!(
-            options.iter().any(|x| validate(x, v).is_ok()),
+            matches!(
+                keyword.as_str(),
+                "type"
+                    | "enum"
+                    | "anyOf"
+                    | "properties"
+                    | "required"
+                    | "additionalProperties"
+                    | "items"
+                    | "minItems"
+                    | "maxItems"
+                    | "minLength"
+                    | "maxLength"
+                    | "description"
+                    | "title"
+            ),
+            "Unsupported schema keyword {keyword}"
+        );
+    }
+    if let Some(options) = fields.get("anyOf") {
+        ensure!(
+            options
+                .as_array()
+                .context("Expected schema alternatives")?
+                .iter()
+                .any(|s| validate(s, value).is_ok()),
             "No matching schema variant"
         );
-        return Ok(());
     }
-    if let Some(choices) = s["enum"].as_array() {
-        ensure!(choices.contains(v), "Invalid enumerated value")
-    }
-    let kind = match v {
-        Value::Null => "null",
-        Value::Bool(_) => "boolean",
-        Value::Number(n) if n.is_i64() || n.is_u64() => "integer",
-        Value::Number(_) => "number",
-        Value::String(_) => "string",
-        Value::Object(_) => "object",
-        Value::Array(_) => "array",
-    };
-    ensure!(
-        s["type"] == kind
-            || s["type"]
+    if let Some(allowed) = fields.get("enum") {
+        ensure!(
+            allowed
                 .as_array()
-                .is_some_and(|k| k.contains(&json!(kind))),
-        "Expected {} but received {kind}",
-        s["type"]
-    );
-    if let Some(a) = v.as_array() {
-        for x in a {
-            validate(&s["items"], x)?;
+                .context("Expected enum values")?
+                .contains(value),
+            "Invalid enumerated value"
+        );
+    }
+    let matches_type = |name: &Value| match name.as_str() {
+        Some("null") => value.is_null(),
+        Some("integer") => value.is_i64() || value.is_u64(),
+        Some("number") => value.is_number(),
+        Some("string") => value.is_string(),
+        Some("boolean") => value.is_boolean(),
+        Some("object") => value.is_object(),
+        Some("array") => value.is_array(),
+        _ => false,
+    };
+    if let Some(ty) = fields.get("type") {
+        ensure!(
+            matches_type(ty)
+                || ty
+                    .as_array()
+                    .is_some_and(|options| options.iter().any(matches_type)),
+            "Value does not match type {ty}"
+        );
+    }
+    let bounds = |length: usize, min: &str, max: &str| -> Result<()> {
+        if let Some(n) = fields.get(min) {
+            ensure!(
+                length as u64 >= n.as_u64().context("Invalid minimum length")?,
+                "Value falls below {min}"
+            )
+        }
+        if let Some(n) = fields.get(max) {
+            ensure!(
+                length as u64 <= n.as_u64().context("Invalid maximum length")?,
+                "Value exceeds {max}"
+            )
+        }
+        Ok(())
+    };
+    if let Some(content) = value.as_str() {
+        bounds(content.chars().count(), "minLength", "maxLength")?
+    }
+    if let Some(items) = value.as_array() {
+        bounds(items.len(), "minItems", "maxItems")?;
+        if let Some(item) = fields.get("items") {
+            for v in items {
+                validate(item, v)?
+            }
         }
     }
-    if let Some(obj) = v.as_object() {
-        let props = s["properties"]
-            .as_object()
-            .context("Missing schema properties")?;
-        ensure!(props.len() == obj.len(), "Missing or extra property");
-        for (k, v) in props {
-            validate(v, obj.get(k).with_context(|| format!("Missing {k}"))?)?
+    if let Some(obj) = value.as_object() {
+        if let Some(required) = fields.get("required") {
+            for key in required
+                .as_array()
+                .context("Expected required property names")?
+            {
+                let key = text(key)?;
+                ensure!(obj.contains_key(key), "Missing {key}");
+            }
+        }
+        for (key, v) in obj {
+            if let Some(rule) = schema["properties"].get(key) {
+                validate(rule, v)?
+            } else if let Some(extra) = fields.get("additionalProperties") {
+                if let Some(allow) = extra.as_bool() {
+                    ensure!(allow, "Unexpected property {key}")
+                } else {
+                    validate(extra, v)?
+                }
+            }
         }
     }
     Ok(())

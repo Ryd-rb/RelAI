@@ -1,8 +1,9 @@
 fluxr 1
 
-fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 17
+fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 18
   set role call key 2 j call str 1 utf8 "role"
   set body call key 2 j call str 1 utf8 "body"
+  if not call selected_source_ok 2 call key 2 j call str 1 utf8 "id" arguments 1 ret call str 1 utf8 "Select this live host file for the addressed request and session, or attach it." 0
   if and call same 2 role call str 1 utf8 "workflow_improver" not call has_ref 2 call resource 1 call str 1 utf8 "improver-tools.json" name 1
     ret call str 1 utf8 "Improvement scope excludes this operation."
   0

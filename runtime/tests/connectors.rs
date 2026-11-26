@@ -120,6 +120,41 @@ async fn named_connector_captures_bytes_and_consumes_an_exact_write_grant_once()
     .await
     .unwrap();
     assert!(result.to_string().contains("ZnJvbSBmaXh0dXJl"));
+    let mut constrained = definition(
+        "GET",
+        "read",
+        json!({"query":{"type":"string","maxLength":3},"filter":{"type":"string"}}),
+    );
+    constrained["schema"]["required"] = json!(["query"]);
+    let scoped = register(constrained)
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json::<Value>()
+        .await
+        .unwrap()["id"]
+        .clone();
+    assert!(
+        run("web.fetch", &scoped, json!({"query":"ok"}), &Value::Null)
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
+    for invalid in [
+        json!({}),
+        json!({"query":"length"}),
+        json!({"query":"ok","unknown":1}),
+    ] {
+        assert!(
+            run("web.fetch", &scoped, invalid, &Value::Null)
+                .await
+                .unwrap()
+                .status()
+                .is_client_error()
+        );
+    }
     let write = register(definition(
         "POST",
         "write",

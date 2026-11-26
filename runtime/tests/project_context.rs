@@ -233,6 +233,72 @@ fn linked_definitions_use_exact_versions_and_do_not_confer_third_dictionary_acce
 }
 
 #[test]
+fn proposed_human_wording_requires_owner_acceptance_at_the_exact_revision() {
+    let (t, mut app) = fixture();
+    let p = open(&mut app, &t.path().join("project"));
+    let owner = open(&mut app, &t.path().join("owner"));
+    let original=app.invoke("dictionary",json!({"op":"save","project":owner,"name":"Week","kind":"knowledge","definition":"Seven days."})).unwrap();
+    app.invoke(
+        "dictionary",
+        json!({"op":"link","project":p,"dictionary":owner}),
+    )
+    .unwrap();
+    let source = app
+        .invoke(
+            "capture",
+            json!({"project":p,"name":"note.txt","mime":"text/plain","base64":"aW5wdXQ="}),
+        )
+        .unwrap();
+    let propose = |text: &str, rev: u64| json!({"project":p,"tool":"dictionary.propose","arguments":{"entry":original["id"],"revision":rev,"source":source["id"],"definition":text}});
+    let first = app
+        .invoke("tool_run", propose("Five working days.", 1))
+        .unwrap()["value"]
+        .clone();
+    assert_eq!(
+        app.invoke("tool_run", propose("Five working days.", 1))
+            .unwrap()["value"],
+        first
+    );
+    assert!(
+        app.invoke(
+            "review_definition",
+            json!({"project":p,"op":"accept","proposal":first})
+        )
+        .is_err()
+    );
+    let stale = app.invoke("tool_run", propose("A schedule.", 1)).unwrap()["value"].clone();
+    let accepted = app
+        .invoke(
+            "review_definition",
+            json!({"project":owner,"op":"accept","proposal":first}),
+        )
+        .unwrap();
+    assert_eq!(accepted["status"], "accepted");
+    assert_eq!(accepted["ref"]["revision"], 2);
+    assert_eq!(
+        app.invoke(
+            "review_definition",
+            json!({"project":owner,"op":"accept","proposal":stale})
+        )
+        .unwrap()["status"],
+        "conflict"
+    );
+    assert_eq!(
+        app.invoke("term_view", json!({"project":p,"ref":original}))
+            .unwrap()["entry"]["definition"],
+        "Seven days."
+    );
+    assert_eq!(
+        app.invoke("term_view", json!({"project":p,"ref":accepted["ref"]}))
+            .unwrap()["entry"]["definition"],
+        "Five working days."
+    );
+    let mut bogus = propose("No source", 2);
+    bogus["arguments"]["source"] = json!("missing");
+    assert!(app.invoke("tool_run", bogus).is_err());
+}
+
+#[test]
 fn graph_does_not_read_a_different_projects_snapshot() {
     let (t, mut a) = fixture();
     let p = open(&mut a, &t.path().join("one"));

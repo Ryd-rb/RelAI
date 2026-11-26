@@ -29,11 +29,18 @@ CREATE TABLE IF NOT EXISTS dictionaries(id TEXT PRIMARY KEY,owner TEXT,name TEXT
 CREATE TABLE IF NOT EXISTS dictionary_links(project TEXT NOT NULL REFERENCES projects,dictionary TEXT NOT NULL REFERENCES dictionaries,enabled INTEGER NOT NULL,revision INTEGER NOT NULL,PRIMARY KEY(project,dictionary));
 CREATE TABLE IF NOT EXISTS entries(id TEXT NOT NULL,revision INTEGER NOT NULL,dictionary TEXT NOT NULL REFERENCES dictionaries,name TEXT NOT NULL,kind TEXT NOT NULL,definition TEXT NOT NULL,source TEXT NOT NULL,human INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(id,revision));
 CREATE TABLE IF NOT EXISTS skills(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,name TEXT NOT NULL,digest TEXT NOT NULL,description TEXT NOT NULL,body TEXT NOT NULL,resources TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS selected_sources(request TEXT NOT NULL REFERENCES requests,revision INTEGER NOT NULL,session TEXT NOT NULL,path TEXT NOT NULL,PRIMARY KEY(request,revision,session,path));
+CREATE TABLE IF NOT EXISTS registry_terms(project TEXT NOT NULL,name TEXT NOT NULL,entry TEXT NOT NULL UNIQUE,contract TEXT NOT NULL,PRIMARY KEY(project,name));
+CREATE TABLE IF NOT EXISTS term_tool_versions(entry TEXT NOT NULL,revision INTEGER NOT NULL,tool_version TEXT,PRIMARY KEY(entry,revision));
 CREATE TABLE IF NOT EXISTS definition_parts(entry TEXT NOT NULL,revision INTEGER NOT NULL,parts TEXT NOT NULL,PRIMARY KEY(entry,revision));
+INSERT OR IGNORE INTO registry_terms SELECT d.project,d.name,lower(hex(randomblob(16))),t.contract FROM tool_defaults d JOIN tools t ON t.version=d.version;
+INSERT INTO entries SELECT r.entry,1,r.project,r.name,'tool','Checked implementation of '||r.contract,'registry',0 FROM registry_terms r WHERE NOT EXISTS(SELECT 1 FROM entries e WHERE e.id=r.entry);
+INSERT OR IGNORE INTO term_tool_versions SELECT e.id,e.revision,d.version FROM registry_terms r JOIN entries e ON e.id=r.entry LEFT JOIN tool_defaults d ON d.project=r.project AND d.name=r.name WHERE e.revision=(SELECT max(revision) FROM entries WHERE id=r.entry);
 CREATE TABLE IF NOT EXISTS skill_origins(version TEXT NOT NULL REFERENCES skills,identity TEXT NOT NULL,source TEXT NOT NULL,PRIMARY KEY(version,identity));
 CREATE TABLE IF NOT EXISTS skill_dependencies(version TEXT NOT NULL REFERENCES skills,name TEXT NOT NULL,tool_version TEXT NOT NULL,required INTEGER NOT NULL,PRIMARY KEY(version,name));
 CREATE TABLE IF NOT EXISTS skill_drafts(version TEXT NOT NULL REFERENCES skills,path TEXT NOT NULL,source TEXT NOT NULL,contract TEXT NOT NULL,tests TEXT NOT NULL,PRIMARY KEY(version,path));
 CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY,project TEXT NOT NULL,entry TEXT,base_revision INTEGER,proposed TEXT NOT NULL,source TEXT NOT NULL,status TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS proposal_terms(proposal TEXT PRIMARY KEY REFERENCES proposals,dictionary TEXT NOT NULL REFERENCES dictionaries,name TEXT NOT NULL,kind TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS candidate_versions(candidate TEXT PRIMARY KEY REFERENCES candidates,version TEXT NOT NULL,baseline TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS verified_checks(test TEXT PRIMARY KEY REFERENCES tool_tests,version TEXT NOT NULL,project TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS publications(id TEXT PRIMARY KEY,project TEXT NOT NULL,request TEXT NOT NULL,candidate TEXT NOT NULL UNIQUE REFERENCES candidates,receipt TEXT NOT NULL);

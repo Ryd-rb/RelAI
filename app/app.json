@@ -35,7 +35,10 @@
     "operations_panel.fluxr",
     "worktrees.fluxr",
     "passages.fluxr",
-    "definitions.fluxr"
+    "definitions.fluxr",
+    "tool_terms.fluxr",
+    "source_access.fluxr",
+    "proposals.fluxr"
   ],
   "public": [
     "open_project",
@@ -85,7 +88,9 @@
     "worktree_get",
     "worktree_revoke",
     "worktree_recover",
-    "term_view"
+    "term_view",
+    "source_access",
+    "review_definition"
   ],
   "assets": {
     "client.js": "text/javascript; charset=utf-8",

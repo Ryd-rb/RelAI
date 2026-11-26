@@ -1,0 +1,28 @@
+fluxr 1
+
+fn sync_tool_term 2 pid uint name uint uint do 8 toolval uint previous uint identity uint eid uint rev uint definition uint discard uint version uint 13
+  set toolval call nth 2 call query 2 call str 1 utf8 "SELECT t.* FROM tool_defaults d JOIN tools t ON t.version=d.version WHERE d.project=? AND d.name=?" call append 2 call append 2 call arr 0 pid name 0
+  set identity call nth 2 call query 2 call str 1 utf8 "SELECT entry,contract FROM registry_terms WHERE project=? AND name=?" call append 2 call append 2 call arr 0 pid name 0
+  set version call key 2 toolval call str 1 utf8 "version"
+  if call same 2 identity 0u 3
+    if call same 2 toolval 0u 1
+    ret 0u
+  0
+    set eid call uid 0
+    set discard call query 2 call str 1 utf8 "INSERT INTO registry_terms VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 pid name eid call key 2 toolval call str 1 utf8 "contract"
+  2
+    set eid call key 2 identity call str 1 utf8 "entry"
+    set discard call require 2 or call same 2 toolval 0u call same 2 call key 2 identity call str 1 utf8 "contract" call key 2 toolval call str 1 utf8 "contract" call str 1 utf8 "The registered tool capability cannot be widened or replaced"
+  set previous call nth 2 call query 2 call str 1 utf8 "SELECT e.*,v.tool_version FROM entries e LEFT JOIN term_tool_versions v ON v.entry=e.id AND v.revision=e.revision WHERE e.id=? ORDER BY e.revision DESC LIMIT 1" call append 2 call arr 0 eid 0
+  if and not call same 2 previous 0u call same 2 call key 2 previous call str 1 utf8 "tool_version" version 1
+    ret 0u
+  0
+  set definition call key 2 previous call str 1 utf8 "definition"
+  if call same 2 definition 0u 1
+    set definition call cat 2 call str 1 utf8 "Checked implementation of " call key 2 toolval call str 1 utf8 "contract"
+  0
+  set rev call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT coalesce(max(revision),0)+1 AS n FROM entries WHERE id=?" call append 2 call arr 0 eid 0 call str 1 utf8 "n"
+  set discard call query 2 call str 1 utf8 "INSERT INTO entries VALUES(?1,?2,?3,coalesce((SELECT name FROM entries WHERE id=?1 ORDER BY revision DESC LIMIT 1),?4),'tool',?5,'registry',coalesce((SELECT max(human) FROM entries WHERE id=?6),0))" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid rev pid name definition eid
+  set discard call query 2 call str 1 utf8 "INSERT INTO term_tool_versions VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 eid rev version
+  set discard call query 2 call str 1 utf8 "INSERT INTO definition_parts SELECT entry,?,parts FROM definition_parts WHERE entry=? AND revision=?" call append 2 call append 2 call append 2 call arr 0 rev eid call key 2 previous call str 1 utf8 "revision"
+  ret 0u

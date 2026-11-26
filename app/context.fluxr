@@ -24,9 +24,10 @@ fn selected_skills 2 pid uint ids uint uint do 4 out uint row uint discard uint 
     next i
   ret out
 
-fn seal_current 1 j uint bool do 7 sealed uint pid uint frame uint refs uint part uint row uint i int 12
+fn seal_current 1 j uint bool do 7 sealed uint pid uint frame uint refs uint part uint row uint i int 14
   set pid call key 2 j call str 1 utf8 "project"
   set frame call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "selection"
+  if not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS denied FROM json_each(?) a WHERE NOT EXISTS(SELECT 1 FROM jobs j JOIN selected_sources s ON s.request=j.request AND s.session=j.session AND s.revision=j.revision WHERE j.id=? AND s.path=a.value->>'path') LIMIT 1" call append 2 call append 2 call arr 0 call key 2 frame call str 1 utf8 "selected_host_files" call key 2 j call str 1 utf8 "id" 0 0u 1 ret false 0
   set refs call key 2 frame call str 1 utf8 "parts"
   set i 0
   while lt i call size 1 refs 3
@@ -47,6 +48,7 @@ fn seal_current 1 j uint bool do 7 sealed uint pid uint frame uint refs uint par
   0
     next i
   set part call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT input AS \"body:json\" FROM jobs WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id" 0 call str 1 utf8 "body"
+  if not call selected_source_ok 2 call key 2 j call str 1 utf8 "id" call key 2 call key 2 part call str 1 utf8 "tool_receipt" call str 1 utf8 "arguments" 1 ret false 0
   if not call definition_receipt_current 2 pid call key 2 part call str 1 utf8 "tool_receipt" 1 ret false 0
   if not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT version FROM tools WHERE project=? AND version=? AND status='revoked'" call append 2 call append 2 call arr 0 pid call key 2 call key 2 part call str 1 utf8 "tool_receipt" call str 1 utf8 "version" 0 0u 1
     ret false

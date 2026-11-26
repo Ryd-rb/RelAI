@@ -1,0 +1,51 @@
+fluxr 1
+
+fn propose_wording 2 pid uint args uint uint do 10 target uint dictionaryid uint revision uint name uint kind uint row uint proposal uint wording uint evidence uint discard uint 14
+  set target call key 2 args call str 1 utf8 "entry"
+  set revision call key 2 args call str 1 utf8 "revision"
+  set wording call key 2 args call str 1 utf8 "definition"
+  set evidence call key 2 args call str 1 utf8 "source"
+  set discard call require 2 and lt 0 call size 1 wording le call size 1 wording 32768 call str 1 utf8 "Proposed wording exceeds limits"
+  set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM artifacts WHERE project=?1 AND id=?2 UNION ALL SELECT id FROM submissions WHERE project=?1 AND id=?2 UNION ALL SELECT id FROM jobs WHERE project=?1 AND id=?2 AND receipt IS NOT NULL" call append 2 call append 2 call arr 0 pid evidence 0 0u call str 1 utf8 "Choose a recorded project source"
+  set dictionaryid pid
+  set name call key 2 args call str 1 utf8 "name"
+  set kind call str 1 utf8 "knowledge"
+  if not call same 2 target 0u 5
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT e.* FROM entries e JOIN dictionary_links l ON l.dictionary=e.dictionary AND l.project=?1 AND l.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE e.id=?2 AND e.revision=?3" call append 2 call append 2 call append 2 call arr 0 pid target revision 0
+    set discard call require 2 not call same 2 row 0u call str 1 utf8 "The proposed base definition is unavailable"
+    set dictionaryid call key 2 row call str 1 utf8 "dictionary"
+    set name call key 2 row call str 1 utf8 "name"
+    set kind call key 2 row call str 1 utf8 "kind"
+  1
+    set discard call require 2 and lt 0 call size 1 name le call size 1 name 256 call str 1 utf8 "Choose a name for a new knowledge entry"
+  set proposal call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid dictionaryid target revision name wording
+  set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO proposals VALUES(?,?,?,?,?,?,'pending')" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 proposal pid target revision wording evidence
+  set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO proposal_terms VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 proposal dictionaryid name kind
+  ret proposal
+
+pub review_definition 1 arg uint uint do 7 pid uint op uint row uint idval uint r uint edit uint discard uint 15
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set op call key 2 arg call str 1 utf8 "op"
+  if call same 2 op call str 1 utf8 "list" 1
+    ret call query 2 call str 1 utf8 "SELECT p.*,v.dictionary,v.name FROM proposals p JOIN proposal_terms v ON v.proposal=p.id JOIN dictionaries d ON d.id=v.dictionary WHERE d.owner=? ORDER BY p.rowid DESC LIMIT 128" call append 2 call arr 0 pid
+  0
+  set idval call key 2 arg call str 1 utf8 "proposal"
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT p.*,v.dictionary,v.name,v.kind FROM proposals p JOIN proposal_terms v ON v.proposal=p.id JOIN dictionaries d ON d.id=v.dictionary AND d.archived=0 WHERE p.id=? AND d.owner=?" call append 2 call append 2 call arr 0 idval pid 0
+  set discard call require 2 not call same 2 row 0u call str 1 utf8 "Review this proposal in the dictionary owner project"
+  if not call same 2 call key 2 row call str 1 utf8 "status" call str 1 utf8 "pending" 1
+    ret row
+  0
+  if call same 2 op call str 1 utf8 "decline" 2
+    set discard call query 2 call str 1 utf8 "UPDATE proposals SET status='declined' WHERE id=?" call append 2 call arr 0 idval
+    ret call shape 2 call str 1 utf8 "{\"status\":\"declined\"}" call arr 0
+  0
+  set discard call require 2 call same 2 op call str 1 utf8 "accept" call str 1 utf8 "Unknown proposal decision"
+  set r call nth 2 call query 2 call str 1 utf8 "SELECT e.revision FROM entries e WHERE e.id=? ORDER BY revision DESC LIMIT 1" call append 2 call arr 0 call key 2 row call str 1 utf8 "entry" 0
+  if not call same 2 call key 2 r call str 1 utf8 "revision" call key 2 row call str 1 utf8 "base_revision" 2
+    set discard call query 2 call str 1 utf8 "UPDATE proposals SET status='conflict' WHERE id=?" call append 2 call arr 0 idval
+    ret call shape 2 call str 1 utf8 "{\"status\":\"conflict\"}" call arr 0
+  0
+  set edit call shape 2 call str 1 utf8 "{\"op\":\"save\",\"project\":\"$0\",\"dictionary\":\"$1\",\"id\":\"$2\",\"revision\":\"$3\",\"name\":\"$4\",\"kind\":\"$5\",\"definition\":\"$6\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 row call str 1 utf8 "dictionary" call key 2 row call str 1 utf8 "entry" call key 2 row call str 1 utf8 "base_revision" call key 2 row call str 1 utf8 "name" call key 2 row call str 1 utf8 "kind" call key 2 row call str 1 utf8 "proposed"
+  set edit call dictionary 1 edit
+  set discard call query 2 call str 1 utf8 "UPDATE proposals SET status='accepted' WHERE id=?" call append 2 call arr 0 idval
+  ret call shape 2 call str 1 utf8 "{\"status\":\"accepted\",\"ref\":\"$0\"}" call append 2 call arr 0 edit

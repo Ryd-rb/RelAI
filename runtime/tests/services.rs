@@ -37,6 +37,113 @@ impl TestProject {
     }
 }
 #[test]
+fn scoped_catalog_reads_return_exact_project_records_and_artifact_ranges() {
+    let mut f = TestProject::new();
+    let root = f
+        .app
+        .invoke("open_project", json!({"root":f.path}))
+        .unwrap();
+    let sub = f
+        .app
+        .invoke(
+            "submit",
+            json!({"project":f.p,"key":"records","text":"Record a plan","attachments":[]}),
+        )
+        .unwrap();
+    let rid = &sub["request"];
+    let job = f.app.invoke("poll", Value::Null).unwrap()["job"].clone();
+    f.app.invoke("seal", json!({"job":job})).unwrap();
+    f.app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(
+        f.tool("project.lookup", json!({"request":rid})).unwrap()[0]["revision"],
+        1
+    );
+    assert!(
+        f.tool("plan.update", json!({"request":"missing","plan":[]}))
+            .is_err()
+    );
+    f.tool(
+        "plan.update",
+        json!({"request":rid,"revision":1,"plan":["write"]}),
+    )
+    .unwrap();
+    assert_eq!(
+        f.tool("plan.get", json!({"request":rid})).unwrap()[0]["plan"],
+        json!(["write"])
+    );
+    assert_eq!(
+        f.tool("session.list", json!({})).unwrap()[0]["session"],
+        root["discriminator"]
+    );
+    assert_eq!(
+        f.tool("session.get", json!({"id":root["discriminator"]}))
+            .unwrap()[0]["role"],
+        "discriminator"
+    );
+    assert_eq!(
+        f.tool("job.status", json!({"id":job})).unwrap()[0]["state"],
+        "running"
+    );
+    assert_eq!(
+        f.tool("job.receipt", json!({"id":job})).unwrap()[0]["state"],
+        "running"
+    );
+    assert_eq!(
+        f.tool("job.trace", json!({"id":job})).unwrap()[0]["job"],
+        job
+    );
+    assert_eq!(
+        f.tool("daemon.metrics", json!({})).unwrap()[0]["model_attempts"],
+        1
+    );
+    for name in [
+        "workflow.find",
+        "skill.find",
+        "schedule.list",
+        "task.list",
+        "resource.find",
+    ] {
+        assert!(
+            f.tool(name, json!({}))
+                .unwrap()
+                .as_array()
+                .unwrap()
+                .is_empty(),
+            "{name}"
+        );
+    }
+    let out = f
+        .tool(
+            "artifact.write",
+            json!({"name":"log.txt","mime":"text/plain","base64":"YWJjZGU="}),
+        )
+        .unwrap();
+    assert_eq!(
+        f.tool("artifact.list", json!({})).unwrap()[0]["artifact"]["id"],
+        out["id"]
+    );
+    let cut = f
+        .tool(
+            "artifact.read",
+            json!({"artifact":out["id"],"range":{"unit":"bytes","start":1,"end":3}}),
+        )
+        .unwrap();
+    assert_eq!(cut["text"], "bc");
+    assert_eq!(cut["meta"]["digest"], out["digest"]);
+    assert!(
+        f.tool("artifact.read", json!({"artifact":"missing"}))
+            .is_err()
+    );
+    assert!(
+        !f.tool("tool.find", json!({"query":"git.stage"}))
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[test]
 fn real_git_objects_and_immutable_commit_snapshot() {
     use gix::objs::{
         Tree,

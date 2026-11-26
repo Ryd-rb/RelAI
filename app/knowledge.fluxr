@@ -20,7 +20,7 @@ fn expand 2 pid uint refs uint uint do 6 out uint refval uint seen uint entry ui
   while lt i call size 1 refs 3
     set refval call nth 2 refs i
     if call same 2 call key 2 seen call encode 1 refval 0u 3
-    set entry call nth 2 call query 2 call str 1 utf8 "SELECT e.*,(SELECT json_group_array(json(a.value->'term')) FROM definition_parts f,json_each(f.parts) a JOIN dictionary_links l ON l.dictionary=a.value->>'$.term.dictionary_id' AND l.enabled=1 JOIN dictionaries permitted ON permitted.id=l.dictionary AND permitted.archived=0 WHERE f.entry=e.id AND f.revision=e.revision AND l.project=?1) AS \"links:json\" FROM entries e JOIN dictionary_links g ON g.dictionary=e.dictionary AND g.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE g.project=?1 AND e.id=?2 AND e.revision=?3 AND e.dictionary=?4" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 refval call str 1 utf8 "id" call key 2 refval call str 1 utf8 "revision" call key 2 refval call str 1 utf8 "dictionary_id" 0
+    set entry call nth 2 call query 2 call str 1 utf8 "SELECT e.*,(SELECT tool_version FROM term_tool_versions v WHERE v.entry=e.id AND v.revision=e.revision) AS tool_version,(SELECT json_group_array(json(a.value->'term')) FROM definition_parts f,json_each(f.parts) a JOIN dictionary_links l ON l.dictionary=a.value->>'$.term.dictionary_id' AND l.enabled=1 JOIN dictionaries permitted ON permitted.id=l.dictionary AND permitted.archived=0 WHERE f.entry=e.id AND f.revision=e.revision AND l.project=?1) AS \"links:json\" FROM entries e JOIN dictionary_links g ON g.dictionary=e.dictionary AND g.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE g.project=?1 AND e.id=?2 AND e.revision=?3 AND e.dictionary=?4" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 refval call str 1 utf8 "id" call key 2 refval call str 1 utf8 "revision" call key 2 refval call str 1 utf8 "dictionary_id" 0
     set out call append 2 out call shape 2 call str 1 utf8 "{\"ref\":\"$0\",\"definition\":\"$1\"}" call append 2 call append 2 call arr 0 refval entry
     set seen call put 3 seen call encode 1 refval call integer 1 1
   0
@@ -28,7 +28,7 @@ fn expand 2 pid uint refs uint uint do 6 out uint refval uint seen uint entry ui
   set discard call require 2 le call size 1 call encode 1 out 131072 call str 1 utf8 "Expansion byte limit"
   ret out
 
-pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry uint eid uint revision uint n uint discard uint 24
+pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry uint eid uint revision uint n uint discard uint 25
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set op call key 2 arg call str 1 utf8 "op"
   set did call key 2 arg call str 1 utf8 "dictionary"
@@ -80,6 +80,7 @@ pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry u
   set discard call require 2 and lt 0 call size 1 call key 2 arg call str 1 utf8 "name" le call size 1 call key 2 arg call str 1 utf8 "name" 256 call str 1 utf8 "Invalid term name"
   set discard call require 2 or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "tool" call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "skill" call str 1 utf8 "Unknown entry type"
   set discard call query 2 call str 1 utf8 "INSERT INTO entries VALUES(?,?,?,?,?,?,'user',1)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid revision did call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "kind" call key 2 arg call str 1 utf8 "definition"
+  set discard call query 2 call str 1 utf8 "INSERT INTO term_tool_versions SELECT r.entry,?,d.version FROM registry_terms r LEFT JOIN tool_defaults d ON d.project=r.project AND d.name=r.name WHERE r.entry=?" call append 2 call append 2 call arr 0 revision eid
   set discard call query 2 call str 1 utf8 "INSERT INTO definition_parts VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 eid revision call annotate_selection 3 pid call key 2 arg call str 1 utf8 "definition" call key 2 arg call str 1 utf8 "markers"
   ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"dictionary_id\":\"$1\",\"revision\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 eid did revision
 

@@ -218,6 +218,67 @@ fn active_exact_versions_defaults_and_retirement_use_checked_registry() {
 }
 
 #[test]
+fn promotion_updates_only_the_stable_term_binding_and_preserves_human_wording() {
+    let mut f = Fixture::new();
+    let first = f.propose(
+        "tick",
+        "fluxr 1\npub run 1 x int int ret add x 1",
+        "integer.increment",
+    )["version"]
+        .clone();
+    f.call("tool_qualify", json!({"version":first})).unwrap();
+    let lookup = f.call("suggest_terms", json!({"prefix":"tick"})).unwrap();
+    let term = lookup[0].clone();
+    let id = term["id"].clone();
+    let p = f.project.clone();
+    let human=f.call("dictionary",json!({"op":"save","name":"tick","kind":"tool","id":id,"revision":1,"definition":"One more than the input."})).unwrap();
+    let next = f.propose(
+        "tick",
+        "fluxr 1\npub run 1 x int int ret add 1 x",
+        "integer.increment",
+    )["version"]
+        .clone();
+    f.call("tool_qualify", json!({"version":next})).unwrap();
+    f.call(
+        "tool_promote",
+        json!({"tool":"tick","version":next,"expected":first}),
+    )
+    .unwrap();
+    let earlier = f.call("term_view", json!({"ref":human})).unwrap();
+    assert_eq!(earlier["entry"]["tool_version"], first);
+    let newer = f
+        .call(
+            "term_view",
+            json!({"ref":{"id":id,"dictionary_id":p,"revision":3}}),
+        )
+        .unwrap();
+    assert_eq!(newer["entry"]["tool_version"], next);
+    assert_eq!(newer["entry"]["definition"], "One more than the input.");
+    let sum=f.propose("tick","fluxr 1\npub run 1 xs list int int do 1 total int 3 set total 0 while not empty xs 2 bump total last xs pop xs ret total","integer.sum")["version"].clone();
+    assert_eq!(
+        f.call("tool_qualify", json!({"version":sum})).unwrap()["active"],
+        true
+    );
+    assert!(
+        f.call(
+            "tool_promote",
+            json!({"tool":"tick","version":sum,"expected":next})
+        )
+        .is_err()
+    );
+    assert_eq!(f.run("tick", json!([{"i64":7}]))["value"]["i64"], 8);
+    f.call("tool_retire", json!({"version":next})).unwrap();
+    assert!(
+        f.call(
+            "term_view",
+            json!({"ref":{"id":id,"dictionary_id":p,"revision":4}})
+        )
+        .unwrap()["entry"]["tool_version"]
+            .is_null()
+    );
+}
+
+#[test]
 fn source_admission_and_vm_failures_preserve_next_valid_invocation() {
     let mut f = Fixture::new();
     for source in [

@@ -15,7 +15,9 @@ async fn subscription_attachment() {
     )
     .unwrap();
     let p = app.invoke("open_project", json!({"root":work})).unwrap()["id"].clone();
-    app.invoke("save_model",json!({"project":p,"role":"discriminator","provider":"codex","model":"gpt-6.1-sol","effort":"low"})).unwrap();
+    for role in ["discriminator", "workflow_improver"] {
+        app.invoke("save_model",json!({"project":p,"role":role,"provider":"codex","model":"gpt-6.1-sol","effort":"low"})).unwrap();
+    }
     let a = app
         .invoke(
             "capture",
@@ -39,8 +41,37 @@ async fn subscription_attachment() {
     let (count,msg):(i64,String)=db.query_row("SELECT count(*),coalesce(json_extract(payload,'$.findings'),'') FROM actions WHERE state='awaiting_acceptance'",[],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
     assert_eq!(count, 1);
     assert!(msg.to_lowercase().contains("marigold"));
+    let foreground = start.elapsed();
+    let action: String = db
+        .query_row(
+            "SELECT id FROM actions WHERE state='awaiting_acceptance'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    app.invoke(
+        "control",
+        json!({"op":"accept","project":p,"action":action}),
+    )
+    .unwrap();
+    let seal = app.invoke("poll", Value::Null).unwrap();
+    app.invoke("seal", seal).unwrap();
+    let improvement = app.invoke("poll", Value::Null).unwrap();
+    let second = Instant::now();
+    let response = transport::exchange(&improvement["transport"], app.metadata())
+        .await
+        .unwrap();
+    app.invoke(
+        "receive",
+        json!({"job":improvement["job"],"attempt":improvement["attempt"],"response":response}),
+    )
+    .unwrap();
+    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
+    let counts:(i64,i64,i64,i64)=db.query_row("SELECT (SELECT count(*) FROM attempts),(SELECT count(*) FROM improvements),(SELECT count(*) FROM events WHERE kind='Final result'),(SELECT count(*) FROM actions WHERE json_extract(payload,'$.outcome')='no_change')",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
+    assert_eq!(counts, (2, 1, 1, 1));
     println!(
-        "One Codex provider attempt. One direct result. Attachment verified. Elapsed {:.1} s.",
-        start.elapsed().as_secs_f64()
+        "Two subscription attempts. Attachment verified and accepted in {:.1} s. One final delivery and one no-change improvement in {:.1} s.",
+        foreground.as_secs_f64(),
+        second.elapsed().as_secs_f64()
     );
 }

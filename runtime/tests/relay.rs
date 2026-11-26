@@ -320,6 +320,88 @@ fn a_named_question_survives_restart_and_can_be_reviewed_as_waiting() {
     assert!(app.invoke("poll", Value::Null).unwrap().is_null());
 }
 #[test]
+fn queued_external_read_rechecks_the_exact_human_source_selection() {
+    let t = tempfile::tempdir().unwrap();
+    let folder = t.path().join("project");
+    fs::create_dir(&folder).unwrap();
+    let external = t.path().join("outside.txt");
+    fs::write(&external, "selected content").unwrap();
+    let other = t.path().join("other.txt");
+    fs::write(&other, "unselected content").unwrap();
+    let mut app = App::open(&bundle(), &t.path().join("db")).unwrap();
+    let p = app.invoke("open_project", json!({"root":folder})).unwrap()["id"].clone();
+    let sub = app
+        .invoke(
+            "submit",
+            json!({"project":p,"key":"live-source","text":"Read","attachments":[]}),
+        )
+        .unwrap();
+    let selection = json!({"op":"allow","project":p,"request":sub["request"],"revision":1,"host_path":external});
+    app.invoke("source_access", selection.clone()).unwrap();
+    let job = next(&mut app);
+    let read = |path: &std::path::Path| json!({"type":"RUN_TOOL","summary":"Read selected source.","tool":"fs.read","arguments_json":json!({"host_path":path}).to_string()});
+    deliver(
+        &mut app,
+        &job,
+        intake(json!([read(&external), read(&other)]), 4),
+    )
+    .unwrap();
+    let db = rusqlite::Connection::open(t.path().join("db/state.sqlite3")).unwrap();
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM actions WHERE state='held'", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+    let mut revoke = selection.clone();
+    revoke["op"] = json!("revoke");
+    app.invoke("source_access", revoke).unwrap();
+    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
+    assert_eq!(
+        db.query_row(
+            "SELECT count(*) FROM jobs WHERE kind='tool' AND state='held'",
+            [],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap(),
+        1
+    );
+    let sub2 = app
+        .invoke(
+            "submit",
+            json!({"project":p,"key":"read-permitted","text":"Read","attachments":[]}),
+        )
+        .unwrap();
+    let mut permit = selection;
+    permit["request"] = sub2["request"].clone();
+    app.invoke("source_access", permit.clone()).unwrap();
+    let job = next(&mut app);
+    deliver(&mut app, &job, intake(json!([read(&external)]), 4)).unwrap();
+    let local = app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(local["local"], "read_selected_file");
+    let receipt = app
+        .invoke("read_selected_file", local["arguments"].clone())
+        .unwrap();
+    assert_eq!(receipt["value"]["text"], "selected content");
+    permit["op"] = json!("revoke");
+    app.invoke("source_access", permit).unwrap();
+    assert!(
+        app.invoke("read_selected_file", local["arguments"].clone())
+            .is_err()
+    );
+    app.invoke("tool_done", json!({"job":local["job"],"result":receipt}))
+        .unwrap();
+    assert_eq!(
+        db.query_row(
+            "SELECT state FROM jobs WHERE id=?",
+            [local["job"].as_str().unwrap()],
+            |r| r.get::<_, String>(0)
+        )
+        .unwrap(),
+        "held"
+    );
+}
+#[test]
 fn a_direct_checked_tool_result_needs_no_followup_model_turn() {
     let temp = tempfile::tempdir().unwrap();
     let data = temp.path().join("db");

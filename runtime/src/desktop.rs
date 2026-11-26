@@ -174,6 +174,11 @@ impl Desktop {
             if control["enabled"] == false || control["event"].is_null() {
                 return Ok(None);
             }
+            if matches!(control["kind"].as_str(), Some("input" | "multiline"))
+                && (kind != "change" || !input["value"].is_string())
+            {
+                return Ok(None);
+            }
             if control["kind"] == "multiline" {
                 normalize_edit(&mut input);
             }
@@ -384,6 +389,18 @@ mod tests {
             .unwrap()["id"]
             .clone();
         desktop.process(json!({"id":composer,"type":"change","value":"🙂\r\nhello.","start":10,"end":10,"serial":4}))?;
+        let typed = desktop.state.clone();
+        for notification in [
+            json!({"id":composer,"type":"focus"}),
+            json!({"id":composer,"type":"click","value":"unrelated caption"}),
+            json!({"id":composer,"type":"change"}),
+        ] {
+            assert!(desktop.process(notification)?.is_none());
+            assert_eq!(
+                desktop.state, typed,
+                "Only text changes may replace the draft"
+            );
+        }
         let attachment = project.join("manual.md");
         std::fs::write(&attachment, "captured once")?;
         let private = data.join("private.txt");

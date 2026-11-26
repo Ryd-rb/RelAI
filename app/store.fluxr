@@ -11,7 +11,7 @@ fn job 6 project uint request uint session uint role uint kind uint body uint ui
   set discard call query 2 call str 1 utf8 "INSERT INTO jobs(id,project,request,revision,session,role,kind,input) SELECT ?,?,id,revision,?,?,?,? FROM requests WHERE id=? AND project=?" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 jid project session role kind body request project
   ret jid
 
-fn reply_context 2 j uint body uint uint do 3 q uint context uint discard uint 7
+fn reply_context 2 j uint body uint uint do 4 q uint context uint discard uint batch uint 8
   set q 0u
   if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "intake" 1
     set q call key 2 body call str 1 utf8 "reply"
@@ -37,7 +37,19 @@ fn reply_context 2 j uint body uint uint do 3 q uint context uint discard uint 7
     call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "kind"
     call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" 0
   set discard call require 2 not call same 2 context 0u call str 1 utf8 "Reply context unavailable for this assignment"
+  if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "message" 2
+    set batch call query 2 call asset 1 call str 1 utf8 "question_batch.sql" @build append 1 6 call arr 0 q
+      call key 2 j call str 1 utf8 "project" call key 2 j call str 1 utf8 "request"
+      call key 2 j call str 1 utf8 "revision" call key 2 context call str 1 utf8 "recipient"
+      call key 2 context call str 1 utf8 "recipient_role"
+    if lt 1 call size 1 batch 1
+      set body call put 3 body call str 1 utf8 "question_batch" batch
+    0
+  0
   ret call put 3 body call str 1 utf8 "reply_context" context
+
+fn question_wait 1 j uint bool do 0 1
+  ret not call same 2 call nth 2 call query 2 call asset 1 call str 1 utf8 "question_wait.sql" call append 2 call arr 0 call key 2 j call str 1 utf8 "id" 0 0u
 
 fn project 1 arg uint uint do 2 row uint discard uint 3
   set row call nth 2 call query 2 call str 1 utf8 "SELECT * FROM projects WHERE id=?" call append 2 call arr 0 call key 2 arg call str 1 utf8 "project" 0

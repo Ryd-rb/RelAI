@@ -15,7 +15,9 @@ pub receive 1 arg uint uint do 13 j uint replyval uint actions uint a uint fan u
   set discard call check 2 call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "schema" replyval
   set actions call key 2 replyval call str 1 utf8 "actions"
   set discard call require 2 le call size 1 actions 8 call str 1 utf8 "Action limit exceeded"
-  set discard call require 2 or lt 0 call size 1 actions call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" call str 1 utf8 "Missing actions"
+  if eq 0 call size 1 actions 1
+    set discard call require 2 or call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" and call same 2 call key 2 replyval call str 1 utf8 "next" call str 1 utf8 "wait_for" call question_wait 1 j call str 1 utf8 "Missing actions"
+  0
   if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "intake" 4
     set items call key 2 replyval call str 1 utf8 "dispositions"
     set discard call require 2 lt 0 call size 1 items call str 1 utf8 "Missing dispositions"

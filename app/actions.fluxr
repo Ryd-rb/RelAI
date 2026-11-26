@@ -86,7 +86,10 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
     set discard call bind_requirements 3 j a task
     ret 0u
   0
-  if call same 2 kind call str 1 utf8 "ASK" 3
+  if call same 2 kind call str 1 utf8 "ASK" 4
+    if not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT q.id FROM questions q JOIN requests r ON r.id=q.request WHERE r.project=?1 AND q.request=?2 AND q.revision=?3 AND q.session=?4 AND q.role=?5 AND q.state IN ('open','answer_queued') AND q.body->>'$.question'=?6->>'$.question' AND q.body->>'$.work' IS ?6->>'$.work' AND coalesce(nullif(q.body->'$.choices','null'),'[]')=coalesce(nullif(?6->'$.choices','null'),'[]') LIMIT 1" @build append 1 6 call arr 0 p r rev s role a 0 0u 1
+      ret 0u
+    0
     set discard call record_action 4 j aid a call str 1 utf8 "admitted"
     set discard call query 2 call str 1 utf8 "INSERT INTO questions(id,request,revision,session,role,body) VALUES(?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid r rev s role a
     ret 0u

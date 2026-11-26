@@ -5,10 +5,7 @@ WITH visible AS NOT MATERIALIZED (
     WHERE e.project=?1 AND e.kind IN ('Submission','ASK','RESULT','Final result','Request stopped')
       AND (e.kind IN ('Submission','Request stopped')
         OR (e.kind='ASK' AND EXISTS (SELECT 1 FROM questions q WHERE q.id=e.payload->>'$.action'))
-        OR (e.kind='RESULT' AND (
-            e.payload->>'$.state'='awaiting_acceptance'
-            OR EXISTS (SELECT 1 FROM branches b WHERE b.report=e.payload->>'$.action'
-                       AND b.revision=r.revision AND b.accepted IS NULL AND r.state='open')))
+        OR (e.kind='RESULT' AND e.payload->>'$.state' IN ('awaiting_acceptance','evidence'))
         OR (e.kind='Final result' AND NOT EXISTS (
             SELECT 1 FROM finals f JOIN events proposed ON proposed.project=e.project AND proposed.kind='RESULT'
             AND proposed.payload->>'$.action'=f.action WHERE f.request=r.id)))

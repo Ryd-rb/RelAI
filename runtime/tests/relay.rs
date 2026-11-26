@@ -244,11 +244,31 @@ fn two_workers_require_separate_receipts_before_review() {
                 r.get(0)
             })
             .unwrap();
+        let conversation = |app: &mut App| {
+            let view = app.invoke("dashboard", json!({"project":p})).unwrap();
+            app.invoke("desktop_frame", json!({"view":view,"state":{}}))
+                .unwrap()
+        };
+        let before = conversation(&mut a);
+        let message = before["controls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["role"] == "incoming" && c["value"] == msg)
+            .unwrap();
         a.invoke(
             "control",
             json!({"project":p,"op":"accept","action":action}),
         )
         .unwrap();
+        let after = conversation(&mut a);
+        let controls = after["controls"].as_array().unwrap();
+        assert!(controls.iter().any(|c| c == message));
+        assert!(
+            !controls
+                .iter()
+                .any(|c| c["event"]["spec"]["fixed"]["action"] == action)
+        );
     }
     let review = next(&mut a);
     let rid: String = sql

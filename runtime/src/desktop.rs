@@ -47,14 +47,23 @@ impl Desktop {
         self.app.lock().unwrap().invoke(export, input)
     }
 
-    fn render(&mut self, reload: bool, effect: &Value) -> Result<Value> {
+    fn describe(&mut self, reload: bool) -> Result<Value> {
         if reload {
             self.view = self.step("view", self.state["nav"].clone())?;
         }
         let mut frame = self.step("frame", json!({"state":self.state,"view":self.view}))?;
         frame["ack"] = json!(self.serial);
-        frame["focus"] = effect["focus"].clone();
+        Ok(frame)
+    }
+
+    fn render(&mut self, reload: bool, effect: &Value) -> Result<Value> {
+        let frame = self.describe(reload)?;
+        self.present(frame, effect)
+    }
+
+    fn present(&mut self, mut frame: Value, effect: &Value) -> Result<Value> {
         self.frame = frame.clone();
+        frame["focus"] = effect["focus"].clone();
         if let Some(range) = effect.get("selection") {
             let control = frame["controls"]
                 .as_array()
@@ -207,8 +216,17 @@ impl Desktop {
             }
             return match effect["refresh"].as_str() {
                 Some("none") => Ok(None),
-                Some("data") => Ok(Some(self.render(true, &effect)?)),
-                Some("view") => Ok(Some(self.render(false, &effect)?)),
+                Some(refresh @ ("data" | "view")) => {
+                    let frame = self.describe(refresh == "data")?;
+                    if kind == "refresh"
+                        && frame == self.frame
+                        && effect["focus"].is_null()
+                        && effect["selection"].is_null()
+                    {
+                        return Ok(None);
+                    }
+                    self.present(frame, &effect).map(Some)
+                }
                 _ => bail!("Unknown desktop response"),
             };
         }
@@ -288,6 +306,46 @@ mod tests {
         let mut e = json!({"value":"🙂\r\na\r\nb","start":4,"end":8});
         normalize_edit(&mut e);
         assert_eq!(e, json!({"value":"🙂\na\nb","start":3,"end":6}));
+    }
+
+    #[test]
+    fn background_activity_only_sends_a_frame_when_the_chat_changes() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let project = temp.path().join("project");
+        std::fs::create_dir(&project)?;
+        let data = temp.path().join("data");
+        let mut app = App::open(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"), &data)?;
+        let pid = app.invoke("open_project", json!({"root":project}))?["id"].clone();
+        let runtime = tokio::runtime::Runtime::new()?;
+        let _entered = runtime.enter();
+        let mut desktop = Desktop::new(Arc::new(Mutex::new(app)));
+        desktop.render(true, &Value::Null)?;
+        let db = rusqlite::Connection::open(data.join("state.sqlite3"))?;
+        db.execute(
+            "INSERT INTO events(project,kind,payload) VALUES(?,'Delivery','{}')",
+            [pid.as_str().unwrap()],
+        )?;
+        let refresh = json!({"type":"refresh"});
+        assert!(
+            desktop.process(refresh.clone())?.is_none(),
+            "Internal activity sent an unchanged native frame"
+        );
+        desktop.app.lock().unwrap().invoke(
+            "submit",
+            json!({"project":pid,"key":"visible","text":"New message","attachments":[]}),
+        )?;
+        let frame = desktop
+            .process(refresh.clone())?
+            .expect("A new message needs a native frame");
+        assert!(
+            frame["controls"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c["role"] == "outgoing" && c["value"] == "New message")
+        );
+        assert!(desktop.process(refresh)?.is_none());
+        Ok(())
     }
 
     #[test]

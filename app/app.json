@@ -45,6 +45,7 @@
     "desktop_panels.fluxr",
     "desktop_edits.fluxr",
     "desktop_events.fluxr",
+    "desktop_sections.fluxr",
     "desktop_frame.fluxr",
     "desktop_files.fluxr",
     "desktop_pages.fluxr",
@@ -267,6 +268,7 @@
     }
   ],
   "desktop": {
+    "views": ["relay", "activity", "graph", "tools", "models", "dictionary", "open"],
     "view": "dashboard",
     "frame": "desktop_frame",
     "event": "desktop_event",

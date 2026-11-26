@@ -172,15 +172,23 @@ async fn main() -> Result<()> {
     let mut args = std::env::args().skip(1);
     let bundle = PathBuf::from(
         args.next()
-            .context("Usage: fluxr-app-host BUNDLE DATA [--headless [PORT]]")?,
+            .context("Usage: fluxr-app-host BUNDLE DATA [--view VIEW | --headless [PORT]]")?,
     );
     let data = PathBuf::from(args.next().context("Missing data directory")?);
     let mode = args.next();
     let app = Arc::new(Mutex::new(App::open(&bundle, &data)?));
     let port: u16 = match mode.as_deref() {
-        None => {
+        None | Some("--view") => {
+            let view = if mode.is_some() {
+                Some(args.next().context("Missing native view name")?)
+            } else {
+                None
+            };
+            anyhow::ensure!(args.next().is_none(), "Unexpected argument");
             #[cfg(windows)]
-            return desktop::run(app);
+            return desktop::run(app, view.as_deref());
+            #[cfg(not(windows))]
+            let _ = view;
             #[cfg(not(windows))]
             anyhow::bail!("Native desktop requires Windows. Use --headless for the local API.");
         }

@@ -3,19 +3,34 @@ fluxr 1
 fn ui_shift_markers 4 markers uint start uint oldend uint newend uint uint do 0  1
   ret call query 2 call str 1 utf8 "SELECT CASE WHEN value->>'$.end'<=?2 THEN value->>'$.start' ELSE value->>'$.start'+?4-?3 END AS start,CASE WHEN value->>'$.end'<=?2 THEN value->>'$.end' ELSE value->>'$.end'+?4-?3 END AS end,value->'$.ref' AS \"ref:json\" FROM json_each(?1) WHERE value->>'$.end'<=?2 OR value->>'$.start'>=?3 ORDER BY start" call append 2 call append 2 call append 2 call append 2 call arr 0 markers start oldend newend
 
-fn ui_edit 4 state uint pid uint event uint inputval uint uint do 9 scope uint name uint draft uint v uint old uint span uint hits uint previous uint caret uint 20
+fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint name uint draft uint v uint old uint span uint hits uint previous uint caret uint readiness uint changed uint 23
   set scope call key 2 event call str 1 utf8 "scope"
   set name call key 2 event call str 1 utf8 "name"
   set draft call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
+  set changed call decode 1 call str 1 utf8 "false"
+  set readiness 0u
   if not call same 2 call key 2 event call str 1 utf8 "destination" 0u 1
-    set draft call put 3 draft call str 1 utf8 "$destination" call key 2 event call str 1 utf8 "destination"
+    set readiness call chat_ready 2 call key 2 draft call str 1 utf8 "text" call key 2 draft call str 1 utf8 "attachments"
   0
   set v call key 2 inputval call str 1 utf8 "value"
   set old call ui_default 2 call key 2 draft name call str 1 utf8 ""
   set draft call put 3 draft name v
+  if not call same 2 readiness 0u 4
+    set previous call chat_ready 2 call key 2 draft call str 1 utf8 "text" call key 2 draft call str 1 utf8 "attachments"
+    if not call same 2 readiness previous 1
+      set changed call decode 1 call str 1 utf8 "true"
+    0
+    if call same 2 previous call decode 1 call str 1 utf8 "true" 1
+      set draft call put 3 draft call str 1 utf8 "$destination" call key 2 event call str 1 utf8 "destination"
+    1
+      set draft call put 3 draft call str 1 utf8 "$destination" 0u
+    if not call same 2 old v 1
+      set draft call put 3 draft call str 1 utf8 "$key" 0u
+    0
+  0
   if not call same 2 call key 2 call key 2 event call str 1 utf8 "completion" call str 1 utf8 "field" name 2
     set state call ui_set_map 4 state call str 1 utf8 "drafts" scope draft
-    ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"$1\"}" call append 2 call append 2 call arr 0 state call ui_default 2 call key 2 event call str 1 utf8 "refresh" call str 1 utf8 "none"
   0
   set caret call key 2 inputval call str 1 utf8 "end"
   if not call same 2 caret call key 2 inputval call str 1 utf8 "start" 1
@@ -31,7 +46,7 @@ fn ui_edit 4 state uint pid uint event uint inputval uint uint do 9 scope uint n
   0
   set draft call put 3 draft call str 1 utf8 "$suggestions" hits
   set state call ui_set_map 4 state call str 1 utf8 "drafts" scope draft
-  if call same 2 call ui_default 2 previous call arr 0 hits 1
+  if and call same 2 changed call decode 1 call str 1 utf8 "false" call same 2 call ui_default 2 previous call arr 0 hits 1
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
   0
   ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0

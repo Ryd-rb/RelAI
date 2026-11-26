@@ -62,8 +62,13 @@ impl Desktop {
     }
 
     fn present(&mut self, mut frame: Value, effect: &Value) -> Result<Value> {
+        let focus = if self.frame.is_null() && effect["focus"].is_null() {
+            frame["composer"].clone()
+        } else {
+            effect["focus"].clone()
+        };
         self.frame = frame.clone();
-        frame["focus"] = effect["focus"].clone();
+        frame["focus"] = focus;
         if let Some(range) = effect.get("selection") {
             let control = frame["controls"]
                 .as_array()
@@ -140,7 +145,7 @@ impl Desktop {
             .file_name()
             .and_then(|n| n.to_str())
             .context("Expected a file name")?;
-        let request=self.step("file",json!({"project":self.view["project"],"after":after,"name":name,"extension":path.extension().and_then(|s|s.to_str()).unwrap_or("")}))?;
+        let request=self.step("file",json!({"project":self.view["project"],"state":self.state,"after":after,"name":name,"extension":path.extension().and_then(|s|s.to_str()).unwrap_or("")}))?;
         let mut args = request["input"].clone();
         args["base64"] = fluxr_app_host::selected_file(path, &self.private)?;
         let receipt = self.action(&request["op"], args)?;
@@ -264,8 +269,17 @@ fn normalize_edit(input: &mut Value) {
     input["value"] = json!(raw.replace("\r\n", "\n"));
 }
 
-pub(super) fn run(app: Arc<Mutex<App>>) -> Result<()> {
+pub(super) fn run(app: Arc<Mutex<App>>, view: Option<&str>) -> Result<()> {
     let mut desktop = Desktop::new(app.clone());
+    if let Some(view) = view {
+        anyhow::ensure!(
+            desktop.exports["views"]
+                .as_array()
+                .is_some_and(|views| views.iter().any(|value| value == view)),
+            "Unknown native view {view}"
+        );
+        desktop.state = json!({"nav":{"view":view}});
+    }
     let initial = desktop.render(true, &Value::Null)?;
     let title = initial["title"].as_str().unwrap_or("FluxR").to_owned();
     let (events, rx) = mpsc::channel::<Value>();
@@ -319,7 +333,9 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new()?;
         let _entered = runtime.enter();
         let mut desktop = Desktop::new(Arc::new(Mutex::new(app)));
-        desktop.render(true, &Value::Null)?;
+        let initial = desktop.render(true, &Value::Null)?;
+        assert!(initial["composer"].is_string());
+        assert_eq!(initial["focus"], initial["composer"]);
         let db = rusqlite::Connection::open(data.join("state.sqlite3"))?;
         db.execute(
             "INSERT INTO events(project,kind,payload) VALUES(?,'Delivery','{}')",
@@ -406,6 +422,25 @@ mod tests {
                     && c["value"] == "🙂\nhello.\n\nAttached · manual.md")
         );
         assert!(!desktop.frame.to_string().contains("Remove manual.md"));
+
+        // Enter can arrive before the native window sees the first edit's enabled button.
+        desktop.process(
+            json!({"id":composer,"type":"change","value":"X","start":1,"end":1,"serial":6}),
+        )?;
+        let enter = json!({"id":submit,"type":"click","pending_edit":6,"serial":7});
+        let sent = desktop
+            .process(enter.clone())?
+            .expect("Pending Enter should send");
+        assert_eq!(
+            sent["controls"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|c| c["role"] == "outgoing" && c["value"] == "X")
+                .count(),
+            1
+        );
+        assert!(desktop.process(enter)?.is_none());
         Ok(())
     }
 }

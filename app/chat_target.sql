@@ -19,4 +19,4 @@ WITH available AS (
         AND (f.action=?4 OR (?2 IS NULL AND ?3 IS NULL AND ?4 IS NULL AND ?5 IS NOT 1
         AND f.request=(SELECT request FROM recent) AND NOT EXISTS (SELECT 1 FROM requests WHERE project=?1 AND state='open')))
 )
-SELECT binding AS "bind:json",hint FROM targets ORDER BY priority LIMIT 1
+SELECT binding AS "bind:json", CASE WHEN priority=3 AND ?4 IS NULL THEN NULL ELSE hint END AS hint FROM targets ORDER BY priority LIMIT 1

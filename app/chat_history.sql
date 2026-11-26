@@ -25,6 +25,10 @@ SELECT p.cursor, p.kind, p.request, p.state, CASE WHEN p.kind='Final result' THE
       WHERE value->>'$.term' IS NOT NULL) AS "parts:json",
     (SELECT group_concat(value->>'$.display_name',char(10)) FROM json_each(p.payload,'$.attachments')) AS attachments,
     (SELECT group_concat(value,' · ') FROM json_each(p.payload,'$.payload.choices')) AS choices,
+    CASE WHEN json_type(p.payload,'$.payload.choices')='array'
+        AND json_array_length(p.payload,'$.payload.choices') BETWEEN 1 AND 6
+        AND NOT EXISTS (SELECT 1 FROM json_each(p.payload,'$.payload.choices') WHERE type!='text' OR length(trim(value))=0 OR length(value)>48)
+        THEN p.payload->'$.payload.choices' ELSE '[]' END AS "quick_choices:json",
     CASE WHEN p.kind='ASK' AND p.state='open' AND q.revision=p.revision AND q.state='open'
         AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.request=p.request AND j.revision=p.revision
           AND j.kind='intake' AND j.input->>'$.reply'=q.id AND j.state IN ('queued','sealing','sealed','running','waiting','held','uncertain')) THEN 'reply'

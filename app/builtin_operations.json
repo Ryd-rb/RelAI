@@ -1,0 +1,144 @@
+[
+  {
+    "id": "fs.mkdir",
+    "description": "Propose creation of one absent directory",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "fs.write",
+    "description": "Propose publishing immutable artifact bytes to one exact expected file",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "fs.copy",
+    "description": "Propose copying one exact source to one expected destination",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "fs.move",
+    "description": "Propose a same-volume move of one exact regular file",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "fs.remove",
+    "description": "Propose removing one exact file or empty directory",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "patch.preview",
+    "description": "Transform an immutable base artifact with a unified text patch",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "patch.stage",
+    "description": "Stage immutable patched file versions against one checkout revision",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "patch.apply",
+    "description": "Propose one protected transaction for an exact staged patch",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "effect.apply",
+    "description": "Execute one exact previously authorized effect",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "effect.status",
+    "description": "Read the scoped effect intent and durable receipt",
+    "route": "portable",
+    "authority": "Exact immutable proposal plus typed user grant; model tool calls cannot authorize",
+    "limits": "Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves"
+  },
+  {
+    "id": "git.status",
+    "description": "Bounded raw-byte head/index/worktree status",
+    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "execution": "embedded gix; no executable helpers",
+    "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
+  },
+  {
+    "id": "git.stage",
+    "description": "Propose staging exact artifact file versions and preserve unrelated index entries",
+    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "execution": "embedded gix; no executable helpers",
+    "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
+  },
+  {
+    "id": "git.commit",
+    "description": "Propose committing only selected index paths while preserving the complete index",
+    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "execution": "embedded gix; no executable helpers",
+    "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
+  },
+  {
+    "id": "git.branch",
+    "description": "Propose exact expected-old branch creation or deletion",
+    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "execution": "embedded gix; no executable helpers",
+    "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
+  },
+  {
+    "id": "git.apply",
+    "description": "Execute an exact user-authorized mutation",
+    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "execution": "embedded gix; no executable helpers",
+    "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
+  },
+  {
+    "id": "git.status_mutation",
+    "description": "Read the scoped mutation and recovery receipt",
+    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "execution": "embedded gix; no executable helpers",
+    "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
+  },
+  {
+    "id": "git.worktree_create",
+    "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
+    "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+  },
+  {
+    "id": "git.worktree_remove",
+    "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
+    "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+  },
+  {
+    "id": "worktree.list",
+    "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
+    "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+  },
+  {
+    "id": "worktree.status",
+    "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
+    "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+  },
+  {
+    "id": "worktree.apply",
+    "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
+    "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+  }
+]

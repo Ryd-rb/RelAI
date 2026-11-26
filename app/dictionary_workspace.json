@@ -1,0 +1,174 @@
+{
+  "type": "group",
+  "items": [
+    {
+      "type": "data",
+      "label": "Dictionary links",
+      "value": "$0",
+      "pane": "Dictionaries",
+      "section": "dictionaries-list"
+    },
+    {
+      "type": "data",
+      "label": "Installed skills",
+      "value": "$1",
+      "pane": "Skills",
+      "section": "skills-list"
+    },
+    {
+      "type": "fold",
+      "label": "Manage dictionaries",
+      "items": [
+        {
+          "type": "form",
+          "label": "Create dictionary",
+          "op": "dictionary",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Name",
+              "type": "text"
+            }
+          ],
+          "fixed": {
+            "op": "create"
+          },
+          "showResult": true
+        },
+        {
+          "type": "form",
+          "label": "Change link",
+          "op": "dictionary",
+          "fields": [
+            {
+              "name": "dictionary",
+              "label": "Dictionary ID",
+              "type": "text"
+            },
+            {
+              "name": "op",
+              "label": "Change",
+              "type": "select",
+              "choices": [
+                "link",
+                "unlink"
+              ]
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        }
+      ],
+      "pane": "Dictionaries",
+      "section": "dictionaries-manage"
+    },
+    {
+      "type": "fold",
+      "label": "Edit definitions",
+      "items": [
+        {
+          "type": "form",
+          "label": "Edit definition",
+          "op": "dictionary",
+          "fields": [
+            {
+              "name": "dictionary",
+              "label": "Owner dictionary ID",
+              "type": "text"
+            },
+            {
+              "name": "name",
+              "label": "Name",
+              "type": "text"
+            },
+            {
+              "name": "kind",
+              "label": "Type",
+              "type": "select",
+              "choices": [
+                "knowledge",
+                "tool",
+                "skill"
+              ]
+            },
+            {
+              "name": "definition",
+              "label": "Definition",
+              "type": "textarea"
+            }
+          ],
+          "fixed": {
+            "op": "save"
+          },
+          "showResult": true
+        },
+        {
+          "type": "form",
+          "label": "Review proposed definitions",
+          "op": "review_definition",
+          "fields": [
+            {
+              "name": "op",
+              "label": "Decision",
+              "type": "select",
+              "choices": [
+                "list",
+                "accept",
+                "decline"
+              ]
+            },
+            {
+              "name": "proposal",
+              "label": "Proposal ID",
+              "type": "text"
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        }
+      ],
+      "pane": "Terms",
+      "section": "terms-manage"
+    },
+    {
+      "type": "fold",
+      "label": "Manage skills",
+      "items": [
+        {
+          "type": "form",
+          "label": "Install skill",
+          "op": "skill",
+          "fields": [
+            {
+              "name": "path",
+              "label": "Package folder or ZIP",
+              "type": "text"
+            }
+          ],
+          "fixed": {
+            "op": "install"
+          },
+          "showResult": true
+        },
+        {
+          "type": "form",
+          "label": "Remove skill",
+          "op": "skill",
+          "fields": [
+            {
+              "name": "id",
+              "label": "Installed version ID",
+              "type": "text"
+            }
+          ],
+          "fixed": {
+            "op": "remove"
+          },
+          "showResult": true
+        }
+      ],
+      "pane": "Skills",
+      "section": "skills-manage"
+    }
+  ]
+}

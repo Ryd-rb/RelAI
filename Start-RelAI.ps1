@@ -2,11 +2,16 @@
 param(
     [string]$Data = (Join-Path $env:LOCALAPPDATA 'RelAI'),
     [int]$Port = 0,
+    [ValidateSet('relay','activity','graph','tools','models','dictionary','open')]
+    [string]$View,
     [switch]$Headless,
     [switch]$ExternalProvider,
     [switch]$CheckProvider
 )
 $ErrorActionPreference = 'Stop'
+if ($View -and ($Headless -or $CheckProvider -or $PSBoundParameters.ContainsKey('Port'))) {
+    throw '-View selects a native window. Use it with the desktop launcher.'
+}
 $root = $PSScriptRoot
 $manifest = Join-Path $root 'Cargo.toml'
 $exe = Join-Path $root 'target/release/fluxr-app-host.exe'
@@ -40,6 +45,7 @@ try {
     }
     if($CheckProvider){cargo test --release --manifest-path $manifest --locked --test codex_live -- --ignored --nocapture}
     elseif ($Headless -or $PSBoundParameters.ContainsKey('Port')) { & $exe (Join-Path $root 'app') $Data --headless $Port }
+    elseif ($View) { & $exe (Join-Path $root 'app') $Data --view $View.ToLowerInvariant() }
     else { & $exe (Join-Path $root 'app') $Data }
     if ($LASTEXITCODE -ne 0) { throw 'RelAI exited with an error.' }
 } finally {

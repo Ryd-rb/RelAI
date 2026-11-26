@@ -47,31 +47,38 @@ pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint disca
   set discard call query 2 call str 1 utf8 "INSERT INTO graph_cursors SELECT ?,coalesce(max(cursor),0) FROM events WHERE project=?" call append 2 call append 2 call arr 0 sid pid
   ret call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\"}" call append 2 call arr 0 sid
 
-fn graph_view 2 arg uint pid uint uint do 7 sid uint rowsval uint components uint node uint body uint a uint discard uint 10
-  set sid call key 2 arg call str 1 utf8 "snapshot"
+fn graph_view 2 arg uint pid uint uint do 8 sid uint rowsval uint components uint node uint body uint a uint discard uint versions uint 11
+  set sid call key 2 arg call str 1 @text r#"snapshot"#
   if call same 2 sid 0u 1
-    set sid call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? ORDER BY rowid DESC LIMIT 1" call append 2 call arr 0 pid 0 call str 1 utf8 "id"
+    set sid call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT id FROM snapshots WHERE project=? ORDER BY rowid DESC LIMIT 1"# @build append 1 1 call arr 0 pid 0 call str 1 @text r#"id"#
   0
-  set components call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Capture snapshot\",\"op\":\"capture_graph\",\"selectResult\":{\"snapshot\":\"snapshot\"},\"after\":{\"view\":\"graph\"}}" call arr 0
+  set components call append 2 call arr 0 call shape 2 call str 1 @text r#"{"type":"button","label":"Capture snapshot","op":"capture_graph","selectResult":{"snapshot":"snapshot"},"after":{"view":"graph"},"section":"snapshot"}"# call arr 0
   if call same 2 sid 0u 1
-    ret call append 2 call append 2 call arr 0 call decode 1 call str 1 utf8 "{\"type\":\"empty\",\"label\":\"No snapshots yet\",\"text\":\"Capture a snapshot to browse project files and compare changes.\"}" call nth 2 components 0
+    ret call append 2 call append 2 call arr 0 call shape 2 call str 1 @text r#"{"type":"empty","label":"Explore a retained source snapshot","text":"Capture the current project to browse files, inspect source links and compare versions without changing your working files.","section":"snapshot"}"# call arr 0 call nth 2 components 0
   0
-  set rowsval call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT manifest AS \"nodes:json\" FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 sid pid 0 call str 1 utf8 "nodes"
-  set discard call require 2 not call same 2 rowsval 0u call str 1 utf8 "Snapshot unavailable"
-  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"tree\",\"label\":\"Files\",\"nodes\":\"$0\",\"navigate\":{\"view\":\"graph\",\"snapshot\":\"$1\"},\"pathField\":\"selected\"}" call append 2 call append 2 call arr 0 rowsval sid
-  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"graph_layers\",\"label\":\"Source relationships and activity\",\"op\":\"graph_layers\",\"snapshot\":\"$0\",\"versions\":\"$1\"}" call append 2 call append 2 call arr 0 sid call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? ORDER BY rowid DESC LIMIT 64" call append 2 call arr 0 pid
-  if not call same 2 call key 2 arg call str 1 utf8 "selected" 0u 3
-    set node call nth 2 call query 2 call str 1 utf8 "SELECT kind,digest,path FROM inventory WHERE snapshot=? AND path=?" call append 2 call append 2 call arr 0 sid call key 2 arg call str 1 utf8 "selected" 0
-    if call same 2 call key 2 node call str 1 utf8 "kind" call str 1 utf8 "directory" 1
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"Directory contents\",\"value\":\"$0\"}" call append 2 call arr 0 call query 2 call str 1 utf8 "SELECT path,kind,bytes,digest FROM inventory WHERE snapshot=? AND parent=? ORDER BY path" call append 2 call append 2 call arr 0 sid call key 2 node call str 1 utf8 "path"
-  0
-    if call same 2 call key 2 node call str 1 utf8 "kind" call str 1 utf8 "file" 4
-    set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT content FROM blobs WHERE project=? AND digest=?" call append 2 call append 2 call arr 0 pid call key 2 node call str 1 utf8 "digest" 0 call str 1 utf8 "content"
-    set a call key 2 call baseinfo 1 body call str 1 utf8 "text"
-    if call same 2 a 0u 1
-    set a call str 1 utf8 "Binary file"
-  0
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"$0\",\"value\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 node call str 1 utf8 "path" a
-  0
-  0
+  set rowsval call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT manifest AS "nodes:json" FROM snapshots WHERE id=? AND project=?"# @build append 1 2 call arr 0 sid pid 0 call str 1 @text r#"nodes"#
+  set discard call require 2 not call same 2 rowsval 0u call str 1 @text r#"Snapshot unavailable"#
+  set versions call query 2 call asset 1 call str 1 utf8 "graph_snapshots.sql" @build append 1 2 call arr 0 pid sid
+  set components call append 2 components call shape 2 call str 1 @text r#"{"type":"tree","nodes":"$0","navigate":{"view":"graph","snapshot":"$1"},"versions":"$2","pathField":"selected","pane":"Files","section":"source-tree"}"# @build append 1 3 call arr 0 rowsval sid versions
+  set components call append 2 components call shape 2 call str 1 @text r#"{"type":"graph_layers","op":"graph_layers","snapshot":"$0","versions":"$1","pane":"Relationships","section":"relationships"}"# @build append 1 2 call arr 0 sid versions
+  if call same 2 call key 2 arg call str 1 @text r#"selected"# 0u 1
+    set components call append 2 components call shape 2 call str 1 @text r#"{"type":"empty","label":"Choose a file or folder","text":"Select a path above to read its captured contents. Snapshot selection never reads newer working-file bytes.","pane":"Files","section":"inspection"}"# call arr 0
+  2
+    set node call nth 2 call query 2 call str 1 @text r#"SELECT kind,digest,path,bytes FROM inventory WHERE snapshot=? AND path=?"# @build append 1 2 call arr 0 sid call key 2 arg call str 1 @text r#"selected"# 0
+    if call same 2 node 0u 1
+      set components call append 2 components call shape 2 call str 1 @text r#"{"type":"empty","label":"Path not in this snapshot","text":"Choose another captured path or switch snapshots. Your filter and zoom are retained.","pane":"Files","section":"inspection"}"# call arr 0
+    2
+      if call same 2 call key 2 node call str 1 @text r#"kind"# call str 1 @text r#"directory"# 3
+        set a call query 2 call str 1 @text r#"SELECT path,kind,bytes,digest FROM inventory WHERE snapshot=? AND parent=? ORDER BY path"# @build append 1 2 call arr 0 sid call key 2 node call str 1 @text r#"path"#
+        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"card","label":"$0","text":"$1","details":"$2","pane":"Files","section":"inspection"}"# @build append 1 3 call arr 0 call key 2 node call str 1 @text r#"path"# call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('Folder · %d captured entries',?1) AS text"# @build append 1 1 call arr 0 call integer 1 call size 1 a 0 call str 1 @text r#"text"# call ui_merge 2 node call shape 2 call str 1 @text r#"{"snapshot":"$0"}"# @build append 1 1 call arr 0 sid
+        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"data","label":"Directory contents","value":"$0","pane":"Files","section":"inspection"}"# @build append 1 1 call arr 0 a
+      0
+      if call same 2 call key 2 node call str 1 @text r#"kind"# call str 1 @text r#"file"# 4
+        set body call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT content FROM blobs WHERE project=? AND digest=?"# @build append 1 2 call arr 0 pid call key 2 node call str 1 @text r#"digest"# 0 call str 1 @text r#"content"#
+        set a call key 2 call baseinfo 1 body call str 1 @text r#"text"#
+        if call same 2 a 0u 1
+          set a call str 1 @text r#"Binary file · captured bytes are retained in this snapshot."#
+        0
+        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"card","label":"$0","text":"$1","details":"$2","pane":"Files","section":"inspection"}"# @build append 1 3 call arr 0 call key 2 node call str 1 @text r#"path"# a call ui_merge 2 node call shape 2 call str 1 @text r#"{"snapshot":"$0"}"# @build append 1 1 call arr 0 sid
+      0
   ret components

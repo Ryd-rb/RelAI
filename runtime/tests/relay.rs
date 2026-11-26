@@ -183,7 +183,12 @@ fn a_chat_follow_up_uses_only_the_selected_exchange_and_preserves_the_new_prompt
         1
     );
     assert!(!frame.to_string().contains("internal workflow note"));
-    assert!(!controls.iter().any(|c| c["label"] == "Accept answer"));
+    assert!(
+        !controls
+            .iter()
+            .any(|c| c["label"] == "Accept answer" || c["label"] == "Follow up")
+    );
+    assert!(controls.iter().any(|c| c["label"] == "New topic"));
     let send = controls.iter().find(|c| c["label"] == "Send").unwrap();
     assert_eq!(
         send["event"]["spec"]["destination"]["bind"]["follow"],
@@ -424,8 +429,15 @@ fn a_named_question_survives_restart_and_can_be_reviewed_as_waiting() {
     assert!(
         controls
             .iter()
-            .any(|c| c["role"] == "incoming" && c["value"] == "Include examples?\n\nYes · No")
+            .any(|c| c["role"] == "incoming" && c["value"] == "Include examples?")
     );
+    for answer in ["Yes", "No"] {
+        assert!(
+            controls
+                .iter()
+                .any(|c| c["label"] == answer && c["event"]["reply"] == q)
+        );
+    }
     let send = controls.iter().find(|c| c["label"] == "Send").unwrap();
     assert_eq!(send["event"]["spec"]["destination"]["bind"]["reply"], q);
     let mut response = envelope(json!([]));

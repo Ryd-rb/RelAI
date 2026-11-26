@@ -161,6 +161,11 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
         ui.control("Attach files", "button")["row"]
     );
     assert_eq!(ui.control("Send", "button")["role"], "primary");
+    assert_eq!(ui.control("project", "heading")["area"], "header");
+    let composer = ui.control("Message", "multiline");
+    assert_eq!(composer["caption"], false);
+    assert_eq!(composer["lines"], 2);
+    assert_eq!(composer["placeholder"], "Message RelAI…");
     assert!(
         !ui.control("project", "heading")["side"]
             .as_bool()
@@ -169,7 +174,17 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
     ui.click("Models");
     assert_eq!(ui.control("Models", "button")["role"], "selected");
     assert_eq!(ui.control("Relay", "button")["role"], "nav");
-    assert_eq!(ui.control("Models", "heading")["role"], "title");
+    assert_eq!(ui.control("Models", "heading")["area"], "header");
+    assert_eq!(ui.control("Overview", "button")["selected"], true);
+    assert!(
+        ui.control("Role assignments", "list")["choices"]
+            .as_array()
+            .unwrap()
+            .len()
+            > 1
+    );
+    ui.click("Edit assignment");
+    assert_eq!(ui.control("Model ID", "input")["section"], "model-settings");
     assert!(
         ui.controls()
             .iter()
@@ -181,9 +196,12 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
     ui.change("Model ID", "input", json!({"value":"gpt-6.1-sol"}));
     ui.click("Save preset");
     assert_eq!(ui.control("gpt-6.1-sol", "heading")["id"], "models/active");
+    ui.click("Configuration");
     ui.change("Role", "select", json!({"value":"planner"}));
     assert_eq!(ui.control("Model ID", "input")["value"], "gpt-6.2-sol");
     ui.click("Dictionary");
+    ui.control("Search terms", "input");
+    ui.click("Dictionaries");
     let group = ui.control("Manage dictionaries", "button");
     assert_eq!(group["expanded"], false);
     assert!(
@@ -206,7 +224,7 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
     ui.apply(open);
     assert_eq!(ui.control("Hide records", "button")["expanded"], true);
     ui.click("Open project");
-    ui.control("Your projects", "label");
+    ui.control("Recent projects", "label");
     ui.click("project");
     assert_eq!(ui.frame["layout"], "conversation");
 }
@@ -300,6 +318,66 @@ fn unicode_completion_shifts_pinned_markers_and_explicit_definition_history() {
 }
 
 #[test]
+fn workspace_search_and_selected_activity_survive_navigation_and_refresh() {
+    let mut ui = Desktop::open();
+    for (name, definition) in [
+        ("Green tea", "Unoxidized leaf."),
+        ("Black tea", "Oxidized leaf."),
+    ] {
+        ui.invoke(
+            "dictionary",
+            json!({"op":"save","name":name,"kind":"knowledge","definition":definition}),
+        );
+    }
+    ui.click("Dictionary");
+    ui.change("Search terms", "input", json!({"value":"Green tea"}));
+    let terms = ui.control("Terms", "list");
+    assert_eq!(terms["choices"].as_array().unwrap().len(), 1);
+    ui.click("Open definition");
+    assert_eq!(
+        ui.state["definition"]["entry"]["definition"],
+        "Unoxidized leaf."
+    );
+    ui.click("Close definition");
+    assert_eq!(ui.control("Search terms", "input")["value"], "Green tea");
+    ui.click("Skills");
+    ui.click("Tools");
+    ui.click("Automation");
+    ui.click("Dictionary");
+    assert_eq!(ui.control("Skills", "button")["selected"], true);
+    ui.click("Tools");
+    assert_eq!(ui.control("Automation", "button")["selected"], true);
+
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    let project = ui.view["project"].as_str().unwrap().to_owned();
+    let record = |kind: &str| {
+        db.execute(
+            "INSERT INTO events(project,kind,payload) VALUES(?,?,?)",
+            (&project, kind, json!({"text":kind}).to_string()),
+        )
+        .unwrap();
+        db.last_insert_rowid().to_string()
+    };
+    let saved = record("Worker failed");
+    record("Submission");
+    ui.click("Activity");
+    ui.change("Events", "list", json!({"value":saved}));
+    record("New event");
+    ui.render(true);
+    assert_eq!(ui.control("Events", "list")["value"], saved);
+    assert!(
+        ui.control("Event details", "detail")["value"]
+            .as_str()
+            .unwrap()
+            .contains("Worker failed")
+    );
+    ui.click("Needs attention");
+    let filtered = ui.control("Events", "list");
+    assert_eq!(filtered["choices"].as_array().unwrap().len(), 1);
+    assert_eq!(filtered["value"], saved);
+}
+
+#[test]
 fn completing_terms_right_to_left_submits_in_text_order() {
     let mut ui = Desktop::open();
     for name in ["Café", "Thé"] {
@@ -333,10 +411,28 @@ fn graph_filter_pause_zoom_comparison_and_old_snapshot_read_retained_content() {
     let mut ui = Desktop::open();
     fs::write(ui.root.join("note.md"), "Original café.").unwrap();
     fs::write(ui.root.join("other.txt"), "Other file.").unwrap();
+    fs::write(ui.root.join("lib.rs"), "mod helper;\n").unwrap();
+    fs::write(ui.root.join("helper.rs"), "pub fn helper() {}\n").unwrap();
     ui.click("Project graph");
+    ui.control("Explore a retained source snapshot", "heading");
     ui.click("Capture snapshot");
     let old = ui.state["nav"]["snapshot"].clone();
     assert!(old.is_string());
+    let snapshots = ui.control("Snapshot", "select");
+    assert_eq!(snapshots["value"], old);
+    assert!(
+        snapshots["choices"][0]["label"]
+            .as_str()
+            .unwrap()
+            .starts_with("Snapshot 1")
+    );
+    ui.change(
+        "Filter paths",
+        "input",
+        json!({"value":"not-a-captured-path"}),
+    );
+    ui.find(|c| c["id"] == "graph/no-paths");
+    assert!(!ui.controls().iter().any(|c| c["label"] == "Project paths"));
     ui.change("Filter paths", "input", json!({"value":"NOTE"}));
     assert_eq!(
         ui.control("Project paths", "list")["choices"],
@@ -368,6 +464,25 @@ fn graph_filter_pause_zoom_comparison_and_old_snapshot_read_retained_content() {
     ui.click("Capture snapshot");
     let current = ui.state["nav"]["snapshot"].clone();
     assert_ne!(old, current);
+    ui.click("Relationships");
+    ui.find(|c| c["id"] == "graph/inspect-prompt");
+    ui.click("Inspect source relationships");
+    ui.change("Filter relationships", "input", json!({"value":""}));
+    assert!(
+        ui.state["layers"]["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|e| e["source"] == "lib.rs" && e["target"] == "helper.rs")
+    );
+    let target =
+        ui.find(|c| c["label"] == "Open target" && c["event"]["patch"]["selected"] == "helper.rs");
+    assert_eq!(target["event"]["patch"]["pane"], "Files");
+    let open = ui.event(target, json!({}));
+    ui.apply(open);
+    assert_eq!(ui.state["nav"]["selected"], "helper.rs");
+    ui.find(|c| c["kind"] == "detail" && c["value"] == "pub fn helper() {}\n");
+    ui.click("Relationships");
     ui.change("Compare with snapshot", "select", json!({"value":old}));
     assert!(
         ui.state["layers"]["changes"]
@@ -385,6 +500,9 @@ fn graph_filter_pause_zoom_comparison_and_old_snapshot_read_retained_content() {
             .any(|c| c["kind"] == "detail" && c["value"] == "Original café."),
         "Previous bytes must come from the snapshot"
     );
+    ui.change("Snapshot", "select", json!({"value":current}));
+    ui.find(|c| c["kind"] == "detail" && c["value"] == "Changed café.");
+    assert_eq!(ui.state["zoom"], 1.0);
 }
 
 #[test]
@@ -392,14 +510,9 @@ fn tools_fold_preserves_typed_json_and_dispatches_exact_data() {
     let mut ui = Desktop::open();
     ui.click("Tools");
     assert!(!ui.controls().iter().any(|c| c["label"] == "Tool ID"));
+    let initial_matches = ui.control("Matching tools", "list");
+    assert!(initial_matches["choices"].as_array().unwrap().len() > 1);
     ui.change("Search tools", "input", json!({"value":"project.info"}));
-    let request = ui.event(ui.control("Find tools", "button"), json!({}));
-    assert_eq!(
-        request["request"]["input"]["arguments"],
-        json!({"query":"project.info"})
-    );
-    assert_eq!(request["request"]["input"]["tool"], "tool.find");
-    ui.apply(request);
     let matches = ui.control("Matching tools", "list");
     let selected = matches["choices"]
         .as_array()
@@ -429,8 +542,9 @@ fn tools_fold_preserves_typed_json_and_dispatches_exact_data() {
         rejected.is_err(),
         "Malformed arguments must fail before dispatch"
     );
-    ui.click("Tool versions");
-    let promote = ui.control("Promote a version", "button");
+    ui.click("Versions");
+    ui.click("Promote a version");
+    let promote = ui.find(|c| c["event"]["spec"]["op"] == "tool_promote");
     let scope = promote["event"]["scope"].clone();
     let payload = ui.find(|c| c["label"] == "Typed request" && c["event"]["scope"] == scope);
     let response = ui.event(
@@ -487,6 +601,8 @@ fn chat_pages_keep_durable_messages_visible_across_internal_traffic() {
     let page = transcript(&ui);
     assert_eq!(page.len(), 24);
     assert_eq!(page[0]["value"], "Message 5");
+    assert_eq!(page[0]["caption"], false);
+    assert_eq!(page[0]["label"], "You");
     assert_eq!(page[23]["value"], "Message 28");
     assert!(!ui.frame.to_string().contains("Internal trace"));
     ui.type_message("Unsent draft");
@@ -506,9 +622,92 @@ fn chat_pages_keep_durable_messages_visible_across_internal_traffic() {
     ui.click("Jump to latest");
     assert_eq!(transcript(&ui).last().unwrap()["value"], "A new message");
     ui.click("Activity");
-    ui.control("Internal trace", "label");
+    assert!(
+        ui.control("Events", "list")["choices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["label"] == "Internal trace")
+    );
+    ui.click("Needs attention");
+    ui.find(|c| c["id"] == "activity/empty");
     ui.click("Relay");
     assert_eq!(ui.control("Message", "multiline")["value"], "Unsent draft");
+}
+
+#[test]
+fn send_readiness_tracks_content_and_dismissing_an_error_keeps_the_draft() {
+    let mut ui = Desktop::open();
+    let send = |ui: &Desktop| ui.control("Send", "button");
+    for blank in ["", " \r\n\t", "\u{a0}\u{3000}"] {
+        ui.type_message(blank);
+        assert_eq!(send(&ui)["enabled"], false);
+        assert!(ui.event(send(&ui), json!({})).get("request").is_none());
+    }
+    ui.type_message("  keep this spacing  ");
+    assert_eq!(send(&ui)["enabled"], true);
+    ui.state["status"] = json!("Could not read a file.");
+    ui.render(false);
+    ui.click("Dismiss message");
+    assert!(ui.state["status"].is_null());
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "  keep this spacing  "
+    );
+    ui.type_message("");
+    assert_eq!(send(&ui)["enabled"], false);
+
+    let attach = ui.control("Attach files", "button");
+    let effect = ui.event(attach, json!({}));
+    let receipt = ui
+        .app
+        .invoke(
+            "desktop_result",
+            json!({
+                "state":ui.state,"project":ui.view["project"],"after":effect["after"],
+                "result":{"id":"attached","display_name":"notes.txt"}
+            }),
+        )
+        .unwrap();
+    ui.apply(receipt);
+    assert_eq!(send(&ui)["enabled"], true);
+    assert_eq!(
+        ui.event(send(&ui), json!({}))["request"]["input"]["attachments"],
+        json!(["attached"])
+    );
+    ui.click("Remove notes.txt");
+    assert_eq!(send(&ui)["enabled"], false);
+    let field = ui.control("Attach files", "button")["event"].clone();
+    let scope = field["scope"].as_str().unwrap();
+    ui.state["drafts"][scope]["attachments"] =
+        json!((0..8).map(|i| json!({"id":i,"name":i})).collect::<Vec<_>>());
+    let capture = ui.app.invoke(
+        "desktop_file",
+        json!({"state":ui.state,"after":field,"project":ui.view["project"],"name":"ninth.md"}),
+    );
+    assert!(format!("{:#}", capture.unwrap_err()).contains("eight attachments"));
+}
+
+#[test]
+fn changing_composer_skills_updates_the_visible_count_and_keeps_the_message() {
+    let mut ui = Desktop::open();
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    db.execute(
+        "INSERT INTO skills(id,project,name,digest,description,body,resources) VALUES('notes',?,'Notes','digest','Write notes','Body','[]')",
+        [ui.view["project"].as_str().unwrap()],
+    ).unwrap();
+    ui.render(true);
+    ui.type_message("Keep my draft");
+    ui.click("Skills (0)");
+    ui.change(
+        "Allow skills for this submission",
+        "multi",
+        json!({"value":["notes"]}),
+    );
+    assert!(ui.controls().iter().any(|c| c["label"] == "Skills (1)"));
+    let send = ui.event(ui.control("Send", "button"), json!({}));
+    assert_eq!(send["request"]["input"]["skills"], json!(["notes"]));
+    assert_eq!(send["request"]["input"]["text"], "Keep my draft");
 }
 
 #[test]
@@ -548,8 +747,40 @@ fn a_question_arriving_while_typing_cannot_redirect_the_draft() {
     assert!(
         ui.event(ui.control("Send", "button"), json!({}))["request"]["input"]["reply"].is_null()
     );
+    ui.type_message("");
+    let choose = ui.control("Two", "button");
+    let effect = ui.event(choose.clone(), json!({}));
+    assert!(effect.get("request").is_none());
+    assert_eq!(effect["selection"]["end"], 3);
+    ui.apply(effect);
+    assert_eq!(ui.control("Message", "multiline")["value"], "Two");
+    ui.type_message("Two, please");
+    let stale_click = ui.event(choose, json!({}));
+    assert_eq!(stale_click["refresh"], "none");
+    ui.apply(stale_click);
+    assert_eq!(
+        ui.event(ui.control("Send", "button"), json!({}))["request"]["input"]["reply"],
+        "question"
+    );
+    db.execute(
+        "UPDATE questions SET state='answered' WHERE id='question'",
+        [],
+    )
+    .unwrap();
+    ui.render(true);
+    assert_eq!(ui.control("Send", "button")["enabled"], false);
+    assert!(
+        ui.event(ui.control("Send", "button"), json!({}))
+            .get("request")
+            .is_none()
+    );
+    ui.click("New topic");
+    assert_eq!(ui.control("Message", "multiline")["value"], "Two, please");
+    assert_eq!(ui.control("Send", "button")["enabled"], true);
+    db.execute("UPDATE questions SET state='open' WHERE id='question'", [])
+        .unwrap();
+    ui.render(true);
     ui.click("Reply");
-    ui.type_message("Two");
     ui.click("Send");
     assert!(!ui.controls().iter().any(|c| c["label"] == "Reply"));
     assert!(
@@ -578,15 +809,23 @@ fn many_project_tabs_keep_each_draft_addressable() {
             .clone();
     }
     ui.render(true);
+    ui.click("Open project");
     ui.click("Move tabs to top");
     ui.click("Move tabs to left");
+    ui.change("Active project", "select", json!({"value":first}));
     let switch = ui.control("Active project", "select");
     assert_eq!(switch["choices"].as_array().unwrap().len(), 8);
     assert_eq!(switch["side"], true);
+    ui.click("Tools");
+    ui.click("Versions");
     ui.change("Active project", "select", json!({"value":last}));
     ui.type_message("Draft eight.");
+    ui.click("Tools");
+    assert_eq!(ui.control("Library", "button")["selected"], true);
     ui.change("Active project", "select", json!({"value":first}));
     assert_eq!(ui.control("Message", "multiline")["value"], "Draft one.");
+    ui.click("Tools");
+    assert_eq!(ui.control("Versions", "button")["selected"], true);
 }
 
 #[test]
@@ -614,6 +853,46 @@ fn large_history_and_graph_comparison_remain_browsable() {
     ui.control("Open previous file-12", "button");
     ui.click("More relationships");
     ui.control("source → target-12 · call", "button");
+    assert_eq!(
+        ui.controls()
+            .iter()
+            .filter(|c| c["label"] == "Open target")
+            .count(),
+        12
+    );
+    ui.change(
+        "Filter relationships",
+        "input",
+        json!({"value":"target-511"}),
+    );
+    ui.control("source → target-511 · call", "button");
+    assert_eq!(
+        ui.controls()
+            .iter()
+            .filter(|c| c["label"] == "Open target")
+            .count(),
+        1
+    );
+    ui.change(
+        "Filter relationships",
+        "input",
+        json!({"value":"not-a-path"}),
+    );
+    ui.find(|c| c["id"] == "graph/no-edges");
+    ui.state["layers"]["snapshot"] = json!("different-snapshot");
+    ui.render(false);
+    ui.find(|c| c["id"] == "graph/inspect-prompt");
+    assert!(!ui.controls().iter().any(|c| c["id"] == "graph/coverage"));
+    ui.state["filter"] = json!("");
+    ui.state["layers"] = json!({"snapshot":"new","coverage":{"indexed":2,"total":2},"edges":[{"source":"same","target":"target","name":"call"},{"source":"same","target":"target","name":"call"}],"changes":[]});
+    ui.render(false);
+    assert_eq!(
+        ui.controls()
+            .iter()
+            .filter(|c| c["label"] == "Open target")
+            .count(),
+        2
+    );
 }
 
 #[test]
@@ -629,8 +908,10 @@ fn native_project_navigation_preserves_composer_and_dispatches_exact_unicode() {
     ui.click("Open project");
     let pid = ui.state["nav"]["project"].clone();
     assert!(pid.is_string());
+    ui.click("Open project");
     ui.click("Move tabs to top");
     ui.click("Move tabs to left");
+    ui.click("project");
     assert_eq!(ui.control("Open project", "button")["side"], true);
     let body = "🙂 line\nCafé draft.";
     ui.change(

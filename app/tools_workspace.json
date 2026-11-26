@@ -1,0 +1,581 @@
+{
+  "type": "group",
+  "items": [
+    {
+      "type": "form",
+      "label": "Find tools",
+      "op": "tool_run",
+      "presentation": "search",
+      "fields": [
+        {
+          "name": "query",
+          "label": "Search tools",
+          "type": "text"
+        }
+      ],
+      "fixed": {
+        "tool": "tool.find"
+      },
+      "showResult": true,
+      "pane": "Library",
+      "section": "tool-search"
+    },
+    {
+      "type": "fold",
+      "label": "Run a tool",
+      "foldKey": "run-tools",
+      "items": [
+        {
+          "type": "form",
+          "label": "Run tool",
+          "op": "tool_run",
+          "fields": [
+            {
+              "name": "tool",
+              "label": "Tool ID",
+              "type": "text"
+            },
+            {
+              "name": "arguments",
+              "label": "Arguments",
+              "type": "json"
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        },
+        {
+          "type": "form",
+          "label": "Run an exact registered version",
+          "op": "tool_run",
+          "fields": [
+            {
+              "name": "tool",
+              "label": "Tool name",
+              "type": "text"
+            },
+            {
+              "name": "version",
+              "label": "Version digest",
+              "type": "text"
+            },
+            {
+              "name": "arguments",
+              "label": "Arguments",
+              "type": "json"
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        }
+      ],
+      "pane": "Library",
+      "section": "tool-run"
+    },
+    {
+      "type": "fold",
+      "label": "Propose checked source",
+      "foldKey": "tool-versions-0",
+      "pane": "Versions",
+      "section": "tool-versions",
+      "items": [
+        {
+          "type": "form",
+          "label": "Propose checked source",
+          "op": "tool_propose",
+          "fields": [
+            {
+              "name": "name",
+              "label": "Name",
+              "type": "text"
+            },
+            {
+              "name": "capability",
+              "label": "Capability ID",
+              "type": "text"
+            },
+            {
+              "name": "export",
+              "label": "Export",
+              "type": "text"
+            },
+            {
+              "name": "source",
+              "label": "FluxR source",
+              "type": "textarea"
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        }
+      ]
+    },
+    {
+      "type": "fold",
+      "label": "Test a draft",
+      "foldKey": "tool-versions-1",
+      "pane": "Versions",
+      "section": "tool-versions",
+      "items": [
+        {
+          "type": "form",
+          "label": "Test a draft",
+          "op": "tool_test",
+          "fields": [
+            {
+              "name": "version",
+              "label": "Version digest",
+              "type": "text"
+            },
+            {
+              "name": "case",
+              "label": "Test case",
+              "type": "json"
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        }
+      ]
+    },
+    {
+      "type": "fold",
+      "label": "Qualify a draft",
+      "foldKey": "tool-versions-2",
+      "pane": "Versions",
+      "section": "tool-versions",
+      "items": [
+        {
+          "type": "form",
+          "label": "Qualify a draft",
+          "op": "tool_qualify",
+          "fields": [
+            {
+              "name": "version",
+              "label": "Version digest",
+              "type": "text"
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        }
+      ]
+    },
+    {
+      "type": "fold",
+      "label": "Promote a version",
+      "foldKey": "tool-versions-3",
+      "pane": "Versions",
+      "section": "tool-versions",
+      "items": [
+        {
+          "type": "form",
+          "label": "Promote a version",
+          "op": "tool_promote",
+          "fields": [
+            {
+              "name": "payload",
+              "label": "Typed request",
+              "type": "json"
+            }
+          ],
+          "fixed": {},
+          "showResult": true,
+          "jsonPayload": "payload"
+        }
+      ]
+    },
+    {
+      "type": "fold",
+      "label": "Revoke a version",
+      "foldKey": "tool-versions-4",
+      "pane": "Versions",
+      "section": "tool-versions",
+      "items": [
+        {
+          "type": "form",
+          "label": "Revoke a version",
+          "op": "tool_revoke",
+          "fields": [
+            {
+              "name": "version",
+              "label": "Version digest",
+              "type": "text"
+            }
+          ],
+          "fixed": {},
+          "showResult": true
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "label": "File changes",
+      "pane": "Changes",
+      "section": "files",
+      "items": [
+        {
+          "type": "fold",
+          "label": "Select or revoke a live source",
+          "foldKey": "files-0",
+          "pane": "Changes",
+          "section": "files",
+          "items": [
+            {
+              "type": "form",
+              "op": "source_access",
+              "label": "Select or revoke a live source",
+              "fields": [
+                {
+                  "name": "payload",
+                  "label": "Request, revision, session, host_path and operation",
+                  "type": "json"
+                }
+              ],
+              "jsonPayload": "payload",
+              "showResult": true
+            }
+          ]
+        },
+        {
+          "type": "data",
+          "label": "Recent file proposals",
+          "value": "$0",
+          "pane": "Changes",
+          "section": "files"
+        },
+        {
+          "type": "fold",
+          "label": "Inspect proposal",
+          "foldKey": "files-2",
+          "pane": "Changes",
+          "section": "files",
+          "items": [
+            {
+              "type": "form",
+              "label": "Inspect proposal",
+              "op": "effect_get",
+              "fields": [
+                {
+                  "name": "payload",
+                  "label": "Typed request",
+                  "type": "json"
+                }
+              ],
+              "fixed": {},
+              "showResult": true,
+              "jsonPayload": "payload"
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Authorize file change",
+          "foldKey": "files-3",
+          "pane": "Changes",
+          "section": "files",
+          "items": [
+            {
+              "type": "form",
+              "label": "Authorize file change",
+              "op": "effect_authorize",
+              "fields": [
+                {
+                  "name": "effect",
+                  "label": "Effect ID",
+                  "type": "text"
+                },
+                {
+                  "name": "digest",
+                  "label": "Reviewed proposal digest",
+                  "type": "text"
+                },
+                {
+                  "name": "destructive",
+                  "label": "Authorize destructive scope",
+                  "type": "boolean"
+                }
+              ],
+              "fixed": {},
+              "showResult": true
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Apply authorized change",
+          "foldKey": "files-4",
+          "pane": "Changes",
+          "section": "files",
+          "items": [
+            {
+              "type": "form",
+              "label": "Apply authorized change",
+              "op": "effect_apply",
+              "fields": [
+                {
+                  "name": "effect",
+                  "label": "Effect ID",
+                  "type": "text"
+                },
+                {
+                  "name": "grant",
+                  "label": "Grant ID",
+                  "type": "text"
+                }
+              ],
+              "fixed": {},
+              "showResult": true
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Revoke unused grant",
+          "foldKey": "files-5",
+          "pane": "Changes",
+          "section": "files",
+          "items": [
+            {
+              "type": "form",
+              "label": "Revoke unused grant",
+              "op": "effect_revoke",
+              "fields": [
+                {
+                  "name": "grant",
+                  "label": "Grant ID",
+                  "type": "text"
+                }
+              ],
+              "fixed": {},
+              "showResult": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "group",
+      "label": "Git operations",
+      "pane": "Changes",
+      "section": "git",
+      "items": [
+        {
+          "type": "data",
+          "label": "Recent Git proposals",
+          "value": "$1",
+          "pane": "Changes",
+          "section": "git"
+        },
+        {
+          "type": "fold",
+          "label": "Propose Git change",
+          "foldKey": "git-1",
+          "pane": "Changes",
+          "section": "git",
+          "items": [
+            {
+              "type": "form",
+              "label": "Propose Git change",
+              "op": "git_propose",
+              "fields": [
+                {
+                  "name": "payload",
+                  "label": "Typed request",
+                  "type": "json"
+                }
+              ],
+              "fixed": {},
+              "showResult": true,
+              "jsonPayload": "payload"
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Inspect Git change",
+          "foldKey": "git-2",
+          "pane": "Changes",
+          "section": "git",
+          "items": [
+            {
+              "type": "form",
+              "label": "Inspect Git change",
+              "op": "git_get",
+              "fields": [
+                {
+                  "name": "payload",
+                  "label": "Typed request",
+                  "type": "json"
+                }
+              ],
+              "fixed": {},
+              "showResult": true,
+              "jsonPayload": "payload"
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Authorize Git change",
+          "foldKey": "git-3",
+          "pane": "Changes",
+          "section": "git",
+          "items": [
+            {
+              "type": "form",
+              "label": "Authorize Git change",
+              "op": "git_authorize",
+              "fields": [
+                {
+                  "name": "mutation",
+                  "label": "Mutation ID",
+                  "type": "text"
+                },
+                {
+                  "name": "digest",
+                  "label": "Reviewed proposal digest",
+                  "type": "text"
+                },
+                {
+                  "name": "destructive",
+                  "label": "Authorize destructive scope",
+                  "type": "boolean"
+                }
+              ],
+              "fixed": {},
+              "showResult": true
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Apply Git change",
+          "foldKey": "git-4",
+          "pane": "Changes",
+          "section": "git",
+          "items": [
+            {
+              "type": "form",
+              "label": "Apply Git change",
+              "op": "git_apply",
+              "fields": [
+                {
+                  "name": "payload",
+                  "label": "Typed request",
+                  "type": "json"
+                }
+              ],
+              "fixed": {},
+              "showResult": true,
+              "jsonPayload": "payload"
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Manage remote branch grants",
+          "foldKey": "git-5",
+          "pane": "Changes",
+          "section": "git",
+          "items": [
+            {
+              "type": "form",
+              "label": "Manage remote branch grants",
+              "op": "remote",
+              "fields": [
+                {
+                  "name": "payload",
+                  "label": "Typed request",
+                  "type": "json"
+                }
+              ],
+              "fixed": {},
+              "showResult": true,
+              "jsonPayload": "payload"
+            }
+          ]
+        },
+        {
+          "type": "fold",
+          "label": "Install a fetched skill",
+          "foldKey": "git-6",
+          "pane": "Changes",
+          "section": "git",
+          "items": [
+            {
+              "type": "form",
+              "label": "Install a fetched skill",
+              "op": "skill",
+              "fields": [
+                {
+                  "name": "payload",
+                  "label": "Typed request",
+                  "type": "json"
+                }
+              ],
+              "fixed": {},
+              "showResult": true,
+              "jsonPayload": "payload"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "fold",
+      "label": "Manage connector",
+      "foldKey": "automation-0",
+      "pane": "Automation",
+      "section": "automation",
+      "items": [
+        {
+          "type": "form",
+          "label": "Manage connector",
+          "op": "connector",
+          "fields": [
+            {
+              "name": "payload",
+              "label": "Typed request",
+              "type": "json"
+            }
+          ],
+          "fixed": {},
+          "showResult": true,
+          "jsonPayload": "payload"
+        }
+      ]
+    },
+    {
+      "type": "data",
+      "label": "Schedules",
+      "value": "$2",
+      "pane": "Automation",
+      "section": "automation"
+    },
+    {
+      "type": "fold",
+      "label": "Manage schedule",
+      "foldKey": "automation-2",
+      "pane": "Automation",
+      "section": "automation",
+      "items": [
+        {
+          "type": "form",
+          "label": "Manage schedule",
+          "op": "schedule",
+          "fields": [
+            {
+              "name": "payload",
+              "label": "Typed request",
+              "type": "json"
+            }
+          ],
+          "fixed": {},
+          "showResult": true,
+          "jsonPayload": "payload"
+        }
+      ]
+    }
+  ]
+}

@@ -18,12 +18,10 @@ fn ui_header 3 state uint view uint pid uint uint do 4 name uint titleval uint p
   set name call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay"
   set titleval call ui_default 2 call key 2 call decode 1 call str 1 utf8 "{\"relay\":\"Relay\",\"activity\":\"Activity\",\"graph\":\"Project graph\",\"models\":\"Models\",\"dictionary\":\"Dictionary\",\"tools\":\"Tools\",\"file\":\"File\"}" name call str 1 utf8 "Relay"
   set projectname call ui_default 2 call key 2 view call str 1 utf8 "name" call ui_display_path 1 call ui_default 2 call key 2 view call str 1 utf8 "subtitle" call str 1 utf8 ""
-  if call same 2 name call str 1 utf8 "relay" 2
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/context" call str 1 utf8 "label" call str 1 utf8 "Relay" call shape 2 call str 1 utf8 "{\"role\":\"caption\"}" call arr 0
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/title" call str 1 utf8 "heading" projectname call shape 2 call str 1 utf8 "{\"role\":\"title\"}" call arr 0
-  2
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/context" call str 1 utf8 "label" projectname call shape 2 call str 1 utf8 "{\"role\":\"caption\"}" call arr 0
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/title" call str 1 utf8 "heading" titleval call shape 2 call str 1 utf8 "{\"role\":\"title\"}" call arr 0
+  if call same 2 name call str 1 utf8 "relay" 1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/title" call str 1 utf8 "heading" projectname call shape 2 call str 1 utf8 "{\"role\":\"title\",\"area\":\"header\"}" call arr 0
+  1
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/title" call str 1 utf8 "heading" titleval call shape 2 call str 1 utf8 "{\"role\":\"title\",\"area\":\"header\"}" call arr 0
   ret 0u
 
 fn ui_open_form 3 state uint pid uint spec uint uint do 5 scope uint draft uint rowval uint pick uint discard uint 6
@@ -45,7 +43,7 @@ fn ui_dock_button 2 state uint base uint uint do 2 labelval uint discard uint 4
   if call same 2 call ui_default 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true" call decode 1 call str 1 utf8 "true" 1
     set labelval call str 1 utf8 "Move tabs to top"
   0
-  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "dock" labelval call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"dock\"}" call arr 0 call obj 0 call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"side\":true}" call arr 0
+  set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "dock" labelval call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"dock\"}" call arr 0 call obj 0 call shape 2 call str 1 utf8 "{\"role\":\"quiet\"}" call arr 0
   ret 0u
 
 fn ui_prose 2 base uint body uint uint do 2 linesval uint discard uint 3

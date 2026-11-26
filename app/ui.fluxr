@@ -6,7 +6,7 @@ pub save_term 1 arg uint uint do 2 p uint discard uint 4
   set discard call dictionary 1 call put 3 call put 3 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" call str 1 utf8 "op" call str 1 utf8 "save"
   ret call query 2 call str 1 utf8 "INSERT INTO terms VALUES(?,?,?,?,1,'knowledge') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,revision=terms.revision+1" call append 2 call append 2 call append 2 call append 2 call arr 0 call hash 1 call encode 1 call append 2 call append 2 call arr 0 p call key 2 arg call str 1 utf8 "name" p call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "definition"
 
-pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uint components uint tabs uint row uint viewname uint i int 14
+pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uint components uint tabs uint row uint viewname uint i int 15
   set projects call query 2 call str 1 utf8 "WITH names AS (SELECT rowid AS ord,id,root,coalesce(nullif((SELECT value FROM json_each('['||replace(json_quote(rtrim(replace(p.root,char(92),'/'),'/')), '/',char(34)||','||char(34))||']') ORDER BY key DESC LIMIT 1),''),root) AS leaf FROM projects AS p) SELECT id,root,CASE WHEN count(*) OVER (PARTITION BY lower(leaf))=1 THEN leaf ELSE root END AS short FROM names ORDER BY ord" call arr 0
   set pid call key 2 arg call str 1 utf8 "project"
   if call same 2 pid 0u 1
@@ -21,15 +21,71 @@ pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uin
   0
     set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"$0\",\"shortLabel\":\"$2\",\"navigate\":{\"project\":\"$1\",\"view\":\"relay\",\"reply\":null,\"steer\":null}}" call append 2 call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "root" call key 2 row call str 1 utf8 "id" call key 2 row call str 1 utf8 "short"
     next i
-  set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Open project\",\"navigate\":{\"view\":\"open\"}}" call arr 0
-  set components call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"nav\",\"label\":\"Projects\",\"dockable\":true,\"items\":\"$0\"}" call append 2 call arr 0 tabs
+  set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Open project\",\"navigate\":{\"view\":\"open\"},\"projectCount\":\"$0\"}" call append 2 call arr 0 call integer 1 call size 1 projects
+  set components call append 2 call arr 0 call shape 2 call str 1 @text r#"{
+  "type": "nav",
+  "label": "Projects",
+  "dockable": true,
+  "items": "$0"
+}"# call append 2 call arr 0 tabs
   set viewname call key 2 arg call str 1 utf8 "view"
   if or call same 2 pid 0u call same 2 viewname call str 1 utf8 "open" 2
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Open project\",\"op\":\"open_project\",\"fields\":[{\"name\":\"root\",\"label\":\"Existing project folder\",\"type\":\"folder\",\"required\":true}],\"fixed\":{},\"selectResult\":{\"project\":\"id\"}}" call arr 0
+    set components call append 2 components call shape 2 call str 1 @text r#"{
+  "type": "form",
+  "label": "Open project",
+  "op": "open_project",
+  "fields": [
+    {
+      "name": "root",
+      "label": "Existing project folder",
+      "type": "folder",
+      "required": true
+    }
+  ],
+  "fixed": {},
+  "selectResult": {
+    "project": "id"
+  },
+  "section": "open-project"
+}"# call arr 0
     ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"Project relay\",\"components\":\"$0\"}" call append 2 call arr 0 components
   0
   set p call project 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid
-  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"nav\",\"label\":\"Views\",\"items\":[{\"type\":\"button\",\"label\":\"Relay\",\"navigate\":{\"view\":\"relay\"}},{\"type\":\"button\",\"label\":\"Activity\",\"navigate\":{\"view\":\"activity\"}},{\"type\":\"button\",\"label\":\"Project graph\",\"navigate\":{\"view\":\"graph\"}},{\"type\":\"button\",\"label\":\"Models\",\"navigate\":{\"view\":\"models\"}},{\"type\":\"button\",\"label\":\"Dictionary\",\"navigate\":{\"view\":\"dictionary\"}},{\"type\":\"button\",\"label\":\"Tools\",\"navigate\":{\"view\":\"tools\"}}]}" call arr 0
+  set components call append 2 components call shape 2 call str 1 @text r#"{
+  "type": "nav",
+  "label": "Workspace",
+  "items": [
+    {
+      "type": "button",
+      "label": "Relay",
+      "navigate": {
+        "view": "relay"
+      }
+    },
+    {
+      "type": "button",
+      "label": "Activity",
+      "navigate": {
+        "view": "activity"
+      }
+    },
+    {
+      "type": "button",
+      "label": "Project graph",
+      "navigate": {
+        "view": "graph"
+      }
+    },
+    {
+      "type": "button",
+      "label": "Tools",
+      "navigate": {
+        "view": "tools"
+      }
+    }
+  ]
+}"# call arr 0
+  set components call append 2 components call decode 1 call str 1 @text r#"{"type":"nav","label":"Settings","items":[{"type":"button","label":"Models","navigate":{"view":"models"}},{"type":"button","label":"Dictionary","navigate":{"view":"dictionary"}}]}"#
   if call same 2 viewname call str 1 utf8 "models" 1
     set components call append 2 components call model_panel 2 arg pid
   1
@@ -41,14 +97,45 @@ pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uin
   1
     if call same 2 viewname call str 1 utf8 "dictionary" 3
     set components call append 2 components call dictionary_panel 1 pid
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"Project definitions\",\"value\":\"$0\"}" call append 2 call arr 0 call query 2 call str 1 utf8 "SELECT name,definition,kind,revision FROM terms WHERE project=? ORDER BY name" call append 2 call arr 0 pid
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"fold\",\"label\":\"Add a project term\",\"items\":[{\"type\":\"form\",\"label\":\"Save definition\",\"op\":\"save_term\",\"fields\":[{\"name\":\"name\",\"label\":\"Term\",\"type\":\"text\"},{\"name\":\"definition\",\"label\":\"Definition\",\"type\":\"textarea\"}],\"fixed\":{}}]}" call arr 0
+    set components call append 2 components call shape 2 call str 1 @text r#"{
+  "type": "lexicon",
+  "label": "Project definitions",
+  "value": "$0",
+  "pane": "Terms",
+  "section": "term-library"
+}"# call append 2 call arr 0 call query 2 call str 1 utf8 "SELECT name,definition,kind,revision FROM terms WHERE project=? ORDER BY name" call append 2 call arr 0 pid
+    set components call append 2 components call shape 2 call str 1 @text r#"{
+  "type": "fold",
+  "label": "Add a project term",
+  "items": [
+    {
+      "type": "form",
+      "label": "Save definition",
+      "op": "save_term",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Term",
+          "type": "text"
+        },
+        {
+          "name": "definition",
+          "label": "Definition",
+          "type": "textarea"
+        }
+      ],
+      "fixed": {}
+    }
+  ],
+  "pane": "Terms",
+  "section": "term-edit"
+}"# call arr 0
   1
     if call same 2 viewname call str 1 utf8 "tools" 1
     set components call append 2 components call operations_panel 1 pid
   1
     if call same 2 viewname call str 1 utf8 "activity" 1
-      set components call append 2 components call activity_panel 1 pid
+      set components call append 2 components call activity_panel 0
     1
       set components call chat_panel 3 arg pid components
   ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"$0\",\"project\":\"$1\",\"components\":\"$2\",\"name\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 p call str 1 utf8 "root" pid components projectname

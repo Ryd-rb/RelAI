@@ -1,0 +1,25 @@
+{
+  "models": [
+    "Overview",
+    "Configuration"
+  ],
+  "graph": [
+    "Files",
+    "Relationships"
+  ],
+  "tools": [
+    "Library",
+    "Versions",
+    "Changes",
+    "Automation"
+  ],
+  "dictionary": [
+    "Terms",
+    "Dictionaries",
+    "Skills"
+  ],
+  "activity": [
+    "Timeline",
+    "Needs attention"
+  ]
+}

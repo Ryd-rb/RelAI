@@ -1,0 +1,64 @@
+fluxr 1
+
+fn workspace_tabs 3 state uint page uint viewname uint uint do 6 tabs uint active uint item uint selected uint discard uint i int 5
+  set tabs call key 2 call resource 1 call str 1 utf8 "workspace_views.json" viewname
+  set active call ui_default 2 call key 2 call key 2 state call str 1 utf8 "panes" page call nth 2 tabs 0
+  set i 0
+  while lt i call size 1 tabs 5
+    set item call nth 2 tabs i
+    set selected call decode 1 call str 1 utf8 "false"
+    if call same 2 active item 1
+      set selected call decode 1 call str 1 utf8 "true"
+    0
+    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"$1","role":"tab","row":"page/tabs","selected":"$2","event":{"action":"pane","page":"$3","pane":"$1"}}"# @build append 1 4 call arr 0 call cat 2 call cat 2 page call str 1 utf8 "/tab/" item item selected page
+    next i
+  ret active
+
+fn workspace_chunk 2 chunks uint section uint uint do 0  1
+  ret call append 2 chunks call shape 2 call str 1 @text r#"{"section":"$0","controls":"$1"}"# @build append 1 2 call arr 0 section call ui_collect 0
+
+fn workspace_controls 2 chunks uint section uint uint do 0  3
+  if eq 0 call size 1 chunks 1
+    ret call ui_collect 0
+  0
+  set chunks call workspace_chunk 2 chunks section
+  ret call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json_group_array(json(item)) AS "controls:json" FROM (
+    SELECT CASE WHEN g.value->>'$.section' IS NULL THEN c.value ELSE json_set(c.value,'$.section',g.value->>'$.section') END AS item
+    FROM json_each(?) g JOIN json_each(g.value,'$.controls') c ORDER BY CAST(g.key AS INTEGER), CAST(c.key AS INTEGER)
+  )"# call append 2 call arr 0 chunks 0 call str 1 utf8 "controls"
+
+fn workspace_pick 2 rows uint saved uint uint do 0  1
+  ret call ui_default 2 call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT value AS "item:json" FROM json_each(?) WHERE value->>'$.value'=? LIMIT 1"# @build append 1 2 call arr 0 rows saved 0 call str 1 utf8 "item" call nth 2 rows 0
+
+fn workspace_list 6 pid uint base uint titleval uint rows uint item uint keyval uint uint do 1 choices uint 2
+  set choices call query 2 call str 1 @text r#"SELECT value->>'$.label' AS label,value->>'$.value' AS value FROM json_each(?) ORDER BY CAST(key AS INTEGER)"# call append 2 call arr 0 rows
+  ret call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"list","label":"$1","choices":"$2","value":"$3","lines":6,"event":{"action":"workspace_select","scope":"$4","name":"$5"}}"# @build append 1 6 call arr 0 base titleval choices call key 2 item call str 1 utf8 "value" pid keyval
+
+fn activity_journal 4 state uint pid uint base uint pane uint uint do 5 rows uint item uint keyval uint message uint discard uint 8
+  set rows call query 2 call asset 1 call str 1 utf8 "workspace_activity.sql" @build append 1 2 call arr 0 pid pane
+  if eq 0 call size 1 rows 3
+    set message call str 1 utf8 "No activity yet. Send a message to start the project history."
+    if call same 2 pane call str 1 utf8 "Needs attention" 1
+      set message call str 1 utf8 "No events need attention."
+    0
+    ret call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/empty","kind":"label","role":"muted","value":"$0"}"# call append 2 call arr 0 message
+  0
+  set keyval call cat 2 call str 1 utf8 "activity/" pane
+  set item call workspace_pick 2 rows call key 2 call key 2 call key 2 state call str 1 utf8 "workspaceSelection" pid keyval
+  set discard call workspace_list 6 pid call cat 2 base call str 1 utf8 "/events" call str 1 utf8 "Events" rows item keyval
+  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/event","kind":"heading","label":"$0","value":"$0"}"# call append 2 call arr 0 call key 2 item call str 1 utf8 "kind"
+  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/details","kind":"detail","label":"Event details","lines":6,"value":"$0"}"# call append 2 call arr 0 call ui_show 1 call key 2 item call str 1 utf8 "record"
+  ret 0u
+
+fn workspace_lexicon 3 state uint pid uint base uint uint do 5 values uint queryval uint rows uint item uint discard uint 9
+  set values call key 2 call key 2 state call str 1 utf8 "workspaceSelection" pid
+  set queryval call ui_default 2 call key 2 values call str 1 utf8 "termQuery" call str 1 utf8 ""
+  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"dictionary/search","kind":"input","label":"Search terms","caption":false,"placeholder":"Search linked dictionaries…","value":"$0","event":{"action":"workspace_select","scope":"$1","name":"termQuery"}}"# @build append 1 2 call arr 0 queryval pid
+  set rows call query 2 call asset 1 call str 1 utf8 "workspace_terms.sql" @build append 1 2 call arr 0 pid queryval
+  if eq 0 call size 1 rows 1
+    ret call ui_emit 1 call decode 1 call str 1 @text r#"{"id":"dictionary/empty","kind":"label","role":"muted","value":"No matching terms in the linked dictionaries."}"#
+  0
+  set item call workspace_pick 2 rows call key 2 values call str 1 utf8 "term"
+  set discard call workspace_list 6 pid call cat 2 base call str 1 utf8 "/terms" call str 1 utf8 "Terms" rows item call str 1 utf8 "term"
+  set discard call ui_prose 2 call str 1 utf8 "dictionary/preview" call key 2 item call str 1 utf8 "definition"
+  ret call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"dictionary/definition","kind":"button","role":"quiet","label":"Open definition","event":{"action":"term","ref":"$0"}}"# call append 2 call arr 0 call key 2 item call str 1 utf8 "ref"

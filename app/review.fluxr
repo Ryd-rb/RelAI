@@ -1,0 +1,20 @@
+fluxr 1
+
+fn review_refs 2 revinput uint envelopeval uint uint do 8 known uint branches uint b uint achieved uint remaining uint decision uint discard uint i int 9
+  set branches call key 2 revinput call str 1 utf8 "branches"
+  set achieved call key 2 envelopeval call str 1 utf8 "achieved"
+  set remaining call key 2 envelopeval call str 1 utf8 "remaining"
+  set known call arr 0
+  set i 0
+  while lt i call size 1 branches 5
+    set b call nth 2 branches i
+    set known call append 2 known call key 2 b call str 1 utf8 "criterion_id"
+    set known call append 2 known call key 2 b call str 1 utf8 "report"
+    if call same 2 call key 2 envelopeval call str 1 utf8 "decision" call str 1 utf8 "finish" 2
+    set discard call require 2 call has_ref 2 achieved call key 2 b call str 1 utf8 "criterion_id" call str 1 utf8 "Missing achieved criterion"
+    set discard call require 2 call has_ref 2 call key 2 call nth 2 call key 2 envelopeval call str 1 utf8 "actions" 0 call str 1 utf8 "evidence" call key 2 b call str 1 utf8 "report" call str 1 utf8 "Missing branch evidence"
+  0
+    next i
+  set discard call require 2 call subset 2 achieved known call str 1 utf8 "Unknown achieved reference"
+  set discard call require 2 call subset 2 remaining known call str 1 utf8 "Unknown remaining reference"
+  ret 0u

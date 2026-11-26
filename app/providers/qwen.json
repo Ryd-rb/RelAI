@@ -1,0 +1,27 @@
+{
+  "destination": "qwen",
+  "body": {
+    "model": "$0",
+    "messages": [
+      {
+        "role": "system",
+        "content": "$1"
+      },
+      {
+        "role": "user",
+        "content": "$3"
+      }
+    ],
+    "reasoning_effort": "$2",
+    "response_format": {
+      "type": "json_schema",
+      "json_schema": {
+        "name": "relai_actions",
+        "schema": "$4",
+        "strict": true
+      }
+    },
+    "max_tokens": 8192,
+    "stream": false
+  }
+}

@@ -1,0 +1,169 @@
+fluxr 1
+
+fn extra_catalog 0  uint do 0  1
+  ret call query 2 call str 1 utf8 "SELECT key AS id,value AS description,'portable' AS route FROM json_each(?) ORDER BY key" call append 2 call arr 0 call asset 1 call str 1 utf8 "services.json"
+
+fn extra_known 1 toolname uint bool do 0  1
+  ret not call same 2 call key 2 call resource 1 call str 1 utf8 "services.json" toolname 0u
+
+fn git_walk 6 root uint pid uint sid uint oid uint dir uint depth int uint do 9 entries uint entry uint path uint blob uint hashval uint kind uint sizeval uint discard uint i int 5
+  set discard call require 2 lt depth 30 call str 1 utf8 "Git tree depth limit"
+  set entries call git_read 3 root call str 1 utf8 "tree" call shape 2 call str 1 utf8 "{\"object\":\"$0\"}" call append 2 call arr 0 oid
+  set i 0
+  while lt i call size 1 entries 8
+    set entry call nth 2 entries i
+    set path call pathjoin 2 dir call key 2 entry call str 1 utf8 "name"
+    set kind call str 1 utf8 "directory"
+    set sizeval call integer 1 0
+    set hashval 0u
+    if call same 2 call key 2 entry call str 1 utf8 "directory" call decode 1 call str 1 utf8 "true" 1
+    set discard call git_walk 6 root pid sid call key 2 entry call str 1 utf8 "id" path add depth 1
+  5
+    set blob call git_read 3 root call str 1 utf8 "object" call shape 2 call str 1 utf8 "{\"object\":\"$0\"}" call append 2 call arr 0 call key 2 entry call str 1 utf8 "id"
+    set sizeval call key 2 blob call str 1 utf8 "size"
+    set hashval call key 2 call baseinfo 1 call key 2 blob call str 1 utf8 "base64" call str 1 utf8 "digest"
+    set kind call str 1 utf8 "file"
+    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO blobs VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 pid hashval call key 2 blob call str 1 utf8 "base64"
+    set discard call query 2 call str 1 utf8 "INSERT INTO inventory VALUES(?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid path dir kind hashval sizeval
+    next i
+  ret 0u
+
+fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint out uint oid uint sid uint oldid uint newid uint discard uint i int n int 37
+  set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
+  set discard call require 2 not call same 2 root 0u call str 1 utf8 "Unknown project"
+  if call same 2 toolname call str 1 utf8 "git.refs" 1
+    ret call git_read 3 root call str 1 utf8 "refs" args
+  0
+  if call same 2 toolname call str 1 utf8 "git.tree" 1
+    ret call git_read 3 root call str 1 utf8 "tree" args
+  0
+  if call same 2 toolname call str 1 utf8 "git.show" 1
+    ret call git_read 3 root call str 1 utf8 "object" args
+  0
+  if call same 2 toolname call str 1 utf8 "git.log" 8
+    set n 32
+    if not call same 2 call key 2 args call str 1 utf8 "limit" 0u 1
+    set n call number 1 call key 2 args call str 1 utf8 "limit"
+  0
+    set discard call require 2 and lt 0 n le n 256 call str 1 utf8 "Invalid history limit"
+    set i 0
+    set oid call key 2 args call str 1 utf8 "object"
+    set out call arr 0
+    while and lt i n not call same 2 oid 0u 4
+    set row call git_read 3 root call str 1 utf8 "commit" call shape 2 call str 1 utf8 "{\"object\":\"$0\"}" call append 2 call arr 0 oid
+    set out call append 2 out row
+    set oid call nth 2 call key 2 row call str 1 utf8 "parents" 0
+    next i
+    ret call shape 2 call str 1 utf8 "{\"commits\":\"$0\",\"next\":\"$1\"}" call append 2 call append 2 call arr 0 out oid
+  0
+  if call same 2 toolname call str 1 utf8 "git.snapshot" 6
+    set row call git_read 3 root call str 1 utf8 "commit" args
+    set sid call uid 0
+    set discard call git_walk 6 root pid sid call key 2 row call str 1 utf8 "tree" call str 1 utf8 "" 0
+    set out call query 2 call str 1 utf8 "SELECT path,parent,kind,digest,bytes FROM inventory WHERE snapshot=? ORDER BY path" call append 2 call arr 0 sid
+    set discard call query 2 call str 1 utf8 "INSERT INTO snapshots VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 sid pid out
+    ret call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\",\"commit\":\"$1\",\"entries\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid call key 2 row call str 1 utf8 "object" call integer 1 call size 1 out
+  0
+  if call same 2 toolname call str 1 utf8 "snapshot.diff" 4
+    set oldid call key 2 args call str 1 utf8 "before"
+    set newid call key 2 args call str 1 utf8 "after"
+    set discard call require 2 and not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 oldid pid 0 0u not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 newid pid 0 0u call str 1 utf8 "Snapshot unavailable"
+    ret call query 2 call str 1 utf8 "WITH a AS(SELECT * FROM inventory WHERE snapshot=?1), b AS(SELECT * FROM inventory WHERE snapshot=?2), paths AS(SELECT path FROM a UNION SELECT path FROM b) SELECT paths.path,a.digest AS old,b.digest AS new,CASE WHEN a.path IS NULL THEN 'added' WHEN b.path IS NULL THEN 'removed' ELSE 'changed' END AS change FROM paths LEFT JOIN a USING(path) LEFT JOIN b USING(path) WHERE a.path IS NULL OR b.path IS NULL OR a.digest IS NOT b.digest OR a.kind IS NOT b.kind ORDER BY paths.path" call append 2 call append 2 call arr 0 oldid newid
+  0
+  if call same 2 toolname call str 1 utf8 "artifact.read" 3
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT meta AS \"meta:json\",encoded AS base64 FROM artifacts WHERE id=? AND project=?" call append 2 call append 2 call arr 0 call key 2 args call str 1 utf8 "artifact" pid 0
+    set discard call require 2 not call same 2 row 0u call str 1 utf8 "Artifact unavailable"
+    ret row
+  0
+  if call same 2 toolname call str 1 utf8 "artifact.list" 1
+    ret call query 2 call str 1 utf8 "SELECT meta AS \"artifact:json\" FROM artifacts WHERE project=? ORDER BY rowid DESC LIMIT 100" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "artifact.write" 1
+    ret call capture 1 call put 3 args call str 1 utf8 "project" pid
+  0
+  if call same 2 toolname call str 1 utf8 "stage.mkdir" 1
+    ret call stage 3 pid call str 1 utf8 "mkdir" args
+  0
+  if call same 2 toolname call str 1 utf8 "stage.copy" 1
+    ret call stage 3 pid call str 1 utf8 "copy" args
+  0
+  if call same 2 toolname call str 1 utf8 "stage.move" 1
+    ret call stage 3 pid call str 1 utf8 "move" args
+  0
+  if call same 2 toolname call str 1 utf8 "stage.remove" 1
+    ret call stage 3 pid call str 1 utf8 "remove" args
+  0
+  if call same 2 toolname call str 1 utf8 "stage.create" 1
+    ret call stage 3 pid call str 1 utf8 "create" args
+  0
+  if call same 2 toolname call str 1 utf8 "project.lookup" 1
+    ret call query 2 call str 1 utf8 "SELECT id,intent,state,revision FROM requests WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request"
+  0
+  if call same 2 toolname call str 1 utf8 "task.list" 1
+    ret call query 2 call str 1 utf8 "SELECT b.id,b.role,b.report,b.accepted FROM branches b JOIN requests r ON r.id=b.request WHERE r.project=? LIMIT 100" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "task.get" 1
+    ret call query 2 call str 1 utf8 "SELECT b.* FROM branches b JOIN requests r ON r.id=b.request WHERE r.project=? AND b.id=?" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "id"
+  0
+  if call same 2 toolname call str 1 utf8 "session.list" 1
+    ret call query 2 call str 1 utf8 "SELECT DISTINCT session,role FROM jobs WHERE project=? LIMIT 100" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "session.get" 1
+    ret call query 2 call str 1 utf8 "SELECT session,role,kind,state FROM jobs WHERE project=? AND session=? ORDER BY rowid DESC LIMIT 30" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "id"
+  0
+  if call same 2 toolname call str 1 utf8 "job.status" 1
+    ret call query 2 call str 1 utf8 "SELECT id,kind,state,reason,revision FROM jobs WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "id"
+  0
+  if call same 2 toolname call str 1 utf8 "job.receipt" 1
+    ret call query 2 call str 1 utf8 "SELECT receipt AS \"receipt:json\",state FROM jobs WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "id"
+  0
+  if call same 2 toolname call str 1 utf8 "job.trace" 1
+    ret call query 2 call str 1 utf8 "SELECT a.* FROM attempts a JOIN jobs j ON j.id=a.job WHERE j.project=? AND j.id=? ORDER BY started" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "id"
+  0
+  if call same 2 toolname call str 1 utf8 "daemon.metrics" 1
+    ret call query 2 call str 1 utf8 "SELECT j.role,count(DISTINCT j.id) AS jobs,count(a.id) AS model_attempts FROM jobs j LEFT JOIN attempts a ON a.job=j.id WHERE j.project=? GROUP BY j.role" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "workflow.find" 1
+    ret call query 2 call str 1 utf8 "SELECT * FROM candidates WHERE project=? ORDER BY rowid DESC LIMIT 100" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "skill.find" 1
+    ret call query 2 call str 1 utf8 "SELECT id,name,digest,active FROM skills WHERE project=? ORDER BY name" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "plan.get" 1
+    ret call query 2 call str 1 utf8 "SELECT revision,body AS \"plan:json\" FROM plans WHERE project=? AND request=?" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request"
+  0
+  if call same 2 toolname call str 1 utf8 "schedule.list" 1
+    ret call query 2 call str 1 utf8 "SELECT * FROM schedules WHERE project=? LIMIT 100" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "dictionary.get" 1
+    ret call nth 2 call expand 2 pid call append 2 call arr 0 call key 2 args call str 1 utf8 "ref" 0
+  0
+  if call same 2 toolname call str 1 utf8 "dictionary.expand" 1
+    ret call expand 2 pid call key 2 args call str 1 utf8 "refs"
+  0
+  if call same 2 toolname call str 1 utf8 "skill.read" 5
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT resources AS \"files:json\" FROM skills WHERE project=? AND id=? AND active=1" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "id" 0
+    set discard call require 2 not call same 2 row 0u call str 1 utf8 "Skill unavailable"
+    set out call key 2 call key 2 row call str 1 utf8 "files" call key 2 args call str 1 utf8 "path"
+    set discard call require 2 not call same 2 out 0u call str 1 utf8 "Resource unavailable"
+    ret out
+  0
+  if call same 2 toolname call str 1 utf8 "plan.update" 3
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT revision FROM requests WHERE project=? AND id=? AND state='open'" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request" 0
+    set discard call require 2 call same 2 call key 2 row call str 1 utf8 "revision" call key 2 args call str 1 utf8 "revision" call str 1 utf8 "Request revision conflict"
+    ret call query 2 call str 1 utf8 "INSERT INTO plans VALUES(?,?,?,?) ON CONFLICT(project,request) DO UPDATE SET revision=excluded.revision,body=excluded.body" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request" call key 2 args call str 1 utf8 "revision" call encode 1 call key 2 args call str 1 utf8 "plan"
+  0
+  if call same 2 toolname call str 1 utf8 "workflow.propose" 3
+    set sid call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "operation" call key 2 args call str 1 utf8 "contract" call key 2 args call str 1 utf8 "source"
+    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO candidates VALUES(?,?,?,?,?,?,'deferred')" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid call key 2 args call str 1 utf8 "operation" call key 2 args call str 1 utf8 "description" call key 2 args call str 1 utf8 "evidence" call key 2 args call str 1 utf8 "checks"
+    ret call shape 2 call str 1 utf8 "{\"candidate\":\"$0\",\"state\":\"deferred\"}" call append 2 call arr 0 sid
+  0
+  if call same 2 toolname call str 1 utf8 "dictionary.propose" 3
+    set sid call uid 0
+    set discard call query 2 call str 1 utf8 "INSERT INTO proposals VALUES(?,?,?,?,?,?,'pending')" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid call key 2 args call str 1 utf8 "entry" call key 2 args call str 1 utf8 "revision" call key 2 args call str 1 utf8 "definition" call key 2 args call str 1 utf8 "source"
+    ret sid
+  0
+  if call same 2 toolname call str 1 utf8 "notify.local" 1
+    ret call audit 3 pid call str 1 utf8 "Notification" call shape 2 call str 1 utf8 "{\"summary\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "message"
+  0
+  ret call require 2 false call str 1 utf8 "Unknown service"

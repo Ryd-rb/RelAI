@@ -1,0 +1,24 @@
+{
+  "destination": "anthropic",
+  "body": {
+    "model": "$0",
+    "system": "$1",
+    "thinking": {
+      "type": "adaptive"
+    },
+    "output_config": {
+      "effort": "$2",
+      "format": {
+        "type": "json_schema",
+        "schema": "$4"
+      }
+    },
+    "messages": [
+      {
+        "role": "user",
+        "content": "$3"
+      }
+    ],
+    "max_tokens": 8192
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "text/plain": "text",
+  "text/markdown": "text",
+  "application/json": "text",
+  "text/csv": "text",
+  "application/pdf": "document",
+  "image/png": "image",
+  "image/jpeg": "image"
+}

@@ -1,0 +1,103 @@
+fluxr 1
+
+pub receive 1 arg uint uint do 13 j uint replyval uint actions uint a uint fan uint aid uint reason uint items uint span uint contract uint decision uint discard uint i int 21
+  set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\",j.seal AS \"sealed:json\",r.revision AS current_revision FROM jobs j JOIN requests r ON r.id=j.request WHERE j.id=? AND j.attempt=?" call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" call key 2 arg call str 1 utf8 "attempt" 0
+  set discard call require 2 not call same 2 j 0u call str 1 utf8 "Unknown attempt"
+  if not and call same 2 call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "current_revision" call same 2 call key 2 j call str 1 utf8 "state" call str 1 utf8 "running" 2
+    set discard call query 2 call str 1 utf8 "UPDATE attempts SET state='late',ended=unixepoch() WHERE id=? AND state='sending'" call append 2 call arr 0 call key 2 arg call str 1 utf8 "attempt"
+    ret 0u
+  0
+  if not call same 2 call key 2 arg call str 1 utf8 "error" 0u 1
+    ret call hold 1 arg
+  0
+  if not call seal_current 1 j 1 ret call hold 1 call put 3 arg call str 1 utf8 "error" call str 1 utf8 "Input access changed before admission." 0
+  set replyval call unpack 2 call key 2 call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "preset" call str 1 utf8 "provider" call key 2 arg call str 1 utf8 "response"
+  set discard call check 2 call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "schema" replyval
+  set actions call key 2 replyval call str 1 utf8 "actions"
+  set discard call require 2 le call size 1 actions 8 call str 1 utf8 "Action limit exceeded"
+  set discard call require 2 or lt 0 call size 1 actions call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" call str 1 utf8 "Missing actions"
+  if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "intake" 4
+    set items call key 2 replyval call str 1 utf8 "dispositions"
+    set discard call require 2 lt 0 call size 1 items call str 1 utf8 "Missing dispositions"
+    set i 0
+    while lt i call size 1 items 4
+    set span call nth 2 items i
+    set discard call slice 3 call key 2 call key 2 j call str 1 utf8 "body" call str 1 utf8 "text" call number 1 call key 2 span call str 1 utf8 "start" call number 1 call key 2 span call str 1 utf8 "end"
+    if call same 2 call key 2 span call str 1 utf8 "attachment" 0u 1
+    set discard call require 2 lt 0 call size 1 discard call str 1 utf8 "Empty source span"
+  1
+    set discard call require 2 call has_ref 2 call key 2 call key 2 j call str 1 utf8 "body" call str 1 utf8 "attachments" call key 2 span call str 1 utf8 "attachment" call str 1 utf8 "Unknown attachment disposition"
+    next i
+  0
+  if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" 4
+    set discard call review_refs 2 call key 2 j call str 1 utf8 "body" replyval
+    set discard call require 2 call same 2 call key 2 replyval call str 1 utf8 "review_id" call key 2 call key 2 j call str 1 utf8 "body" call str 1 utf8 "review_id" call str 1 utf8 "Incorrect review ID"
+    set decision call key 2 replyval call str 1 utf8 "decision"
+    if call same 2 decision call str 1 utf8 "finish" 1
+    set discard call require 2 and eq 1 call size 1 actions call same 2 call key 2 call nth 2 actions 0 call str 1 utf8 "result_kind" call str 1 utf8 "final" call str 1 utf8 "Finish requires exactly one final result"
+  0
+  0
+  set i 0
+  while lt i call size 1 actions 3
+    set a call nth 2 actions i
+    if call same 2 call key 2 a call str 1 utf8 "result_kind" call str 1 utf8 "final" 2
+    set discard call require 2 eq 1 call size 1 actions call str 1 utf8 "Final result must be the only action"
+    if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" 1
+    set discard call require 2 call same 2 decision call str 1 utf8 "finish" call str 1 utf8 "Final result requires finish"
+  0
+  0
+    next i
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='accepted',receipt=? WHERE id=?" call append 2 call append 2 call arr 0 replyval call key 2 j call str 1 utf8 "id"
+  set discard call query 2 call str 1 utf8 "UPDATE attempts SET state='accepted',ended=unixepoch() WHERE id=?" call append 2 call arr 0 call key 2 arg call str 1 utf8 "attempt"
+  set discard call query 2 call str 1 utf8 "UPDATE questions SET state='answered' WHERE id=? AND state='answer_queued'" call append 2 call arr 0 call key 2 call key 2 j call str 1 utf8 "body" call str 1 utf8 "answer_to"
+  set fan call uid 0
+  set i 0
+  while lt i call size 1 actions 5
+    set a call nth 2 actions i
+    set aid call uid 0
+    set reason call admit 4 j aid fan a
+    if not call same 2 reason 0u 2
+    set discard call query 2 call str 1 utf8 "INSERT INTO actions VALUES(?,?,?,?,'held')" call append 2 call append 2 call append 2 call append 2 call arr 0 aid call key 2 j call str 1 utf8 "id" call key 2 a call str 1 utf8 "type" a
+    set discard call audit 3 call key 2 j call str 1 utf8 "project" call str 1 utf8 "Action held" call shape 2 call str 1 utf8 "{\"action\":\"$0\",\"request\":\"$1\",\"reason\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 aid call key 2 j call str 1 utf8 "request" reason
+  0
+    next i
+  ret call review_ready 1 call key 2 j call str 1 utf8 "request"
+
+pub control 1 arg uint uint do 10 p uint cmd uint jid uint aid uint j uint r uint discard uint requestid uint state uint row uint 9
+  set p call key 2 call project 1 arg call str 1 utf8 "id"
+  set cmd call key 2 arg call str 1 utf8 "op"
+  set jid call key 2 arg call str 1 utf8 "job"
+  set aid call key 2 arg call str 1 utf8 "action"
+  if call same 2 cmd call str 1 utf8 "accept" 7
+    set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,a.payload AS \"proposal:json\",a.state AS action_state FROM actions a JOIN jobs j ON j.id=a.job JOIN requests r ON r.id=j.request AND r.revision=j.revision AND r.state='open' WHERE a.id=? AND j.project=? AND a.kind='RESULT'" call append 2 call append 2 call arr 0 aid p 0
+    set discard call require 2 not call same 2 j 0u call str 1 utf8 "Evidence is unavailable or superseded"
+    set r call key 2 j call str 1 utf8 "request"
+    if call same 2 call key 2 j call str 1 utf8 "action_state" call str 1 utf8 "awaiting_acceptance" 2
+    set discard call require 2 call clear_work 2 r call key 2 j call str 1 utf8 "revision" call str 1 utf8 "Outstanding work"
+    set discard call close_request 4 j aid call cat 2 call cat 2 call cat 2 call cat 2 call str 1 utf8 "actions/" aid call str 1 utf8 "/RESULT-" aid call str 1 utf8 ".json" call key 2 j call str 1 utf8 "proposal"
+  2
+    set discard call query 2 call str 1 utf8 "UPDATE branches SET accepted=? WHERE id=? AND report=? AND accepted IS NULL AND NOT EXISTS(SELECT 1 FROM questions WHERE session=? AND revision=? AND state!='answered')" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"verifier\":\"user\",\"evidence\":\"$0\",\"revision\":\"$1\"}" call append 2 call append 2 call arr 0 aid call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "session" aid call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "revision"
+    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Evidence no longer current"
+    set discard call query 2 call str 1 utf8 "UPDATE actions SET state='verified' WHERE id=?" call append 2 call arr 0 aid
+    set discard call audit 3 p call str 1 utf8 "Accepted" call shape 2 call str 1 utf8 "{\"request\":\"$0\",\"evidence\":\"$1\"}" call append 2 call append 2 call arr 0 r aid
+    ret call review_ready 1 r
+  0
+  if call same 2 cmd call str 1 utf8 "stop" 5
+    set r call key 2 arg call str 1 utf8 "request"
+    set discard call query 2 call str 1 utf8 "UPDATE requests SET state='cancelled' WHERE project=? AND id=? AND state='open'" call append 2 call append 2 call arr 0 p r
+    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Request already closed"
+    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='cancelled' WHERE request=? AND state NOT IN ('accepted','superseded')" call append 2 call arr 0 r
+    ret call audit 3 p call str 1 utf8 "Request stopped" call shape 2 call str 1 utf8 "{\"request\":\"$0\"}" call append 2 call arr 0 r
+  0
+  if call same 2 cmd call str 1 utf8 "retry" 3
+    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state=CASE WHEN seal IS NULL THEN 'queued' ELSE 'sealed' END,reason=NULL WHERE id=? AND project=? AND state IN ('held','uncertain') AND revision=(SELECT revision FROM requests WHERE id=jobs.request)" call append 2 call append 2 call arr 0 jid p
+    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Job is no longer retryable"
+    ret call audit 3 p call str 1 utf8 "Retry queued" call shape 2 call str 1 utf8 "{\"job\":\"$0\"}" call append 2 call arr 0 jid
+  0
+  if call same 2 cmd call str 1 utf8 "replace" 4
+    set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\" FROM jobs j JOIN requests r ON r.id=j.request AND r.revision=j.revision WHERE j.id=? AND j.project=? AND j.state IN ('running','held','uncertain','sealed')" call append 2 call append 2 call arr 0 jid p 0
+    set discard call require 2 not call same 2 j 0u call str 1 utf8 "Job cannot be replaced"
+    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded' WHERE id=?" call append 2 call arr 0 jid
+    ret call job 6 p call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call key 2 j call str 1 utf8 "kind" call key 2 j call str 1 utf8 "body"
+  0
+  ret call require 2 false call str 1 utf8 "Unknown control"

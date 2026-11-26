@@ -1,0 +1,140 @@
+fluxr 1
+
+fn dictionary_init 1 pid uint uint do 1 discard uint 3
+  set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO dictionaries VALUES(?,?,'Project',0)" call append 2 call append 2 call arr 0 pid pid
+  set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO dictionary_links VALUES(?,?,1,1)" call append 2 call append 2 call arr 0 pid pid
+  ret call query 2 call str 1 utf8 "INSERT OR IGNORE INTO dictionary_links VALUES(?,'RelAI',1,1)" call append 2 call arr 0 pid
+
+fn glossary 0  uint do 1 discard uint 2
+  set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO dictionaries VALUES('RelAI',NULL,'RelAI',0)" call arr 0
+  ret call query 2 call str 1 utf8 "INSERT OR IGNORE INTO entries SELECT 'RelAI/'||key,1,'RelAI',key,'knowledge',value,'DESIGN.md',0 FROM json_each(?)" call append 2 call arr 0 call asset 1 call str 1 utf8 "glossary.json"
+
+fn vocab 1 pid uint uint do 0  1
+  ret call query 2 call str 1 utf8 "SELECT e.id,e.revision,e.dictionary AS dictionary_id,e.name,e.kind FROM entries e JOIN dictionary_links g ON g.dictionary=e.dictionary AND g.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE g.project=? AND e.revision=(SELECT max(revision) FROM entries x WHERE x.id=e.id) ORDER BY e.id" call append 2 call arr 0 pid
+
+fn expand 2 pid uint refs uint uint do 6 out uint refval uint seen uint entry uint discard uint i int 7
+  set discard call require 2 le call size 1 refs 32 call str 1 utf8 "Expansion exceeds 32 terms"
+  set out call arr 0
+  set seen call obj 0
+  set i 0
+  while lt i call size 1 refs 3
+    set refval call nth 2 refs i
+    if call same 2 call key 2 seen call encode 1 refval 0u 3
+    set entry call nth 2 call query 2 call str 1 utf8 "SELECT e.* FROM entries e JOIN dictionary_links g ON g.dictionary=e.dictionary AND g.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE g.project=? AND e.id=? AND e.revision=? AND e.dictionary=?" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 refval call str 1 utf8 "id" call key 2 refval call str 1 utf8 "revision" call key 2 refval call str 1 utf8 "dictionary_id" 0
+    set out call append 2 out call shape 2 call str 1 utf8 "{\"ref\":\"$0\",\"definition\":\"$1\"}" call append 2 call append 2 call arr 0 refval entry
+    set seen call put 3 seen call encode 1 refval call integer 1 1
+  0
+    next i
+  set discard call require 2 le call size 1 call encode 1 out 131072 call str 1 utf8 "Expansion byte limit"
+  ret out
+
+pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry uint eid uint revision uint n uint discard uint 23
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set op call key 2 arg call str 1 utf8 "op"
+  set did call key 2 arg call str 1 utf8 "dictionary"
+  if call same 2 did 0u 1
+    set did pid
+  0
+  if call same 2 op call str 1 utf8 "list" 1
+    ret call query 2 call str 1 utf8 "SELECT d.*,coalesce(g.enabled,0) AS enabled FROM dictionaries d LEFT JOIN dictionary_links g ON g.dictionary=d.id AND g.project=? ORDER BY d.name" call append 2 call arr 0 pid
+  0
+  if call same 2 op call str 1 utf8 "find" 1
+    ret call vocab 1 pid
+  0
+  if call same 2 op call str 1 utf8 "expand" 1
+    ret call expand 2 pid call key 2 arg call str 1 utf8 "refs"
+  0
+  if call same 2 op call str 1 utf8 "create" 4
+    set did call uid 0
+    set discard call query 2 call str 1 utf8 "INSERT INTO dictionaries VALUES(?,?,?,0)" call append 2 call append 2 call append 2 call arr 0 did pid call key 2 arg call str 1 utf8 "name"
+    set discard call query 2 call str 1 utf8 "INSERT INTO dictionary_links VALUES(?,?,1,1)" call append 2 call append 2 call arr 0 pid did
+    ret did
+  0
+  if or call same 2 op call str 1 utf8 "link" call same 2 op call str 1 utf8 "unlink" 4
+    set discard call require 2 not call same 2 did call str 1 utf8 "RelAI" call str 1 utf8 "The protocol dictionary is permanent"
+    set n call integer 1 0
+    if call same 2 op call str 1 utf8 "link" 1
+    set n call integer 1 1
+  0
+    ret call query 2 call str 1 utf8 "INSERT INTO dictionary_links VALUES(?,?,?,1) ON CONFLICT(project,dictionary) DO UPDATE SET enabled=excluded.enabled,revision=dictionary_links.revision+1" call append 2 call append 2 call append 2 call arr 0 pid did n
+  0
+  set owner call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT owner FROM dictionaries WHERE id=? AND archived=0" call append 2 call arr 0 did 0 call str 1 utf8 "owner"
+  set discard call require 2 call same 2 owner pid call str 1 utf8 "Edit in the dictionary owner project"
+  if call same 2 op call str 1 utf8 "rename" 1
+    ret call query 2 call str 1 utf8 "UPDATE dictionaries SET name=? WHERE id=?" call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "name" did
+  0
+  if call same 2 op call str 1 utf8 "archive" 1
+    ret call query 2 call str 1 utf8 "UPDATE dictionaries SET archived=1 WHERE id=?" call append 2 call arr 0 did
+  0
+  set discard call require 2 call same 2 op call str 1 utf8 "save" call str 1 utf8 "Unknown dictionary operation"
+  set eid call key 2 arg call str 1 utf8 "id"
+  if call same 2 eid 0u 1
+    set eid call uid 0
+  0
+  set entry call nth 2 call query 2 call str 1 utf8 "SELECT * FROM entries WHERE id=? ORDER BY revision DESC LIMIT 1" call append 2 call arr 0 eid 0
+  set revision call integer 1 1
+  if not call same 2 entry 0u 2
+    set discard call require 2 and call same 2 call key 2 entry call str 1 utf8 "revision" call key 2 arg call str 1 utf8 "revision" call same 2 call key 2 entry call str 1 utf8 "dictionary" did call str 1 utf8 "Revision conflict"
+    set revision call integer 1 add 1 call number 1 call key 2 entry call str 1 utf8 "revision"
+  0
+  set discard call require 2 and lt 0 call size 1 call key 2 arg call str 1 utf8 "name" le call size 1 call key 2 arg call str 1 utf8 "name" 256 call str 1 utf8 "Invalid term name"
+  set discard call require 2 or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "tool" call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "skill" call str 1 utf8 "Unknown entry type"
+  set discard call query 2 call str 1 utf8 "INSERT INTO entries VALUES(?,?,?,?,?,?,'user',1)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid revision did call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "kind" call key 2 arg call str 1 utf8 "definition"
+  ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"dictionary_id\":\"$1\",\"revision\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 eid did revision
+
+fn annotate 2 pid uint body uint uint do 9 matchesval uint out uint span uint term uint mark uint i int pos int start int end int 7
+  set matchesval call matches 2 body call vocab 1 pid
+  set out call arr 0
+  set i 0
+  set pos 0
+  while lt i call size 1 matchesval 12
+    set span call nth 2 matchesval i
+    set start call number 1 call key 2 span call str 1 utf8 "start"
+    set end call number 1 call key 2 span call str 1 utf8 "end"
+    if lt pos start 1
+    set out call append 2 out call shape 2 call str 1 utf8 "{\"text\":\"$0\"}" call append 2 call arr 0 call slice 3 body pos start
+  0
+    set term call key 2 span call str 1 utf8 "ref"
+    set mark call str 1 utf8 "◇"
+    if call same 2 call key 2 term call str 1 utf8 "kind" call str 1 utf8 "tool" 1
+    set mark call str 1 utf8 "⚙"
+  0
+    if call same 2 call key 2 term call str 1 utf8 "kind" call str 1 utf8 "skill" 1
+    set mark call str 1 utf8 "✦"
+  0
+    set term call put 3 term call str 1 utf8 "mark" mark
+    set out call append 2 out call shape 2 call str 1 utf8 "{\"text\":\"$0\",\"term\":\"$1\"}" call append 2 call append 2 call arr 0 call slice 3 body start end term
+    set pos end
+    next i
+  if lt pos call size 1 body 1
+    set out call append 2 out call shape 2 call str 1 utf8 "{\"text\":\"$0\"}" call append 2 call arr 0 call slice 3 body pos call size 1 body
+  0
+  ret out
+
+pub skill 1 arg uint uint do 11 pid uint op uint pkg uint md uint attrs uint sid uint name uint hashval uint eid uint discard uint found uint 20
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set op call key 2 arg call str 1 utf8 "op"
+  set sid call key 2 arg call str 1 utf8 "id"
+  if call same 2 op call str 1 utf8 "list" 1
+    ret call query 2 call str 1 utf8 "SELECT id,name,digest,description,active FROM skills WHERE project=? ORDER BY name" call append 2 call arr 0 pid
+  0
+  if call same 2 op call str 1 utf8 "remove" 1
+    ret call query 2 call str 1 utf8 "UPDATE skills SET active=0 WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid sid
+  0
+  if call same 2 op call str 1 utf8 "inspect" 1
+    ret call nth 2 call query 2 call str 1 utf8 "SELECT id,name,digest,description,body,resources AS \"files:json\",active FROM skills WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid sid 0
+  0
+  set discard call require 2 call same 2 op call str 1 utf8 "install" call str 1 utf8 "Unknown skill operation"
+  set pkg call bundle 1 call key 2 arg call str 1 utf8 "path"
+  set md call frontmatter 1 call key 2 pkg call str 1 utf8 "SKILL.md"
+  set attrs call key 2 md call str 1 utf8 "attributes"
+  set name call key 2 attrs call str 1 utf8 "name"
+  set discard call require 2 and lt 0 call size 1 name le call size 1 name 128 call str 1 utf8 "Invalid skill name"
+  set discard call require 2 and lt 0 call size 1 call key 2 attrs call str 1 utf8 "description" lt 0 call size 1 call key 2 md call str 1 utf8 "body" call str 1 utf8 "Missing skill description or instructions"
+  set discard call require 2 call same 2 call key 2 pkg call str 1 utf8 "relai-skill.json" 0u call str 1 utf8 "Package tool dependencies require qualification"
+  set hashval call hash 1 call encode 1 pkg
+  set sid call hash 1 call encode 1 call append 2 call append 2 call append 2 call arr 0 pid name hashval
+  set discard call query 2 call str 1 utf8 "INSERT INTO skills VALUES(?,?,?,?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET active=1" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid name hashval call key 2 attrs call str 1 utf8 "description" call key 2 md call str 1 utf8 "body" pkg
+  set eid call hash 1 call encode 1 call append 2 call append 2 call append 2 call arr 0 pid call str 1 utf8 "skill" name
+  set discard call query 2 call str 1 utf8 "INSERT INTO entries SELECT ?1,coalesce(max(revision),0)+1,?2,?3,'skill',coalesce((SELECT definition FROM entries WHERE id=?1 AND human=1 ORDER BY revision DESC LIMIT 1),?4),?5,coalesce(max(human),0) FROM entries WHERE id=?1" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid pid name call key 2 attrs call str 1 utf8 "description" sid
+  ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"name\":\"$1\",\"digest\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid name hashval

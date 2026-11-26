@@ -1,0 +1,572 @@
+fluxr 1
+
+fn tool_runtime 0  uint do 0  1
+  ret call str 1 utf8 "fluxr:69e1898934f8954f6f03a51bd7bc9ffc1ed3b620;portable;source=65536;fuel=100000;cells=262144;frames=64;hosts=none"
+
+fn tool_known 1 toolname uint bool do 0  1
+  ret or call extra_known 1 toolname or or or or or or or or or or or or or or or or or or or or or or or or call same 2 toolname call str 1 utf8 "project.info" call same 2 toolname call str 1 utf8 "fs.list" call same 2 toolname call str 1 utf8 "fs.read" call same 2 toolname call str 1 utf8 "fs.digest" call same 2 toolname call str 1 utf8 "fs.count" call same 2 toolname call str 1 utf8 "fs.search" call same 2 toolname call str 1 utf8 "data.parse" call same 2 toolname call str 1 utf8 "data.summarize" call same 2 toolname call str 1 utf8 "data.transform" call same 2 toolname call str 1 utf8 "tool.inspect" call same 2 toolname call str 1 utf8 "dictionary.find" call same 2 toolname call str 1 utf8 "document.read" call same 2 toolname call str 1 utf8 "document.write" call same 2 toolname call str 1 utf8 "sheet.read" call same 2 toolname call str 1 utf8 "sheet.write" call same 2 toolname call str 1 utf8 "notebook.edit" call same 2 toolname call str 1 utf8 "archive.list" call same 2 toolname call str 1 utf8 "archive.create" call same 2 toolname call str 1 utf8 "archive.extract" call same 2 toolname call str 1 utf8 "verify.format" call same 2 toolname call str 1 utf8 "verify.lint" call same 2 toolname call str 1 utf8 "verify.build" call same 2 toolname call str 1 utf8 "verify.test" call same 2 toolname call str 1 utf8 "verify.benchmark" false
+
+fn tool_signature 1 capability uint uint do 0  3
+  if call same 2 capability call str 1 utf8 "integer.increment" 1
+  ret call decode 1 call str 1 utf8 "[[\"i64\"],\"i64\"]"
+  0
+
+  if or call same 2 capability call str 1 utf8 "integer.sum" call same 2 capability call str 1 utf8 "integer.count" 1
+  ret call decode 1 call str 1 utf8 "[[{\"list\":\"i64\"}],\"i64\"]"
+  0
+
+  ret 0u
+
+fn tool_fixtures 1 capability uint uint do 0  4
+  if call same 2 capability call str 1 utf8 "integer.increment" 1
+  ret call decode 1 call str 1 utf8 "[{\"arguments\":[{\"i64\":0}],\"inputs\":[],\"expected\":{\"i64\":1}},{\"arguments\":[{\"i64\":7}],\"inputs\":[],\"expected\":{\"i64\":8}},{\"arguments\":[{\"i64\":-11}],\"inputs\":[],\"expected\":{\"i64\":-10}},{\"arguments\":[{\"i64\":0}],\"inputs\":[],\"expected\":{\"i64\":1}},{\"arguments\":[{\"i64\":7}],\"inputs\":[],\"expected\":{\"i64\":8}},{\"arguments\":[{\"i64\":-11}],\"inputs\":[],\"expected\":{\"i64\":-10}}]"
+  0
+
+  if call same 2 capability call str 1 utf8 "integer.sum" 1
+  ret call decode 1 call str 1 utf8 "[{\"arguments\":[{\"list\":[]}],\"inputs\":[],\"expected\":{\"i64\":0}},{\"arguments\":[{\"list\":[{\"i64\":2},{\"i64\":-1},{\"i64\":7}]}],\"inputs\":[],\"expected\":{\"i64\":8}},{\"arguments\":[{\"list\":[{\"i64\":42}]}],\"inputs\":[],\"expected\":{\"i64\":42}},{\"arguments\":[{\"list\":[]}],\"inputs\":[],\"expected\":{\"i64\":0}},{\"arguments\":[{\"list\":[{\"i64\":2},{\"i64\":-1},{\"i64\":7}]}],\"inputs\":[],\"expected\":{\"i64\":8}},{\"arguments\":[{\"list\":[{\"i64\":42}]}],\"inputs\":[],\"expected\":{\"i64\":42}}]"
+  0
+
+  if call same 2 capability call str 1 utf8 "integer.count" 1
+  ret call decode 1 call str 1 utf8 "[{\"arguments\":[{\"list\":[]}],\"inputs\":[],\"expected\":{\"i64\":0}},{\"arguments\":[{\"list\":[{\"i64\":1},{\"i64\":9}]}],\"inputs\":[],\"expected\":{\"i64\":2}},{\"arguments\":[{\"list\":[{\"i64\":0}]}],\"inputs\":[],\"expected\":{\"i64\":1}},{\"arguments\":[{\"list\":[]}],\"inputs\":[],\"expected\":{\"i64\":0}},{\"arguments\":[{\"list\":[{\"i64\":1},{\"i64\":9}]}],\"inputs\":[],\"expected\":{\"i64\":2}},{\"arguments\":[{\"list\":[{\"i64\":0}]}],\"inputs\":[],\"expected\":{\"i64\":1}}]"
+  0
+
+  ret 0u
+
+fn tool_entry 2 projectid uint version uint uint do 2 entry uint discard uint 4
+  set entry call nth 2 call query 2 call str 1 utf8 "SELECT * FROM tools WHERE project=? AND version=?" call append 2 call append 2 call arr 0  projectid version 0
+  set discard call require 2 not call same 2 entry 0u call str 1 utf8 "Tool version is outside this project or unavailable"
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "runtime" call tool_runtime 0  call str 1 utf8 "Tool runtime changed; new qualification required"
+  ret entry
+
+fn tool_evaluation 2 entry uint case uint uint do 0  1
+  ret call shape 2 call str 1 utf8 "{\"source\":\"$0\",\"export\":\"$1\",\"arguments\":\"$2\",\"inputs\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "source" call key 2 entry call str 1 utf8 "export" call key 2 case call str 1 utf8 "arguments" call key 2 case call str 1 utf8 "inputs"
+
+fn tool_defer 3 evaluation uint resume uint state uint uint do 0  1
+  ret call shape 2 call str 1 utf8 "{\"$evaluate\":\"$0\",\"resume\":\"$1\",\"state\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  evaluation resume state
+
+pub tool_propose 1 arg uint uint do 7 pid uint name uint source uint exportname uint capability uint version uint discard uint 12
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set name call key 2 arg call str 1 utf8 "name"
+  set source call key 2 arg call str 1 utf8 "source"
+  set exportname call key 2 arg call str 1 utf8 "export"
+  set capability call key 2 arg call str 1 utf8 "capability"
+  set discard call require 2 and lt 0 call size 1 name le call size 1 name 128 call str 1 utf8 "Tool name must contain 1..128 bytes"
+  set discard call require 2 not call tool_known 1 name call str 1 utf8 "Built-in tool identifiers cannot be redefined"
+  set discard call require 2 and lt 0 call size 1 source le call size 1 source 65536 call str 1 utf8 "Draft source must contain 1..65536 bytes"
+  set discard call require 2 not call same 2 call tool_signature 1 capability 0u call str 1 utf8 "No independent fixtures for this capability; request a trusted example"
+  set version call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  pid name source exportname capability call tool_runtime 0
+  set discard call require 2 or not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT version FROM tools WHERE project=? AND version=?" call append 2 call append 2 call arr 0  pid version 0 0u lt call number 1 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM tools WHERE project=?" call append 2 call arr 0  pid 0 call str 1 utf8 "n" 128 call str 1 utf8 "Project tool registry limit reached"
+  ret call tool_defer 3 call shape 2 call str 1 utf8 "{\"source\":\"$0\",\"export\":\"$1\",\"compile_only\":true}" call append 2 call append 2 call arr 0  source exportname call str 1 utf8 "guest_tool_admit" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"name\":\"$1\",\"source\":\"$2\",\"export\":\"$3\",\"capability\":\"$4\",\"version\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  pid name source exportname capability version
+
+pub guest_tool_admit 1 arg uint uint do 5 state uint resultval uint discard uint version uint entry uint 10
+  set state call key 2 arg call str 1 utf8 "state"
+  set resultval call key 2 arg call str 1 utf8 "result"
+  set discard call require 2 call same 2 call key 2 arg call str 1 utf8 "error" 0u call str 1 utf8 "Source admission failed: native code, host imports, or malformed checked source"
+  set discard call require 2 call same 2 call key 2 resultval call str 1 utf8 "signature" call tool_signature 1 call key 2 state call str 1 utf8 "capability" call str 1 utf8 "Export signature differs from capability contract"
+  set discard call require 2 call same 2 call key 2 resultval call str 1 utf8 "input_types" call arr 0  call str 1 utf8 "Reusable tools cannot depend on undeclared VM inputs"
+  set discard call require 2 call same 2 call key 2 resultval call str 1 utf8 "source_digest" call hash 1 call key 2 state call str 1 utf8 "source" call str 1 utf8 "Source digest changed during admission"
+  set version call key 2 state call str 1 utf8 "version"
+  set discard call query 2 call str 1 utf8 "INSERT INTO tools(version,project,name,source,export,contract,runtime) VALUES(?,?,?,?,?,?,?) ON CONFLICT(version) DO NOTHING" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  version call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "name" call key 2 state call str 1 utf8 "source" call key 2 state call str 1 utf8 "export" call key 2 state call str 1 utf8 "capability" call tool_runtime 0
+  set entry call tool_entry 2 call key 2 state call str 1 utf8 "project" version
+  ret call shape 2 call str 1 utf8 "{\"version\":\"$0\",\"name\":\"$1\",\"status\":\"$2\",\"runtime\":\"$3\",\"source_digest\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  version call key 2 entry call str 1 utf8 "name" call key 2 entry call str 1 utf8 "status" call key 2 entry call str 1 utf8 "runtime" call key 2 resultval call str 1 utf8 "source_digest"
+
+fn tool_test_start 1 state uint uint do 4 entry uint case uint tid uint discard uint 7
+  set entry call tool_entry 2 call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "version"
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "draft" call str 1 utf8 "Tests require the exact inactive draft"
+  set case call key 2 state call str 1 utf8 "case"
+  set tid call uid 0
+  set discard call query 2 call str 1 utf8 "INSERT INTO tool_tests(id,project,version,request,expected,outcome,receipt) VALUES(?,?,?,?,?,'running','{}')" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  tid call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "version" call encode 1 case call encode 1 call key 2 case call str 1 utf8 "expected"
+  set state call put 3 state call str 1 utf8 "test_id" tid
+  ret call tool_defer 3 call tool_evaluation 2 entry case call str 1 utf8 "guest_tool_tested" state
+
+pub tool_test 1 arg uint uint do 4 pid uint entry uint case uint discard uint 5
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set entry call tool_entry 2 pid call key 2 arg call str 1 utf8 "version"
+  set case call key 2 arg call str 1 utf8 "case"
+  set discard call require 2 le call size 1 call encode 1 case 131072 call str 1 utf8 "Test input exceeds bound"
+  ret call tool_test_start 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"version\":\"$1\",\"case\":\"$2\",\"mode\":\"author\"}" call append 2 call append 2 call append 2 call arr 0  pid call key 2 entry call str 1 utf8 "version" case
+
+pub tool_qualify 1 arg uint uint do 3 pid uint entry uint fixtures uint 4
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set entry call tool_entry 2 pid call key 2 arg call str 1 utf8 "version"
+  set fixtures call tool_fixtures 1 call key 2 entry call str 1 utf8 "contract"
+  ret call tool_test_start 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"version\":\"$1\",\"case\":\"$2\",\"mode\":\"qualification\",\"fixtures\":\"$3\",\"index\":0,\"passed\":true,\"receipts\":[]}" call append 2 call append 2 call append 2 call append 2 call arr 0  pid call key 2 entry call str 1 utf8 "version" call nth 2 fixtures 0 fixtures
+
+pub guest_tool_tested 1 arg uint uint do 13 state uint entry uint case uint observed uint receipt uint discard uint receipts uint passedval uint passedtext uint evidence uint nextstate uint passed bool idx int 21
+  set state call key 2 arg call str 1 utf8 "state"
+  set entry call tool_entry 2 call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "version"
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "draft" call str 1 utf8 "Draft is no longer eligible for testing"
+  set case call key 2 state call str 1 utf8 "case"
+  set observed call key 2 call key 2 arg call str 1 utf8 "result" call str 1 utf8 "value"
+  set passed and call same 2 call key 2 arg call str 1 utf8 "error" 0u call same 2 observed call key 2 case call str 1 utf8 "expected"
+  set passedval call decode 1 call str 1 utf8 "false"
+  set passedtext call str 1 utf8 "failed"
+  if passed 2
+  set passedval call decode 1 call str 1 utf8 "true"
+  set passedtext call str 1 utf8 "passed"
+  0
+
+  set receipt call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"version\":\"$1\",\"case\":\"$2\",\"expected\":\"$3\",\"observed\":\"$4\",\"passed\":\"$5\",\"error\":\"$6\",\"execution\":\"$7\",\"provisional\":true}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 state call str 1 utf8 "test_id" call key 2 state call str 1 utf8 "version" case call key 2 case call str 1 utf8 "expected" observed passedval call key 2 arg call str 1 utf8 "error" call key 2 arg call str 1 utf8 "result"
+  set discard call query 2 call str 1 utf8 "UPDATE tool_tests SET observed=?,outcome=?,receipt=? WHERE id=? AND project=? AND version=? AND outcome='running'" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  observed passedtext call encode 1 receipt call key 2 state call str 1 utf8 "test_id" call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "version"
+  set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Test receipt was already delivered or replaced"
+  if call same 2 call key 2 state call str 1 utf8 "mode" call str 1 utf8 "author" 1
+  ret receipt
+  0
+
+  set receipts call append 2 call key 2 state call str 1 utf8 "receipts" receipt
+  set passedval call decode 1 call str 1 utf8 "false"
+  if and passed call same 2 call key 2 state call str 1 utf8 "passed" call decode 1 call str 1 utf8 "true" 1
+  set passedval call decode 1 call str 1 utf8 "true"
+  0
+
+  set idx add call number 1 call key 2 state call str 1 utf8 "index" 1
+  if lt idx call size 1 call key 2 state call str 1 utf8 "fixtures" 2
+  set nextstate call put 3 call put 3 call put 3 call put 3 state call str 1 utf8 "index" call integer 1 idx call str 1 utf8 "case" call nth 2 call key 2 state call str 1 utf8 "fixtures" idx call str 1 utf8 "receipts" receipts call str 1 utf8 "passed" passedval
+  ret call tool_test_start 1 nextstate
+  0
+
+  set evidence call hash 1 call encode 1 call shape 2 call str 1 utf8 "{\"trusted_capability\":\"$0\",\"runtime\":\"$1\",\"checks\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "contract" call tool_runtime 0  receipts
+  if call same 2 passedval call decode 1 call str 1 utf8 "true" 3
+  set discard call query 2 call str 1 utf8 "UPDATE tools SET status='active',evidence=? WHERE version=? AND project=? AND status='draft' AND runtime=?" call append 2 call append 2 call append 2 call append 2 call arr 0  evidence call key 2 entry call str 1 utf8 "version" call key 2 entry call str 1 utf8 "project" call tool_runtime 0
+  set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Qualification revision changed"
+  set discard call query 2 call str 1 utf8 "INSERT INTO tool_defaults(project,name,version) VALUES(?,?,?) ON CONFLICT(project,name) DO NOTHING" call append 2 call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "project" call key 2 entry call str 1 utf8 "name" call key 2 entry call str 1 utf8 "version"
+  0
+
+  ret call shape 2 call str 1 utf8 "{\"version\":\"$0\",\"active\":\"$1\",\"evidence_digest\":\"$2\",\"checks\":\"$3\",\"runtime\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "version" passedval evidence receipts call tool_runtime 0
+
+pub tool_promote 1 arg uint uint do 4 pid uint entry uint current uint discard uint 8
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set entry call tool_entry 2 pid call key 2 arg call str 1 utf8 "version"
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "active" call str 1 utf8 "Default must be independently qualified and active"
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "name" call key 2 arg call str 1 utf8 "tool" call str 1 utf8 "Tool name differs from the exact version"
+  set current call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT version FROM tool_defaults WHERE project=? AND name=?" call append 2 call append 2 call arr 0  pid call key 2 arg call str 1 utf8 "tool" 0 call str 1 utf8 "version"
+  set discard call require 2 call same 2 current call key 2 arg call str 1 utf8 "expected" call str 1 utf8 "Expected default is stale"
+  set discard call query 2 call str 1 utf8 "INSERT INTO tool_defaults(project,name,version) VALUES(?,?,?) ON CONFLICT(project,name) DO UPDATE SET version=excluded.version" call append 2 call append 2 call append 2 call arr 0  pid call key 2 arg call str 1 utf8 "tool" call key 2 entry call str 1 utf8 "version"
+  ret call shape 2 call str 1 utf8 "{\"version\":\"$0\",\"default\":true}" call append 2 call arr 0  call key 2 entry call str 1 utf8 "version"
+
+fn tool_unavailable 2 arg uint status uint uint do 3 pid uint entry uint discard uint 6
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set entry call tool_entry 2 pid call key 2 arg call str 1 utf8 "version"
+  set discard call require 2 or call same 2 status call str 1 utf8 "revoked" not call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "revoked" call str 1 utf8 "Revocation cannot be downgraded"
+  set discard call query 2 call str 1 utf8 "UPDATE tools SET status=? WHERE version=? AND project=?" call append 2 call append 2 call append 2 call arr 0  status call key 2 entry call str 1 utf8 "version" pid
+  set discard call query 2 call str 1 utf8 "DELETE FROM tool_defaults WHERE project=? AND version=?" call append 2 call append 2 call arr 0  pid call key 2 entry call str 1 utf8 "version"
+  ret call shape 2 call str 1 utf8 "{\"version\":\"$0\",\"status\":\"$1\"}" call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "version" status
+
+pub tool_retire 1 arg uint uint do 0  1
+  ret call tool_unavailable 2 arg call str 1 utf8 "retired"
+
+pub tool_revoke 1 arg uint uint do 0  1
+  ret call tool_unavailable 2 arg call str 1 utf8 "revoked"
+
+pub tool_catalog 1 arg uint uint do 4 pid uint items uint more uint i int 6
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set items call decode 1 call str 1 utf8 "[{\"id\":\"project.info\",\"description\":\"Registered project identity and root\",\"input\":{},\"output\":\"project record\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.list\",\"description\":\"Fresh bounded directory inventory\",\"input\":{\"path\":\"relative path; empty selects root\"},\"output\":\"entries\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.read\",\"description\":\"Fresh bounded UTF-8 text\",\"input\":{\"path\":\"relative path\"},\"output\":\"text\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.digest\",\"description\":\"SHA-256 of UTF-8 file bytes\",\"input\":{\"path\":\"relative path\"},\"output\":\"digest\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.count\",\"description\":\"Count bytes, lines, or ASCII-whitespace words\",\"input\":{\"path\":\"relative path\",\"rule\":\"bytes|lines|words\"},\"output\":\"count\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.search\",\"description\":\"Literal search in one UTF-8 file, with byte spans\",\"input\":{\"path\":\"relative path\",\"query\":\"literal UTF-8 text\"},\"output\":\"matches\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"data.parse\",\"description\":\"Parse bounded JSON text\",\"input\":{\"text\":\"JSON text\"},\"output\":\"parsed JSON\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"data.summarize\",\"description\":\"Checked integer sum/count/min/max and rational mean\",\"input\":{\"values\":\"i64 array\"},\"output\":\"summary\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"data.transform\",\"description\":\"Equality row filter and explicit field projection\",\"input\":{\"rows\":\"objects\",\"filter\":\"optional {field,value}\",\"fields\":\"optional field list\"},\"output\":\"rows\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"tool.inspect\",\"description\":\"Exact scoped immutable tool contract\",\"input\":{\"version\":\"exact version\"},\"output\":\"registry record\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"dictionary.find\",\"description\":\"Find exact project terms by case-insensitive substring\",\"input\":{\"query\":\"substring\"},\"output\":\"terms\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"document.read\",\"description\":\"Read Markdown, DOCX or PDF text from exact file or artifact\",\"input\":{\"path\":\"relative file OR artifact id\",\"format\":\"markdown|docx|pdf\"},\"output\":\"text\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"document.write\",\"description\":\"Create immutable Markdown or DOCX artifact\",\"input\":{\"format\":\"markdown|docx\",\"text\":\"text\",\"name\":\"optional display name\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"sheet.read\",\"description\":\"Read XLSX scalar cell values and formulas\",\"input\":{\"path\":\"relative file OR artifact id\"},\"output\":\"sheets\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"sheet.write\",\"description\":\"Create immutable XLSX values and formula cells\",\"input\":{\"sheets\":\"[{name,cells:[{row,column,value|formula}]}]\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"notebook.edit\",\"description\":\"Derive immutable IPYNB v4 cell edits and clear edited code outputs\",\"input\":{\"path\":\"relative file OR artifact id\",\"edits\":\"[{index,source}]\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"archive.list\",\"description\":\"List safe ZIP entry paths and sizes\",\"input\":{\"path\":\"relative file OR artifact id\"},\"output\":\"entries\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"archive.create\",\"description\":\"Create immutable ZIP artifact\",\"input\":{\"entries\":\"[{path,base64}]\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"archive.extract\",\"description\":\"Extract safe ZIP entries into immutable artifacts\",\"input\":{\"path\":\"relative file OR artifact id\"},\"output\":\"artifact metadata array\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.format\",\"description\":\"Canonicalize pure checked FluxR source without activation\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\"},\"output\":\"canonical source\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.lint\",\"description\":\"Check pure source syntax, types and forbidden native/host imports\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\"},\"output\":\"build result\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.build\",\"description\":\"Compile a pure checked module without activation\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\"},\"output\":\"signature and source digest\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.test\",\"description\":\"Execute exact pure checked case and compare expected VM value\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\",\"arguments\":\"VM values\",\"expected\":\"VM value\"},\"output\":\"provisional test receipt\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.benchmark\",\"description\":\"Measure one bounded pure compilation-and-call\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\",\"arguments\":\"VM values\"},\"output\":\"measured compile and call microseconds\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"}]"
+  set more call extra_catalog 0
+  set i 0
+  while lt i call size 1 more 2
+  set items call append 2 items call nth 2 more i
+  next i
+  ret call shape 2 call str 1 utf8 "{\"builtins\":\"$0\",\"versions\":\"$1\",\"defaults\":\"$2\",\"runtime\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  items call query 2 call str 1 utf8 "SELECT version,name,export,contract,status,runtime,evidence FROM tools WHERE project=? ORDER BY name,version" call append 2 call arr 0  pid call query 2 call str 1 utf8 "SELECT name,version FROM tool_defaults WHERE project=? ORDER BY name" call append 2 call arr 0  pid call tool_runtime 0
+
+fn tool_space 1 byte uint bool do 0  1
+  ret or eq byte 32u and le 9u byte le byte 13u
+
+fn tool_count 2 textval uint rule uint uint do 7 bytes list uint i int bytepos uint countval int wasword bool white bool discard uint 10
+  if call same 2 rule call str 1 utf8 "bytes" 1
+  ret call integer 1 call size 1 textval
+  0
+
+  set discard call require 2 or call same 2 rule call str 1 utf8 "lines" call same 2 rule call str 1 utf8 "words" call str 1 utf8 "Unknown count rule"
+  set bytes call rawbytes 1 textval
+  set i 0
+  set bytepos 0u
+  set countval 0
+  set wasword false
+  while lt i call size 1 textval 3
+  if call same 2 rule call str 1 utf8 "lines" 1
+  if eq at bytes bytepos 10u 1
+  next countval
+  0
+
+  3
+  set white call tool_space 1 at bytes bytepos
+  if and not white not wasword 1
+  next countval
+  0
+
+  set wasword not white
+  next i
+  set bytepos add bytepos 1u
+  if and call same 2 rule call str 1 utf8 "lines" lt 0 call size 1 textval 1
+  if not eq last bytes 10u 1
+  next countval
+  0
+
+  0
+
+  ret call integer 1 countval
+
+fn tool_summary 1 values uint uint do 8 discard uint out uint meanval uint i int total int lowval int highval int n int 9
+  set discard call require 2 le call size 1 values 4096 call str 1 utf8 "Numeric list exceeds 4096 values"
+  set i 0
+  set total 0
+  set lowval 0
+  set highval 0
+  while lt i call size 1 values 6
+  set n call number 1 call nth 2 values i
+  if eq i 0 2
+  set lowval n
+  set highval n
+  0
+
+  if lt n lowval 1
+  set lowval n
+  0
+
+  if lt highval n 1
+  set highval n
+  0
+
+  bump total n
+  next i
+  set out call shape 2 call str 1 utf8 "{\"count\":\"$0\",\"sum\":\"$1\",\"min\":null,\"max\":null,\"mean\":null}" call append 2 call append 2 call arr 0  call integer 1 i call integer 1 total
+  if lt 0 i 3
+  set out call put 3 call put 3 out call str 1 utf8 "min" call integer 1 lowval call str 1 utf8 "max" call integer 1 highval
+  set meanval call shape 2 call str 1 utf8 "{\"numerator\":\"$0\",\"denominator\":\"$1\"}" call append 2 call append 2 call arr 0  call integer 1 total call integer 1 i
+  set out call put 3 out call str 1 utf8 "mean" meanval
+  0
+
+  ret out
+
+fn tool_transform 1 arg uint uint do 9 rows uint fields uint filterval uint out uint item uint projected uint discard uint i int k int 8
+  set rows call key 2 arg call str 1 utf8 "rows"
+  set fields call key 2 arg call str 1 utf8 "fields"
+  set filterval call key 2 arg call str 1 utf8 "filter"
+  set out call arr 0
+  set i 0
+  set discard call require 2 le call size 1 rows 4096 call str 1 utf8 "Row count exceeds bound"
+  while lt i call size 1 rows 3
+  set item call nth 2 rows i
+  if or call same 2 filterval 0u call same 2 call key 2 item call key 2 filterval call str 1 utf8 "field" call key 2 filterval call str 1 utf8 "value" 2
+  if not call same 2 fields 0u 4
+  set projected call obj 0
+  set k 0
+  while lt k call size 1 fields 2
+  set projected call put 3 projected call nth 2 fields k call key 2 item call nth 2 fields k
+  next k
+  set item projected
+  0
+
+  set out call append 2 out item
+  0
+
+  next i
+  ret out
+
+fn tool_search 2 textval uint queryval uint uint do 11 matches uint discard uint indexval uint offsetval uint bytes list uint needle list uint i int k int lineval int columnval int matchval bool 11
+  set discard call require 2 and lt 0 call size 1 queryval le call size 1 queryval 256 call str 1 utf8 "Query must contain 1..256 bytes"
+  set discard call require 2 le call size 1 textval 65536 call str 1 utf8 "Search file exceeds 65536 bytes"
+  set bytes call rawbytes 1 textval
+  set needle call rawbytes 1 queryval
+  set matches call arr 0
+  set i 0
+  set indexval 0u
+  set lineval 1
+  set columnval 0
+  while le add i call size 1 queryval call size 1 textval 8
+  set k 0
+  set offsetval 0u
+  set matchval true
+  while and matchval lt k call size 1 queryval 3
+  if not eq at bytes add indexval offsetval at needle offsetval 1
+  set matchval false
+  0
+
+  next k
+  set offsetval add offsetval 1u
+  if matchval 2
+  set discard call require 2 lt call size 1 matches 1000 call str 1 utf8 "Search result limit reached"
+  set matches call append 2 matches call shape 2 call str 1 utf8 "{\"byte_start\":\"$0\",\"byte_end\":\"$1\",\"line\":\"$2\",\"column\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  call integer 1 i call integer 1 add i call size 1 queryval call integer 1 lineval call integer 1 columnval
+  0
+
+  if eq at bytes indexval 10u 2
+  next lineval
+  set columnval 0
+  1
+  next columnval
+  next i
+  set indexval add indexval 1u
+  ret matches
+
+fn tool_read64 3 pid uint root uint arguments uint uint do 3 aid uint contentval uint discard uint 3
+  set aid call key 2 arguments call str 1 utf8 "artifact"
+  if not call same 2 aid 0u 3
+  set contentval call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT encoded FROM artifacts WHERE id=? AND project=?" call append 2 call append 2 call arr 0  aid pid 0 call str 1 utf8 "encoded"
+  set discard call require 2 not call same 2 contentval 0u call str 1 utf8 "Artifact is outside this project or unavailable"
+  ret contentval
+  0
+
+  ret call read64 2 root call key 2 arguments call str 1 utf8 "path"
+
+fn tool_write_artifact 4 pid uint name uint mime uint packed uint uint do 3 aid uint meta uint discard uint 4
+  set aid call uid 0
+  set meta call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"artifact_id\":\"$0\",\"display_name\":\"$1\",\"media_type\":\"$2\",\"byte_length\":\"$3\",\"digest\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  aid name mime call key 2 packed call str 1 utf8 "size" call key 2 packed call str 1 utf8 "digest"
+  set discard call query 2 call str 1 utf8 "INSERT INTO artifacts VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0  aid pid meta call key 2 packed call str 1 utf8 "base64"
+  ret meta
+
+fn tool_format_mime 1 formatval uint uint do 1 mime uint 3
+  set mime call key 2 call decode 1 call str 1 utf8 "{\"markdown\":\"text/markdown\",\"docx\":\"application/vnd.openxmlformats-officedocument.wordprocessingml.document\",\"xlsx\":\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\",\"ipynb\":\"application/x-ipynb+json\",\"zip\":\"application/zip\"}" formatval
+  if call same 2 mime 0u 1
+  ret call str 1 utf8 "application/octet-stream"
+  0
+
+  ret mime
+
+fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root uint path uint textval uint discard uint entries uint out uint queryval uint formatval uint nameval uint doc uint cells uint item uint edit uint packed uint meta uint i int 17
+  if call extra_known 1 toolname 1
+  ret call extra_run 3 pid toolname arguments
+  0
+
+  set p call nth 2 call query 2 call str 1 utf8 "SELECT * FROM projects WHERE id=?" call append 2 call arr 0  pid 0
+  set root call key 2 p call str 1 utf8 "root"
+  set path call key 2 arguments call str 1 utf8 "path"
+  if call same 2 toolname call str 1 utf8 "project.info" 1
+  ret p
+  0
+
+  if call same 2 toolname call str 1 utf8 "fs.list" 2
+  if call same 2 path 0u 1
+  set path call str 1 utf8 ""
+  0
+
+  ret call directory 2 root path
+  0
+
+  if or call same 2 toolname call str 1 utf8 "fs.read" or call same 2 toolname call str 1 utf8 "fs.digest" or call same 2 toolname call str 1 utf8 "fs.count" call same 2 toolname call str 1 utf8 "fs.search" 6
+  set textval call readtext 2 root path
+  set discard call require 2 le call size 1 textval 131072 call str 1 utf8 "File exceeds tool text limit"
+  if call same 2 toolname call str 1 utf8 "fs.read" 1
+  ret call shape 2 call str 1 utf8 "{\"text\":\"$0\",\"encoding\":\"utf-8\",\"fresh\":true}" call append 2 call arr 0  textval
+  0
+
+  if call same 2 toolname call str 1 utf8 "fs.digest" 1
+  ret call shape 2 call str 1 utf8 "{\"algorithm\":\"sha256\",\"digest\":\"$0\"}" call append 2 call arr 0  call hash 1 textval
+  0
+
+  if call same 2 toolname call str 1 utf8 "fs.count" 1
+  ret call shape 2 call str 1 utf8 "{\"count\":\"$0\",\"rule\":\"$1\"}" call append 2 call append 2 call arr 0  call tool_count 2 textval call key 2 arguments call str 1 utf8 "rule" call key 2 arguments call str 1 utf8 "rule"
+  0
+
+  ret call shape 2 call str 1 utf8 "{\"matches\":\"$0\"}" call append 2 call arr 0  call tool_search 2 textval call key 2 arguments call str 1 utf8 "query"
+  0
+
+  if call same 2 toolname call str 1 utf8 "data.parse" 5
+  set discard call require 2 le call size 1 call key 2 arguments call str 1 utf8 "text" 131072 call str 1 utf8 "Data text exceeds limit"
+  set formatval call key 2 arguments call str 1 utf8 "format"
+  if call same 2 formatval 0u 1
+  set formatval call str 1 utf8 "json"
+  0
+
+  set discard call require 2 or call same 2 formatval call str 1 utf8 "json" call same 2 formatval call str 1 utf8 "csv" call str 1 utf8 "Data format must be json or csv"
+  ret call unpack_format 2 formatval call b64 1 call key 2 arguments call str 1 utf8 "text"
+  0
+
+  if call same 2 toolname call str 1 utf8 "data.summarize" 1
+  ret call tool_summary 1 call key 2 arguments call str 1 utf8 "values"
+  0
+
+  if call same 2 toolname call str 1 utf8 "data.transform" 1
+  ret call tool_transform 1 arguments
+  0
+
+  if call same 2 toolname call str 1 utf8 "tool.inspect" 1
+  ret call tool_entry 2 pid call key 2 arguments call str 1 utf8 "version"
+  0
+
+  if or call same 2 toolname call str 1 utf8 "document.read" or call same 2 toolname call str 1 utf8 "sheet.read" call same 2 toolname call str 1 utf8 "archive.list" 5
+  set formatval call key 2 arguments call str 1 utf8 "format"
+  if call same 2 toolname call str 1 utf8 "sheet.read" 1
+  set formatval call str 1 utf8 "xlsx"
+  0
+
+  if call same 2 toolname call str 1 utf8 "archive.list" 1
+  set formatval call str 1 utf8 "zip.index"
+  0
+
+  if call same 2 toolname call str 1 utf8 "document.read" 1
+  set discard call require 2 or call same 2 formatval call str 1 utf8 "markdown" or call same 2 formatval call str 1 utf8 "docx" call same 2 formatval call str 1 utf8 "pdf" call str 1 utf8 "Document format must be markdown, docx or pdf"
+  0
+
+  ret call unpack_format 2 formatval call tool_read64 3 pid root arguments
+  0
+
+  if or call same 2 toolname call str 1 utf8 "document.write" or call same 2 toolname call str 1 utf8 "sheet.write" call same 2 toolname call str 1 utf8 "archive.create" 7
+  set formatval call key 2 arguments call str 1 utf8 "format"
+  if call same 2 toolname call str 1 utf8 "sheet.write" 1
+  set formatval call str 1 utf8 "xlsx"
+  0
+
+  if call same 2 toolname call str 1 utf8 "archive.create" 1
+  set formatval call str 1 utf8 "zip"
+  0
+
+  if call same 2 toolname call str 1 utf8 "document.write" 1
+  set discard call require 2 or call same 2 formatval call str 1 utf8 "markdown" call same 2 formatval call str 1 utf8 "docx" call str 1 utf8 "Write format must be markdown or docx"
+  0
+
+  set nameval call key 2 arguments call str 1 utf8 "name"
+  if call same 2 nameval 0u 1
+  set nameval call cat 2 call str 1 utf8 "output." formatval
+  0
+
+  ret call tool_write_artifact 4 pid nameval call tool_format_mime 1 formatval call pack_format 2 formatval arguments
+  0
+
+  if call same 2 toolname call str 1 utf8 "notebook.edit" 8
+  set doc call unpack_format 2 call str 1 utf8 "ipynb" call tool_read64 3 pid root arguments
+  set cells call key 2 doc call str 1 utf8 "cells"
+  set entries call key 2 arguments call str 1 utf8 "edits"
+  set i 0
+  set discard call require 2 le call size 1 entries 4096 call str 1 utf8 "Notebook edit limit"
+  while lt i call size 1 entries 10
+  set edit call nth 2 entries i
+  set item call nth 2 cells call number 1 call key 2 edit call str 1 utf8 "index"
+  set discard call require 2 not call same 2 item 0u call str 1 utf8 "Notebook cell index out of bounds"
+  set item call put 3 item call str 1 utf8 "source" call append 2 call arr 0  call key 2 edit call str 1 utf8 "source"
+  if call same 2 call key 2 item call str 1 utf8 "cell_type" call str 1 utf8 "code" 1
+  set item call put 3 call put 3 item call str 1 utf8 "outputs" call arr 0  call str 1 utf8 "execution_count" 0u
+  0
+
+  set out call arr 0
+  set nameval call integer 1 0
+  while lt call number 1 nameval call size 1 cells 4
+  set meta call nth 2 cells call number 1 nameval
+  if call same 2 nameval call key 2 edit call str 1 utf8 "index" 1
+  set meta item
+  0
+
+  set out call append 2 out meta
+  set nameval call integer 1 add call number 1 nameval 1
+  set cells out
+  next i
+  set doc call put 3 doc call str 1 utf8 "cells" cells
+  ret call tool_write_artifact 4 pid call str 1 utf8 "edited.ipynb" call tool_format_mime 1 call str 1 utf8 "ipynb" call pack_format 2 call str 1 utf8 "ipynb" doc
+  0
+
+  if call same 2 toolname call str 1 utf8 "archive.extract" 5
+  set entries call key 2 call unpack_format 2 call str 1 utf8 "zip" call tool_read64 3 pid root arguments call str 1 utf8 "entries"
+  set out call arr 0
+  set i 0
+  while lt i call size 1 entries 3
+  set item call nth 2 entries i
+  if not call same 2 call key 2 item call str 1 utf8 "directory" call decode 1 call str 1 utf8 "true" 2
+  set packed call shape 2 call str 1 utf8 "{\"base64\":\"$0\",\"digest\":\"$1\",\"size\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 item call str 1 utf8 "base64" call key 2 call baseinfo 1 call key 2 item call str 1 utf8 "base64" call str 1 utf8 "digest" call key 2 item call str 1 utf8 "size"
+  set out call append 2 out call tool_write_artifact 4 pid call key 2 item call str 1 utf8 "path" call str 1 utf8 "application/octet-stream" packed
+  0
+
+  next i
+  ret out
+  0
+
+  if call same 2 toolname call str 1 utf8 "dictionary.find" 6
+  set entries call query 2 call str 1 utf8 "SELECT id,name,definition,revision,kind FROM terms WHERE project=? ORDER BY name" call append 2 call arr 0  pid
+  set queryval call lower 1 call key 2 arguments call str 1 utf8 "query"
+  set out call arr 0
+  set i 0
+  while lt i call size 1 entries 2
+  if call contains 2 call lower 1 call key 2 call nth 2 entries i call str 1 utf8 "name" queryval 1
+  set out call append 2 out call nth 2 entries i
+  0
+
+  next i
+  ret out
+  0
+
+  ret 0u
+
+fn tool_verify_name 1 toolname uint bool do 0  1
+  ret or call same 2 toolname call str 1 utf8 "verify.format" or call same 2 toolname call str 1 utf8 "verify.lint" or call same 2 toolname call str 1 utf8 "verify.build" or call same 2 toolname call str 1 utf8 "verify.test" call same 2 toolname call str 1 utf8 "verify.benchmark"
+
+fn tool_verify 4 pid uint toolname uint arguments uint rid uint uint do 6 sourceval uint entryname uint entry uint argsval uint inputsval uint evaluation uint 11
+  set sourceval call key 2 arguments call str 1 utf8 "source"
+  set entryname call key 2 arguments call str 1 utf8 "export"
+  if not call same 2 call key 2 arguments call str 1 utf8 "version" 0u 3
+  set entry call tool_entry 2 pid call key 2 arguments call str 1 utf8 "version"
+  set sourceval call key 2 entry call str 1 utf8 "source"
+  set entryname call key 2 entry call str 1 utf8 "export"
+  0
+
+  if call same 2 entryname 0u 1
+  set entryname call str 1 utf8 "run"
+  0
+
+  set argsval call key 2 arguments call str 1 utf8 "arguments"
+  if call same 2 argsval 0u 1
+  set argsval call arr 0
+  0
+
+  set inputsval call key 2 arguments call str 1 utf8 "inputs"
+  if call same 2 inputsval 0u 1
+  set inputsval call arr 0
+  0
+
+  set evaluation call shape 2 call str 1 utf8 "{\"source\":\"$0\",\"export\":\"$1\",\"arguments\":\"$2\",\"inputs\":\"$3\",\"compile_only\":true}" call append 2 call append 2 call append 2 call append 2 call arr 0  sourceval entryname argsval inputsval
+  if or call same 2 toolname call str 1 utf8 "verify.test" call same 2 toolname call str 1 utf8 "verify.benchmark" 1
+  set evaluation call put 3 evaluation call str 1 utf8 "compile_only" call decode 1 call str 1 utf8 "false"
+  0
+
+  ret call tool_defer 3 evaluation call str 1 utf8 "guest_tool_verified" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"tool\":\"$1\",\"arguments\":\"$2\",\"invocation\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  pid toolname arguments rid
+
+fn tool_builtin_receipt 5 pid uint toolname uint arguments uint rid uint valueval uint uint do 2 receipt uint discard uint 3
+  set receipt call shape 2 call str 1 utf8 "{\"invocation\":\"$0\",\"tool\":\"$1\",\"version\":\"$2\",\"arguments\":\"$3\",\"value\":\"$4\",\"route\":\"portable\",\"runtime\":\"$5\",\"provisional\":false,\"input_digest\":\"$6\",\"output_digest\":\"$7\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  rid toolname call cat 2 call str 1 utf8 "builtin:" toolname arguments valueval call tool_runtime 0  call hash 1 call encode 1 arguments call hash 1 call encode 1 valueval
+  set discard call audit 3 pid call str 1 utf8 "Tool receipt" receipt
+  ret receipt
+
+pub guest_tool_verified 1 arg uint uint do 4 state uint resultval uint passedval uint valueval uint 7
+  set state call key 2 arg call str 1 utf8 "state"
+  set resultval call key 2 arg call str 1 utf8 "result"
+  set passedval call decode 1 call str 1 utf8 "false"
+  if and call same 2 call key 2 arg call str 1 utf8 "error" 0u call same 2 call key 2 resultval call str 1 utf8 "value" call key 2 call key 2 state call str 1 utf8 "arguments" call str 1 utf8 "expected" 1
+  set passedval call decode 1 call str 1 utf8 "true"
+  0
+
+  set valueval call shape 2 call str 1 utf8 "{\"execution\":\"$0\",\"error\":\"$1\",\"passed\":\"$2\",\"provisional\":true}" call append 2 call append 2 call append 2 call arr 0  resultval call key 2 arg call str 1 utf8 "error" passedval
+  if call same 2 call key 2 state call str 1 utf8 "tool" call str 1 utf8 "verify.format" 1
+  set valueval call shape 2 call str 1 utf8 "{\"source\":\"$0\",\"error\":\"$1\",\"activated\":false}" call append 2 call append 2 call arr 0  call key 2 resultval call str 1 utf8 "canonical_source" call key 2 arg call str 1 utf8 "error"
+  0
+
+  ret call tool_builtin_receipt 5 call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "tool" call key 2 state call str 1 utf8 "arguments" call key 2 state call str 1 utf8 "invocation" valueval
+
+pub tool_run 1 arg uint uint do 9 pid uint toolname uint arguments uint version uint entry uint builtinval uint rid uint state uint discard uint 11
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set toolname call key 2 arg call str 1 utf8 "tool"
+  set arguments call key 2 arg call str 1 utf8 "arguments"
+  set version call key 2 arg call str 1 utf8 "version"
+  set rid call uid 0
+  if call same 2 version 0u 2
+  if call tool_known 1 toolname 3
+  if call tool_verify_name 1 toolname 1
+  ret call tool_verify 4 pid toolname arguments rid
+  0
+
+  set builtinval call tool_builtin 3 pid toolname arguments
+  ret call tool_builtin_receipt 5 pid toolname arguments rid builtinval
+  0
+
+  set version call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT version FROM tool_defaults WHERE project=? AND name=?" call append 2 call append 2 call arr 0  pid toolname 0 call str 1 utf8 "version"
+  0
+
+  set entry call tool_entry 2 pid version
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "name" toolname call str 1 utf8 "Tool name and exact version differ"
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "active" call str 1 utf8 "Exact tool version is not active"
+  set state call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"version\":\"$1\",\"tool\":\"$2\",\"invocation\":\"$3\",\"arguments\":\"$4\",\"evidence\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  pid version toolname rid arguments call key 2 entry call str 1 utf8 "evidence"
+  ret call tool_defer 3 call tool_evaluation 2 entry call shape 2 call str 1 utf8 "{\"arguments\":\"$0\",\"inputs\":[]}" call append 2 call arr 0  arguments call str 1 utf8 "guest_tool_deliver" state
+
+pub guest_tool_deliver 1 arg uint uint do 4 state uint entry uint receipt uint discard uint 7
+  set state call key 2 arg call str 1 utf8 "state"
+  set entry call tool_entry 2 call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "version"
+  set discard call require 2 not call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "revoked" call str 1 utf8 "Version revoked before delivery"
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "evidence" call key 2 state call str 1 utf8 "evidence" call str 1 utf8 "Qualification changed before delivery"
+  set receipt call shape 2 call str 1 utf8 "{\"invocation\":\"$0\",\"tool\":\"$1\",\"version\":\"$2\",\"arguments\":\"$3\",\"value\":\"$4\",\"error\":\"$5\",\"execution\":\"$6\",\"provisional\":false,\"runtime\":\"$7\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 state call str 1 utf8 "invocation" call key 2 state call str 1 utf8 "tool" call key 2 state call str 1 utf8 "version" call key 2 state call str 1 utf8 "arguments" call key 2 call key 2 arg call str 1 utf8 "result" call str 1 utf8 "value" call key 2 arg call str 1 utf8 "error" call key 2 arg call str 1 utf8 "result" call tool_runtime 0
+  set discard call audit 3 call key 2 state call str 1 utf8 "project" call str 1 utf8 "Tool receipt" receipt
+  ret receipt

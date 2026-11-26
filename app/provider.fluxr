@@ -1,0 +1,93 @@
+fluxr 1
+
+fn file_part 3 provider uint meta uint encoded uint uint do 5 mime uint kind uint body uint uri uint discard uint 8
+  set mime call key 2 meta call str 1 utf8 "media_type"
+  set kind call key 2 call resource 1 call str 1 utf8 "media.json" mime
+  if call same 2 kind call str 1 utf8 "text" 1
+    ret call shape 2 call str 1 utf8 "{\"type\":\"text\",\"text\":\"$0\"}" call append 2 call arr 0 call key 2 call baseinfo 1 encoded call str 1 utf8 "text"
+  0
+  set uri call cat 2 call cat 2 call cat 2 call str 1 utf8 "data:" mime call str 1 utf8 ";base64," encoded
+  if call same 2 provider call str 1 utf8 "anthropic" 1
+    ret call shape 2 call str 1 utf8 "{\"type\":\"$0\",\"source\":{\"type\":\"base64\",\"media_type\":\"$1\",\"data\":\"$2\"}}" call append 2 call append 2 call append 2 call arr 0 kind mime encoded
+  0
+  set discard call require 2 call same 2 kind call str 1 utf8 "image" call str 1 utf8 "This preset accepts text and images. PDF requires a document-capable provider."
+  if call same 2 provider call str 1 utf8 "codex" 1
+    ret call shape 2 call str 1 utf8 "{\"type\":\"image\",\"url\":\"$0\"}" call append 2 call arr 0 uri
+  0
+  ret call shape 2 call str 1 utf8 "{\"type\":\"image_url\",\"image_url\":{\"url\":\"$0\"}}" call append 2 call arr 0 uri
+
+fn provider_plan 4 presetval uint system uint content uint contract uint uint do 1 file uint 2
+  set file call cat 2 call cat 2 call str 1 utf8 "providers/" call key 2 presetval call str 1 utf8 "provider" call str 1 utf8 ".json"
+  ret call shape 2 call asset 1 file call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 presetval call str 1 utf8 "model" system call key 2 presetval call str 1 utf8 "effort" content contract
+
+fn unpack 2 provider uint response uint uint do 4 parts uint piece uint discard uint i int 7
+  if call same 2 provider call str 1 utf8 "codex" 1
+    ret call decode 1 call key 2 call key 2 call key 2 call key 2 response call str 1 utf8 "message" call str 1 utf8 "params" call str 1 utf8 "item" call str 1 utf8 "text"
+  0
+  if call same 2 provider call str 1 utf8 "qwen" 3
+    set piece call nth 2 call key 2 response call str 1 utf8 "choices" 0
+    set discard call require 2 call same 2 call key 2 piece call str 1 utf8 "finish_reason" call str 1 utf8 "stop" call str 1 utf8 "Incomplete Qwen response"
+    ret call decode 1 call key 2 call key 2 piece call str 1 utf8 "message" call str 1 utf8 "content"
+  0
+  set discard call require 2 call same 2 call key 2 response call str 1 utf8 "stop_reason" call str 1 utf8 "end_turn" call str 1 utf8 "Incomplete Anthropic response"
+  set parts call key 2 response call str 1 utf8 "content"
+  set i 0
+  while lt i call size 1 parts 3
+    set piece call nth 2 parts i
+    if call same 2 call key 2 piece call str 1 utf8 "type" call str 1 utf8 "text" 1
+    ret call decode 1 call key 2 piece call str 1 utf8 "text"
+  0
+    next i
+  ret call require 2 false call str 1 utf8 "Provider returned no answer"
+
+pub seal 1 arg uint uint do 21 j uint p uint rid uint role uint k uint presetval uint instructions uint frame uint system uint contract uint schema_name uint items uint content uint a uint meta uint encoded uint plan uint jid uint inputval uint discard uint i int 27
+  set jid call key 2 arg call str 1 utf8 "job"
+  set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\",p.root FROM jobs j JOIN projects p ON p.id=j.project JOIN requests r ON r.id=j.request AND r.revision=j.revision WHERE j.id=? AND j.state='sealing'" call append 2 call arr 0 jid 0
+  set discard call require 2 not call same 2 j 0u call str 1 utf8 "Stale seal"
+  set p call key 2 j call str 1 utf8 "project"
+  set role call key 2 j call str 1 utf8 "role"
+  set k call key 2 j call str 1 utf8 "kind"
+  set inputval call key 2 j call str 1 utf8 "body"
+  set presetval call preset 2 p role
+  set instructions call instruction_files 2 call key 2 j call str 1 utf8 "root" call key 2 inputval call str 1 utf8 "targets"
+  set frame call shape 2 call str 1 utf8 "{\"project_instructions\":\"$0\",\"working_root\":\"$1\",\"role\":\"$2\",\"session\":\"$3\",\"request\":\"$4\",\"revision\":\"$5\",\"delivery\":\"$6\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 instructions call key 2 j call str 1 utf8 "root" role call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" inputval
+  set frame call put 3 frame call str 1 utf8 "prompt_bytes" call integer 1 call size 1 call key 2 inputval call str 1 utf8 "text"
+  if not call same 2 call key 2 inputval call str 1 utf8 "text" 0u 1
+    set frame call put 3 frame call str 1 utf8 "parts" call annotate 2 p call key 2 inputval call str 1 utf8 "text"
+  0
+  if not call same 2 role call str 1 utf8 "discriminator" 1 set frame call put 3 frame call str 1 utf8 "skill_instructions" call selected_skills 2 p call key 2 inputval call str 1 utf8 "skills" 0
+  set system call asset 1 call str 1 utf8 "SYSTEM.txt"
+  set schema_name call str 1 utf8 "worker"
+  if call same 2 role call str 1 utf8 "tool_author" 1
+    set schema_name call str 1 utf8 "author"
+  0
+  if call same 2 role call str 1 utf8 "discriminator" 2
+    set schema_name k
+    if call same 2 k call str 1 utf8 "message" 1
+    set schema_name call str 1 utf8 "discriminator"
+  0
+  0
+  if call same 2 role call str 1 utf8 "workflow_improver" 1
+    set schema_name call str 1 utf8 "improvement"
+  0
+  set contract call resource 1 call cat 2 call cat 2 call str 1 utf8 "protocol/" schema_name call str 1 utf8 ".json"
+  set content call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"text\",\"text\":\"$0\"}" call append 2 call arr 0 call encode 1 frame
+  set items call key 2 inputval call str 1 utf8 "attachments"
+  set i 0
+  while lt i call size 1 items 10
+    set meta call nth 2 items i
+    set a call key 2 meta call str 1 utf8 "id"
+    if call same 2 a 0u 1
+    set a meta
+  0
+    set meta call nth 2 call query 2 call str 1 utf8 "SELECT meta AS \"details:json\",encoded FROM artifacts WHERE project=? AND id=?" call append 2 call append 2 call arr 0 p a 0
+    set discard call require 2 not call same 2 meta 0u call str 1 utf8 "Attachment unavailable"
+    set encoded call key 2 meta call str 1 utf8 "encoded"
+    set meta call key 2 meta call str 1 utf8 "details"
+    set discard call require 2 call same 2 call key 2 call baseinfo 1 encoded call str 1 utf8 "digest" call key 2 meta call str 1 utf8 "digest" call str 1 utf8 "Attachment digest changed"
+    set content call append 2 content call file_part 3 call key 2 presetval call str 1 utf8 "provider" meta encoded
+    next i
+  set plan call provider_plan 4 presetval system content contract
+  set discard call document 2 call cat 2 call cat 2 call str 1 utf8 "turns/" jid call str 1 utf8 "/SYSTEM.txt" system
+  set discard call document 2 call cat 2 call cat 2 call str 1 utf8 "turns/" jid call str 1 utf8 "/input.json" call encode 1 frame
+  ret call query 2 call str 1 utf8 "UPDATE jobs SET seal=?,state='sealed' WHERE id=?" call append 2 call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"preset\":\"$0\",\"transport\":\"$1\",\"schema\":\"$2\",\"selection\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 presetval plan contract frame jid

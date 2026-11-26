@@ -1,0 +1,174 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "RESULT"
+                ]
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "result_kind": {
+                "type": "string",
+                "enum": [
+                  "report"
+                ]
+              },
+              "findings": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "outcome": {
+                "type": "string",
+                "enum": [
+                  "no_change",
+                  "deferred",
+                  "published"
+                ]
+              }
+            },
+            "required": [
+              "type",
+              "summary",
+              "result_kind",
+              "findings",
+              "evidence",
+              "outcome"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "RUN_TOOL"
+                ]
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tool": {
+                "type": "string"
+              },
+              "arguments_json": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "summary",
+              "tool",
+              "arguments_json"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "PROPOSE_TOOL"
+                ]
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source": {
+                "type": "string"
+              },
+              "contract_json": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "summary",
+              "source",
+              "contract_json",
+              "purpose"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "TEST_TOOL"
+                ]
+              },
+              "summary": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "type": "string"
+              },
+              "case_json": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "summary",
+              "version",
+              "case_json"
+            ]
+          }
+        ]
+      }
+    },
+    "next": {
+      "type": "string",
+      "enum": [
+        "wait_for",
+        "complete_when"
+      ]
+    }
+  },
+  "required": [
+    "version",
+    "actions",
+    "next"
+  ]
+}

@@ -1,0 +1,173 @@
+fluxr 1
+
+fn has_ref 2 items uint refid uint bool do 2 val uint i int 3
+  set i 0
+  while lt i call size 1 items 3
+    set val call nth 2 items i
+    if or call same 2 val refid call same 2 call key 2 val call str 1 utf8 "id" refid 1
+    ret true
+  0
+    next i
+  ret false
+
+fn subset 2 selected uint items uint bool do 1 i int 3
+  set i 0
+  while lt i call size 1 selected 2
+    if not call has_ref 2 items call nth 2 selected i 1
+    ret false
+  0
+    next i
+  ret true
+
+fn close_request 4 j uint aid uint path uint resultval uint uint do 5 p uint r uint session uint jid uint discard uint 9
+  set p call key 2 j call str 1 utf8 "project"
+  set r call key 2 j call str 1 utf8 "request"
+  set discard call query 2 call str 1 utf8 "UPDATE requests SET state='completed' WHERE id=? AND revision=? AND state='open'" call append 2 call append 2 call arr 0 r call key 2 j call str 1 utf8 "revision"
+  set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Request closure conflict"
+  set discard call query 2 call str 1 utf8 "INSERT INTO finals VALUES(?,?,?,0)" call append 2 call append 2 call append 2 call arr 0 r aid path
+  set session call uid 0
+  set jid call job 6 p r session call str 1 utf8 "workflow_improver" call str 1 utf8 "improvement" call shape 2 call str 1 utf8 "{\"summary\":\"Improve the workflow.\",\"result\":\"$0\",\"evidence\":\"$1\"}" call append 2 call append 2 call arr 0 resultval aid
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='publishing' WHERE id=?" call append 2 call arr 0 jid
+  ret call query 2 call str 1 utf8 "INSERT INTO improvements VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 r session jid
+
+fn record_action 4 j uint aid uint a uint state uint uint do 3 path uint name uint discard uint 7
+  set name call cat 2 call cat 2 call cat 2 call key 2 a call str 1 utf8 "type" call str 1 utf8 "-" aid call str 1 utf8 ".json"
+  if call same 2 call key 2 a call str 1 utf8 "type" call str 1 utf8 "MESSAGE" 2
+    set name call cat 2 call cat 2 call cat 2 call cat 2 call str 1 utf8 "MESSAGE-" call key 2 a call str 1 utf8 "destination" call str 1 utf8 "-" aid call str 1 utf8 ".json"
+    if not call same 2 call key 2 a call str 1 utf8 "question" 0u 1
+    set name call cat 2 call cat 2 call cat 2 call cat 2 call cat 2 call cat 2 call str 1 utf8 "MESSAGE-" call key 2 a call str 1 utf8 "destination" call str 1 utf8 "-" call key 2 a call str 1 utf8 "question" call str 1 utf8 "-" aid call str 1 utf8 ".json"
+  0
+  0
+  set path call cat 2 call cat 2 call cat 2 call str 1 utf8 "actions/" aid call str 1 utf8 "/" name
+  set discard call query 2 call str 1 utf8 "INSERT INTO actions VALUES(?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid call key 2 j call str 1 utf8 "id" call key 2 a call str 1 utf8 "type" a state
+  set discard call document 2 path call encode 1 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"request\":\"$1\",\"revision\":\"$2\",\"source\":\"$3\",\"payload\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "session" a
+  if not call same 2 state call str 1 utf8 "closing" 1
+    set discard call audit 3 call key 2 j call str 1 utf8 "project" call key 2 a call str 1 utf8 "type" call shape 2 call str 1 utf8 "{\"action\":\"$0\",\"session\":\"$1\",\"request\":\"$2\",\"payload\":\"$3\",\"state\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "request" a state
+  0
+  ret path
+
+fn clear_work 2 r uint rev uint bool do 0  1
+  ret call same 2 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT NOT EXISTS(SELECT 1 FROM jobs WHERE request=?1 AND revision=?2 AND state NOT IN ('accepted','superseded','cancelled')) AND NOT EXISTS(SELECT 1 FROM branches WHERE request=?1 AND revision=?2 AND accepted IS NULL) AND NOT EXISTS(SELECT 1 FROM questions WHERE request=?1 AND revision=?2 AND state!='answered') AND NOT EXISTS(SELECT 1 FROM actions a JOIN jobs j ON j.id=a.job WHERE j.request=?1 AND j.revision=?2 AND a.state='held') AS ok" call append 2 call append 2 call arr 0 r rev 0 call str 1 utf8 "ok" call integer 1 1
+
+fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint kind uint s uint rev uint payloadval uint discard uint parent uint q uint destination uint task uint body uint path uint n uint 14
+  set p call key 2 j call str 1 utf8 "project"
+  set r call key 2 j call str 1 utf8 "request"
+  set role call key 2 j call str 1 utf8 "role"
+  set s call key 2 j call str 1 utf8 "session"
+  set rev call key 2 j call str 1 utf8 "revision"
+  set kind call key 2 a call str 1 utf8 "type"
+  set payloadval call key 2 j call str 1 utf8 "body"
+  if or eq 0 call size 1 call key 2 a call str 1 utf8 "summary" lt 320 call size 1 call key 2 a call str 1 utf8 "summary" 1
+    ret call str 1 utf8 "A short delivery summary is required."
+  0
+  if not call subset 2 call key 2 a call str 1 utf8 "attachments" call key 2 payloadval call str 1 utf8 "attachments" 1
+    ret call str 1 utf8 "Attachment selection exceeds this assignment."
+  0
+  if call same 2 kind call str 1 utf8 "TASK" 11
+    if not call subset 2 call key 2 a call str 1 utf8 "skills" call key 2 payloadval call str 1 utf8 "skills" 1 ret call str 1 utf8 "The user did not select this skill." 0
+    if or eq 0 call size 1 call key 2 a call str 1 utf8 "criterion" eq 0 call size 1 call key 2 a call str 1 utf8 "deliverable" 1
+    ret call str 1 utf8 "A task needs a criterion and deliverable."
+  0
+    if lt 0 call size 1 call key 2 a call str 1 utf8 "prerequisites" 1
+    ret call str 1 utf8 "Task prerequisites require verification."
+  0
+    set n call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM branches WHERE request=?" call append 2 call arr 0 r 0 call str 1 utf8 "n"
+    if le 32 call number 1 n 1
+    ret call str 1 utf8 "Assignment limit reached."
+  0
+    set parent s
+    if call same 2 role call str 1 utf8 "discriminator" 1
+    set parent call key 2 payloadval call str 1 utf8 "parent"
+  0
+    set discard call record_action 4 j aid a call str 1 utf8 "admitted"
+    set discard call query 2 call str 1 utf8 "INSERT INTO branches(id,request,revision,fan,parent,role,task) VALUES(?,?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid r rev fan parent call key 2 a call str 1 utf8 "role" a
+    set discard call job 6 p r aid call key 2 a call str 1 utf8 "role" call str 1 utf8 "assignment" a
+    ret 0u
+  0
+  if call same 2 kind call str 1 utf8 "ASK" 3
+    set discard call record_action 4 j aid a call str 1 utf8 "admitted"
+    set discard call query 2 call str 1 utf8 "INSERT INTO questions(id,request,revision,session,role,body) VALUES(?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid r rev s role a
+    ret 0u
+  0
+  if call same 2 kind call str 1 utf8 "MESSAGE" 10
+    set q call key 2 a call str 1 utf8 "question"
+    set destination call key 2 a call str 1 utf8 "destination"
+    if not call same 2 rev call key 2 a call str 1 utf8 "revision" 1
+    ret call str 1 utf8 "Stale message revision."
+  0
+    set task call nth 2 call query 2 call str 1 utf8 "SELECT role,task AS \"details:json\" FROM branches WHERE id=? AND request=? AND revision=?" call append 2 call append 2 call append 2 call arr 0 destination r rev 0
+    set body a
+    if not call same 2 q 0u 6
+    if not and call same 2 role call str 1 utf8 "discriminator" call same 2 q call key 2 payloadval call str 1 utf8 "reply" 1
+    ret call str 1 utf8 "Reply does not match the user-selected question."
+  0
+    if not call contains 2 call key 2 payloadval call str 1 utf8 "text" call key 2 a call str 1 utf8 "payload" 1
+    ret call str 1 utf8 "Reply must use the exact answer text."
+  0
+    set role call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT role FROM questions WHERE id=? AND request=? AND revision=? AND session=? AND state='open'" call append 2 call append 2 call append 2 call append 2 call arr 0 q r rev destination 0 call str 1 utf8 "role"
+    if call same 2 role 0u 1
+    ret call str 1 utf8 "Question unavailable."
+  0
+    set discard call query 2 call str 1 utf8 "UPDATE questions SET state='answer_queued' WHERE id=?" call append 2 call arr 0 q
+    set body call put 3 body call str 1 utf8 "answer_to" q
+  2
+    if or call same 2 task 0u not or call same 2 role call str 1 utf8 "discriminator" call same 2 destination s 1
+    ret call str 1 utf8 "Destination is outside the assignment."
+  0
+    set role call key 2 task call str 1 utf8 "role"
+    set body call put 3 body call str 1 utf8 "assignment" call key 2 task call str 1 utf8 "details"
+    set discard call record_action 4 j aid a call str 1 utf8 "admitted"
+    set discard call job 6 p r destination role call str 1 utf8 "message" body
+    ret 0u
+  0
+  if call same 2 kind call str 1 utf8 "RESULT" 9
+    if call same 2 role call str 1 utf8 "workflow_improver" 3
+    if call same 2 call key 2 a call str 1 utf8 "outcome" call str 1 utf8 "published" 1
+    ret call str 1 utf8 "Missing verified improvement receipts."
+  0
+    set discard call record_action 4 j aid a call str 1 utf8 "reported"
+    ret 0u
+  0
+    if call same 2 call key 2 a call str 1 utf8 "result_kind" call str 1 utf8 "report" 3
+    set discard call record_action 4 j aid a call str 1 utf8 "evidence"
+    set discard call query 2 call str 1 utf8 "UPDATE branches SET report=?,accepted=NULL WHERE id=? AND request=? AND revision=?" call append 2 call append 2 call append 2 call append 2 call arr 0 aid s r rev
+    ret 0u
+  0
+    if not call clear_work 2 r rev 1
+    ret call str 1 utf8 "Outstanding work or acceptance receipts."
+  0
+    set n call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM branches WHERE request=? AND revision=?" call append 2 call append 2 call arr 0 r rev 0 call str 1 utf8 "n"
+    if call same 2 n call integer 1 0 2
+    set discard call record_action 4 j aid a call str 1 utf8 "awaiting_acceptance"
+    ret 0u
+  0
+    if not and call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" call same 2 call key 2 payloadval call str 1 utf8 "parent" 0u 1
+    ret call str 1 utf8 "A first-level review is required."
+  0
+    set path call record_action 4 j aid a call str 1 utf8 "closing"
+    set discard call close_request 4 j aid path a
+    ret 0u
+  0
+  ret call schedule_tool 3 j aid a
+
+fn review_ready 1 r uint uint do 11 info uint fans uint fan uint branches uint sig uint prior uint rid uint body uint jobid uint discard uint i int 6
+  set info call nth 2 call query 2 call str 1 utf8 "SELECT r.project,r.revision,r.intent,p.discriminator FROM requests r JOIN projects p ON p.id=r.project WHERE r.id=? AND r.state='open'" call append 2 call arr 0 r 0
+  if call same 2 info 0u 1
+    ret 0u
+  0
+  set fans call query 2 call str 1 utf8 "SELECT fan,parent FROM branches WHERE request=? AND revision=? GROUP BY fan,parent HAVING count(*)=count(accepted) ORDER BY min(rowid) DESC" call append 2 call append 2 call arr 0 r call key 2 info call str 1 utf8 "revision"
+  set i 0
+  while lt i call size 1 fans 6
+    set fan call nth 2 fans i
+    set branches call query 2 call str 1 utf8 "SELECT b.id AS criterion_id,b.role,b.report,b.accepted AS \"acceptance:json\",b.task AS \"task:json\",a.payload AS \"result:json\" FROM branches b JOIN actions a ON a.id=b.report WHERE b.fan=? ORDER BY b.id" call append 2 call arr 0 call key 2 fan call str 1 utf8 "fan"
+    set sig call hash 1 call encode 1 branches
+    set prior call nth 2 call query 2 call str 1 utf8 "SELECT id FROM reviews WHERE fan=? AND signature=? AND revision=?" call append 2 call append 2 call append 2 call arr 0 call key 2 fan call str 1 utf8 "fan" sig call key 2 info call str 1 utf8 "revision" 0
+    if call same 2 prior 0u 5
+    set rid call uid 0
+    set body call shape 2 call str 1 utf8 "{\"review_id\":\"$0\",\"parent\":\"$1\",\"fan\":\"$2\",\"branches\":\"$3\",\"intent\":\"$4\",\"summary\":\"Review the fan-out.\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 rid call key 2 fan call str 1 utf8 "parent" call key 2 fan call str 1 utf8 "fan" branches call key 2 info call str 1 utf8 "intent"
+    set jobid call job 6 call key 2 info call str 1 utf8 "project" r call key 2 info call str 1 utf8 "discriminator" call str 1 utf8 "discriminator" call str 1 utf8 "review" body
+    set discard call query 2 call str 1 utf8 "INSERT INTO reviews VALUES(?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 rid r call key 2 info call str 1 utf8 "revision" call key 2 fan call str 1 utf8 "fan" sig jobid
+    set discard call audit 3 call key 2 info call str 1 utf8 "project" call str 1 utf8 "Fan-out review" body
+  0
+    next i
+  ret 0u

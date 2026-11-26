@@ -1,0 +1,686 @@
+//! Generic application bindings for the portable FluxR interpreter.
+mod application;
+mod formats;
+mod git;
+mod resources;
+pub mod transport;
+use anyhow::{Context, Result, bail, ensure};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use fluxr::structured::{
+    HostServices, Invocation, Limits, Module, SourceDocument, Value as Vm, Workspace,
+};
+use rusqlite::{
+    Connection, params_from_iter,
+    types::{Value as Cell, ValueRef},
+};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+use std::{
+    fs,
+    io::{Read, Write},
+    path::{Component, Path, PathBuf},
+    sync::Mutex,
+};
+
+pub const LIMIT: usize = 16 * 1024 * 1024;
+fn hex(b: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(b))
+}
+pub fn read(path: &Path) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    let file = fs::File::open(path).with_context(|| path.display().to_string())?;
+    ensure!(file.metadata()?.is_file(), "Expected regular file");
+    file.take(LIMIT as u64 + 1).read_to_end(&mut bytes)?;
+    ensure!(bytes.len() <= LIMIT, "File exceeds limit");
+    Ok(bytes)
+}
+pub fn text(v: &Value) -> Result<&str> {
+    v.as_str().context("Expected text")
+}
+fn string(v: &Vm) -> Result<String> {
+    let Vm::List(values) = v else {
+        bail!("Expected UTF-8 bytes")
+    };
+    let bytes = values
+        .iter()
+        .map(|v| match v {
+            Vm::U64(n) => Ok(u8::try_from(*n)?),
+            _ => bail!("Invalid UTF-8 byte"),
+        })
+        .collect::<Result<Vec<u8>>>()?;
+    Ok(String::from_utf8(bytes)?)
+}
+fn linked(m: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        m.file_attributes() & 0x400 != 0
+    }
+    #[cfg(not(windows))]
+    {
+        m.is_symlink()
+    }
+}
+fn relative(name: &str) -> Result<&Path> {
+    let p = Path::new(name);
+    ensure!(
+        !name.contains([':', '\0']) && p.components().all(|c| matches!(c, Component::Normal(_))),
+        "Expected contained relative path"
+    );
+    Ok(p)
+}
+fn join(root: &Path, name: &str) -> Result<PathBuf> {
+    let mut path = root.to_owned();
+    for c in relative(name)?.components() {
+        path.push(c);
+        match fs::symlink_metadata(&path) {
+            Ok(m) => ensure!(!linked(&m), "Unexpected linked path"),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.into()),
+        }
+    }
+    Ok(path)
+}
+pub fn fill(value: &Value, args: &[Value]) -> Result<Value> {
+    Ok(match value {
+        Value::String(s) if s.starts_with('$') && s[1..].parse::<usize>().is_ok() => args
+            .get(s[1..].parse::<usize>()?)
+            .context("Missing template argument")?
+            .clone(),
+        Value::Array(v) => Value::Array(v.iter().map(|v| fill(v, args)).collect::<Result<_>>()?),
+        Value::Object(v) => Value::Object(
+            v.iter()
+                .map(|(k, v)| Ok((k.clone(), fill(v, args)?)))
+                .collect::<Result<_>>()?,
+        ),
+        _ => value.clone(),
+    })
+}
+pub fn validate(s: &Value, v: &Value) -> Result<()> {
+    if let Some(options) = s["anyOf"].as_array() {
+        ensure!(
+            options.iter().any(|x| validate(x, v).is_ok()),
+            "No matching schema variant"
+        );
+        return Ok(());
+    }
+    if let Some(choices) = s["enum"].as_array() {
+        ensure!(choices.contains(v), "Invalid enumerated value")
+    }
+    let kind = match v {
+        Value::Null => "null",
+        Value::Bool(_) => "boolean",
+        Value::Number(n) if n.is_i64() || n.is_u64() => "integer",
+        Value::Number(_) => "number",
+        Value::String(_) => "string",
+        Value::Object(_) => "object",
+        Value::Array(_) => "array",
+    };
+    ensure!(
+        s["type"] == kind
+            || s["type"]
+                .as_array()
+                .is_some_and(|k| k.contains(&json!(kind))),
+        "Expected {} but received {kind}",
+        s["type"]
+    );
+    if let Some(a) = v.as_array() {
+        for x in a {
+            validate(&s["items"], x)?;
+        }
+    }
+    if let Some(obj) = v.as_object() {
+        let props = s["properties"]
+            .as_object()
+            .context("Missing schema properties")?;
+        ensure!(props.len() == obj.len(), "Missing or extra property");
+        for (k, v) in props {
+            validate(v, obj.get(k).with_context(|| format!("Missing {k}"))?)?
+        }
+    }
+    Ok(())
+}
+fn evaluate(r: &Value) -> Result<Value> {
+    let started = std::time::Instant::now();
+    let src = text(&r["source"])?;
+    ensure!(src.len() <= 65536, "Draft source too large");
+    let doc = SourceDocument::parse(src)?;
+    ensure!(
+        !doc.has_native_items(),
+        "Native code is not permitted in a checked module"
+    );
+    let m = doc.compile()?;
+    ensure!(
+        m.host_requirements()?.is_empty(),
+        "Guest host imports are not permitted"
+    );
+    let export = text(&r["export"])?;
+    let signature = m
+        .export_signatures()
+        .get(export)
+        .context("Missing export")?
+        .clone();
+    let mut out = json!({"source_digest":hex(src.as_bytes()),"route":"portable","signature":signature,"canonical_source":m.unified_text()?,"parameters":signature.0,"result_type":signature.1,"input_types":m.input_bindings().iter().map(|b|&b.ty).collect::<Vec<_>>()});
+    if r["compile_only"] != true {
+        let args: Vec<Vm> = serde_json::from_value(r["arguments"].clone())?;
+        let inputs: Vec<Vm> = serde_json::from_value(r["inputs"].clone())?;
+        let result = m.run_portable_with(
+            Invocation {
+                export,
+                inputs: &inputs,
+                arguments: &args,
+                limits: Limits {
+                    instructions: 100_000,
+                    cells: 262144,
+                    frames: 64,
+                },
+            },
+            &mut Workspace::default(),
+        )?;
+        out["value"] = serde_json::to_value(result)?;
+    }
+    out["elapsed_micros"] = json!(started.elapsed().as_micros() as u64);
+    Ok(out)
+}
+pub struct App {
+    modules: std::collections::BTreeMap<String, Module>,
+    config: Value,
+    db: Connection,
+    pub data: PathBuf,
+    pub bundle: PathBuf,
+    _lock: fs::File,
+}
+impl App {
+    pub fn open(bundle: &Path, data: &Path) -> Result<Self> {
+        fs::create_dir_all(data)?;
+        let data = data.canonicalize()?;
+        let bundle = bundle.canonicalize()?;
+        ensure!(
+            !data.starts_with(&bundle) && !bundle.starts_with(&data),
+            "Use separate bundle and state directories"
+        );
+        let lock = fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(data.join("app.lock"))?;
+        fs2::FileExt::try_lock_exclusive(&lock)
+            .context("Another daemon owns the data directory")?;
+        let config: Value = serde_json::from_slice(&read(&bundle.join("app.json"))?)?;
+        let modules = application::link(&bundle, &config)?;
+        let db = Connection::open(data.join("state.sqlite3"))?;
+        db.execute_batch(
+            "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
+        )?;
+        let mut app = Self {
+            modules,
+            config,
+            db,
+            bundle,
+            data,
+            _lock: lock,
+        };
+        app.invoke("init", Value::Null)?;
+        Ok(app)
+    }
+    pub fn metadata(&self) -> &Value {
+        &self.config
+    }
+    pub fn invoke(&mut self, name: &str, input: Value) -> Result<Value> {
+        let mut value = self.enter(name, input)?;
+        for _ in 0..16 {
+            let Some(request) = value.get("$evaluate") else {
+                return Ok(value);
+            };
+            let result = evaluate(request);
+            let next = text(&value["resume"])?.to_owned();
+            ensure!(
+                next.starts_with("guest_") && self.modules.contains_key(&next),
+                "Unknown continuation"
+            );
+            let reply = match result {
+                Ok(v) => json!({"state":value["state"],"result":v,"error":null}),
+                Err(e) => json!({"state":value["state"],"result":null,"error":format!("{e:#}")}),
+            };
+            value = self.enter(&next, reply)?;
+        }
+        bail!("Continuation limit reached")
+    }
+    fn enter(&mut self, name: &str, input: Value) -> Result<Value> {
+        let mut arena = Arena {
+            values: vec![Value::Null],
+            bytes: 0,
+        };
+        let arg = arena.add(input)?;
+        self.db.execute_batch("BEGIN IMMEDIATE")?;
+        let executed = (|| -> Result<Value> {
+            let host = Bindings {
+                arena: Mutex::new(arena),
+                db: Mutex::new(&mut self.db),
+                data: &self.data,
+                bundle: &self.bundle,
+                error: Mutex::new(None),
+            };
+            let result = self
+                .modules
+                .get(name)
+                .context("Unknown application export")?
+                .run_with_host(
+                    Invocation {
+                        export: name,
+                        inputs: &[],
+                        arguments: &[arg],
+                        limits: Limits {
+                            instructions: 2_000_000,
+                            cells: 2_000_000,
+                            frames: 64,
+                        },
+                    },
+                    &mut Workspace::default(),
+                    &host,
+                );
+            if let Some(err) = host.error.lock().unwrap().take() {
+                bail!("{err}")
+            }
+            let result = host.arena.lock().unwrap().get(&result?)?.clone();
+            Ok(result)
+        })();
+        match executed {
+            Ok(v) => {
+                self.db.execute_batch("COMMIT")?;
+                Ok(v)
+            }
+            Err(e) => {
+                self.db.execute_batch("ROLLBACK")?;
+                Err(e)
+            }
+        }
+    }
+}
+struct Arena {
+    values: Vec<Value>,
+    bytes: usize,
+}
+impl Arena {
+    fn add(&mut self, value: Value) -> Result<Vm> {
+        self.bytes += serde_json::to_vec(&value)?.len();
+        ensure!(
+            self.bytes <= 96 * 1024 * 1024 && self.values.len() < 32000,
+            "Call arena limit"
+        );
+        let id = self.values.len();
+        self.values.push(value);
+        Ok(Vm::U64(id as u64))
+    }
+    fn get(&self, v: &Vm) -> Result<&Value> {
+        let Vm::U64(id) = v else {
+            bail!("Expected handle")
+        };
+        self.values.get(*id as usize).context("Unknown handle")
+    }
+}
+struct Bindings<'a> {
+    arena: Mutex<Arena>,
+    db: Mutex<&'a mut Connection>,
+    data: &'a Path,
+    bundle: &'a Path,
+    error: Mutex<Option<String>>,
+}
+impl HostServices for Bindings<'_> {
+    fn call(&self, name: &str, args: &[Vm]) -> std::result::Result<Vm, fluxr::Error> {
+        match self.apply(name, args) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                *self.error.lock().unwrap() = Some(format!("{name}: {e:#}"));
+                Err(fluxr::Error::host(e.to_string()))
+            }
+        }
+    }
+}
+impl Bindings<'_> {
+    fn apply(&self, name: &str, args: &[Vm]) -> Result<Vm> {
+        let mut arena = self.arena.lock().unwrap();
+        let get = |i: usize| arena.get(args.get(i).context("Missing argument")?);
+        let v = match name {
+            "text" => json!(string(&args[0])?),
+            "parse" => serde_json::from_str(text(get(0)?)?)?,
+            "stringify" => json!(serde_json::to_string(get(0)?)?),
+            "bytes" => {
+                let b = text(get(0)?)?.as_bytes();
+                ensure!(b.len() <= 131072, "Byte conversion limit");
+                return Ok(Vm::List(std::sync::Arc::new(
+                    b.iter().map(|v| Vm::U64(*v as u64)).collect(),
+                )));
+            }
+            "decode_format" => formats::decode(text(get(0)?)?, &STANDARD.decode(text(get(1)?)?)?)?,
+            "encode_format" => {
+                let format = text(get(0)?)?;
+                let bytes = formats::encode(format, get(1)?)?;
+                json!({"format":format,"base64":STANDARD.encode(&bytes),"digest":hex(&bytes),"size":bytes.len()})
+            }
+            "git_read" => git::read(
+                Path::new(text(get(0)?)?),
+                self.data,
+                text(get(1)?)?,
+                get(2)?,
+            )?,
+            "stage" => {
+                let scope = text(get(0)?)?;
+                ensure!(
+                    scope.len() == 32 && scope.bytes().all(|b| b.is_ascii_hexdigit()),
+                    "Invalid staging scope"
+                );
+                let base = join(self.data, &format!("staging/{scope}"))?;
+                fs::create_dir_all(&base)?;
+                let op = text(get(1)?)?;
+                let arg = get(2)?;
+                let name = text(&arg["path"])?;
+                ensure!(!name.is_empty(), "Expected stage path");
+                let src = join(&base, name)?;
+                match op {
+                    "mkdir" => fs::create_dir(&src)?,
+                    "remove" => {
+                        if src.is_dir() {
+                            fs::remove_dir(&src)?
+                        } else {
+                            fs::remove_file(&src)?
+                        }
+                    }
+                    "copy" | "move" => {
+                        let dest = join(&base, text(&arg["destination"])?)?;
+                        ensure!(src.is_file(), "Expected regular file");
+                        let mut out = fs::OpenOptions::new()
+                            .create_new(true)
+                            .write(true)
+                            .open(&dest)?;
+                        out.write_all(&read(&src)?)?;
+                        out.sync_all()?;
+                        if op == "move" {
+                            fs::remove_file(src)?
+                        }
+                    }
+                    "create" => {
+                        let bytes = STANDARD.decode(text(&arg["base64"])?)?;
+                        ensure!(bytes.len() <= LIMIT, "Output too large");
+                        let mut temp = tempfile::NamedTempFile::new_in(
+                            src.parent().context("Missing parent")?,
+                        )?;
+                        temp.write_all(&bytes)?;
+                        temp.as_file().sync_all()?;
+                        temp.persist_noclobber(&src)?;
+                    }
+                    _ => bail!("Unknown staging operation"),
+                };
+                json!({"operation":op,"path":name})
+            }
+            "bundle" => resources::package(Path::new(text(get(0)?)?), self.data)?,
+            "frontmatter" => resources::frontmatter(text(get(0)?)?)?,
+            "matches" => resources::matches(text(get(0)?)?, get(1)?)?,
+            "keys" => json!(
+                get(0)?
+                    .as_object()
+                    .context("Expected object")?
+                    .keys()
+                    .collect::<Vec<_>>()
+            ),
+            "lower" => json!(text(get(0)?)?.to_lowercase()),
+            "contains" => return Ok(Vm::Bool(text(get(0)?)?.contains(text(get(1)?)?))),
+            "slice" => {
+                let (Vm::I64(a), Vm::I64(b)) = (&args[1], &args[2]) else {
+                    bail!("Expected byte offsets")
+                };
+                json!(
+                    text(get(0)?)?
+                        .get(usize::try_from(*a)?..usize::try_from(*b)?)
+                        .context("Invalid byte span")?
+                )
+            }
+            "pathjoin" => {
+                let a = text(get(0)?)?;
+                let b = text(get(1)?)?;
+                relative(b)?;
+                json!(if a.is_empty() {
+                    b.into()
+                } else {
+                    format!("{a}/{b}")
+                })
+            }
+            "validate" => {
+                validate(get(0)?, get(1)?)?;
+                Value::Null
+            }
+            "base64" => json!(STANDARD.encode(text(get(0)?)?.as_bytes())),
+            "int" => {
+                let Vm::I64(n) = args[0] else {
+                    bail!("Expected integer")
+                };
+                json!(n)
+            }
+            "number" => return Ok(Vm::I64(get(0)?.as_i64().context("Expected integer")?)),
+            "same" => return Ok(Vm::Bool(get(0)? == get(1)?)),
+            "truth" => return Ok(Vm::Bool(get(0)?.as_bool().context("Expected boolean")?)),
+            "size" => {
+                return Ok(Vm::I64(match get(0)? {
+                    Value::String(s) => s.len(),
+                    Value::Array(a) => a.len(),
+                    Value::Object(m) => m.len(),
+                    Value::Null => 0,
+                    _ => bail!("Expected collection"),
+                } as i64));
+            }
+            "get" => get(0)?.get(text(get(1)?)?).cloned().unwrap_or_default(),
+            "at" => {
+                let Vm::I64(n) = args[1] else {
+                    bail!("Expected index")
+                };
+                get(0)?
+                    .get(usize::try_from(n)?)
+                    .cloned()
+                    .unwrap_or_default()
+            }
+            "put" => {
+                let mut v = get(0)?.clone();
+                v.as_object_mut()
+                    .context("Expected object")?
+                    .insert(text(get(1)?)?.into(), get(2)?.clone());
+                v
+            }
+            "append" => {
+                let mut a = get(0)?.as_array().context("Expected list")?.clone();
+                a.push(get(1)?.clone());
+                json!(a)
+            }
+            "template" => fill(
+                &serde_json::from_str(text(get(0)?)?)?,
+                get(1)?.as_array().context("Expected arguments")?,
+            )?,
+            "concat" => json!(format!("{}{}", text(get(0)?)?, text(get(1)?)?)),
+            "uuid" => json!(uuid::Uuid::new_v4().simple().to_string()),
+            "hash" => json!(hex(text(get(0)?)?.as_bytes())),
+            "require" => {
+                ensure!(args[0] == Vm::Bool(true), "{}", text(get(1)?)?);
+                Value::Null
+            }
+            "asset" => json!(String::from_utf8(read(&join(
+                self.bundle,
+                text(get(0)?)?
+            )?)?)?),
+            "sql" => {
+                let conn = self.db.lock().unwrap();
+                let sql = text(get(0)?)?;
+                let params = get(1)?
+                    .as_array()
+                    .context("Expected SQL parameters")?
+                    .iter()
+                    .map(|v| {
+                        Ok(match v {
+                            Value::Null => Cell::Null,
+                            Value::Number(n) => {
+                                Cell::Integer(n.as_i64().context("Expected integer")?)
+                            }
+                            Value::Bool(b) => Cell::Integer(i64::from(*b)),
+                            Value::String(s) => Cell::Text(s.clone()),
+                            _ => Cell::Text(serde_json::to_string(v)?),
+                        })
+                    })
+                    .collect::<Result<Vec<_>>>()?;
+                let mut stmt = conn.prepare(sql)?;
+                if stmt.column_count() == 0 {
+                    json!(stmt.execute(params_from_iter(params))?)
+                } else {
+                    let names = stmt
+                        .column_names()
+                        .iter()
+                        .map(|n| n.to_string())
+                        .collect::<Vec<_>>();
+                    let mut cursor = stmt.query(params_from_iter(params))?;
+                    let mut out = Vec::new();
+                    let mut size = 0;
+                    while let Some(row) = cursor.next()? {
+                        let mut item = json!({});
+                        for (i, n) in names.iter().enumerate() {
+                            let v = match row.get_ref(i)? {
+                                ValueRef::Null => Value::Null,
+                                ValueRef::Integer(n) => json!(n),
+                                ValueRef::Real(n) => json!(n),
+                                ValueRef::Text(b) => json!(std::str::from_utf8(b)?),
+                                ValueRef::Blob(b) => json!(STANDARD.encode(b)),
+                            };
+                            if let Some(key) = n.strip_suffix(":json") {
+                                item[key] = if v.is_null() {
+                                    v
+                                } else {
+                                    serde_json::from_str(text(&v)?)?
+                                }
+                            } else {
+                                item[n] = v
+                            }
+                        }
+                        size += serde_json::to_vec(&item)?.len();
+                        ensure!(
+                            size <= LIMIT && out.len() < 10000,
+                            "Query result exceeds limit"
+                        );
+                        out.push(item)
+                    }
+                    json!(out)
+                }
+            }
+            "schema" => {
+                self.db.lock().unwrap().execute_batch(text(get(0)?)?)?;
+                Value::Null
+            }
+            "canonical" => {
+                let p = Path::new(text(get(0)?)?).canonicalize()?;
+                ensure!(
+                    p.is_dir() && !p.starts_with(self.data) && !self.data.starts_with(&p),
+                    "Select a directory separate from private storage"
+                );
+                json!(p)
+            }
+            "directory" | "read_file" | "read_base64" => {
+                let root = Path::new(text(get(0)?)?).canonicalize()?;
+                let path = join(&root, text(get(1)?)?)?.canonicalize()?;
+                ensure!(
+                    path.starts_with(&root) && !path.starts_with(self.data),
+                    "Private or escaped path"
+                );
+                if name == "directory" {
+                    let mut entries = Vec::new();
+                    for entry in fs::read_dir(path)? {
+                        let entry = entry?;
+                        ensure!(entries.len() < 10000, "Directory limit");
+                        let m = fs::symlink_metadata(entry.path())?;
+                        entries.push(json!({"name":entry.file_name().to_str().context("Invalid filename")?,"directory":m.is_dir(),"link":linked(&m),"size":m.len()}))
+                    }
+                    entries.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+                    json!(entries)
+                } else {
+                    let before = fs::metadata(&path)?;
+                    let bytes = read(&path)?;
+                    let after = fs::metadata(&path)?;
+                    ensure!(
+                        before.modified()? == after.modified()?
+                            && before.len() == after.len()
+                            && before.len() == bytes.len() as u64,
+                        "File changed while reading"
+                    );
+                    if name == "read_base64" {
+                        json!(STANDARD.encode(bytes))
+                    } else {
+                        json!(String::from_utf8(bytes)?)
+                    }
+                }
+            }
+            "ancestors" => {
+                let root = Path::new(text(get(0)?)?).canonicalize()?;
+                let mut dirs = std::collections::BTreeSet::from([(0, String::new())]);
+                for target in get(1)?.as_array().into_iter().flatten() {
+                    let rel = text(target)?;
+                    let path = join(&root, rel)?;
+                    let dir = if path.is_dir() {
+                        path.as_path()
+                    } else {
+                        path.parent().context("Invalid target")?
+                    };
+                    for prefix in dir.strip_prefix(&root)?.ancestors() {
+                        if join(&root, prefix.to_str().context("Non-Unicode path")?)?.is_dir() {
+                            dirs.insert((
+                                prefix.components().count(),
+                                prefix.to_string_lossy().replace('\\', "/"),
+                            ));
+                        }
+                    }
+                }
+                json!(dirs.into_iter().map(|(_, s)| s).collect::<Vec<_>>())
+            }
+            "find_names" => {
+                let root = Path::new(text(get(0)?)?).canonicalize()?;
+                let dir = join(&root, text(get(1)?)?)?;
+                ensure!(!dir.starts_with(self.data), "Private directory");
+                let mut items = Vec::new();
+                for n in get(2)?.as_array().context("Expected names")? {
+                    let mut found = None;
+                    for entry in fs::read_dir(&dir)? {
+                        let entry = entry?;
+                        if entry.file_name().eq_ignore_ascii_case(text(n)?) {
+                            ensure!(found.is_none(), "Ambiguous file name");
+                            let path = entry.path();
+                            ensure!(!linked(&fs::symlink_metadata(&path)?), "Unexpected link");
+                            let data = read(&path)?;
+                            ensure!(data.len() <= 256 * 1024, "Instruction exceeds limit");
+                            found = Some(
+                                json!({"path":path.strip_prefix(&root)?,"directory_scope":dir.strip_prefix(&root)?,"digest":hex(&data),"text":String::from_utf8(data)?}),
+                            );
+                        }
+                    }
+                    if let Some(item) = found {
+                        items.push(item)
+                    }
+                }
+                json!(items)
+            }
+            "publish" => {
+                let p = join(self.data, text(get(0)?)?)?;
+                let data = text(get(1)?)?.as_bytes();
+                let parent = p.parent().context("Invalid path")?;
+                fs::create_dir_all(parent)?;
+                let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+                tmp.write_all(data)?;
+                tmp.as_file().sync_all()?;
+                tmp.persist(&p)?;
+                ensure!(read(&p)? == data, "File verification failed");
+                json!(hex(data))
+            }
+            "base64_info" => {
+                let encoded = text(get(0)?)?;
+                let bytes = STANDARD.decode(encoded)?;
+                ensure!(bytes.len() <= 8 * 1024 * 1024, "Attachment exceeds limit");
+                json!({"size":bytes.len(),"digest":hex(&bytes),"text":std::str::from_utf8(&bytes).ok()})
+            }
+            _ => bail!("Unknown host service {name}"),
+        };
+        arena.add(v)
+    }
+}

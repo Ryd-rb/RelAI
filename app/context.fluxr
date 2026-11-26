@@ -1,0 +1,48 @@
+fluxr 1
+
+fn instruction_files 2 root uint targets uint uint do 5 dirs uint out uint entries uint i int n int 5
+  set dirs call ancestors 2 root targets
+  set out call arr 0
+  set i 0
+  while lt i call size 1 dirs 4
+    set entries call named 3 root call nth 2 dirs i call append 2 call append 2 call arr 0 call str 1 utf8 "AGENTS.md" call str 1 utf8 "CLAUDE.md"
+    set n 0
+    while lt n call size 1 entries 2
+    set out call append 2 out call nth 2 entries n
+    next n
+    next i
+  ret out
+
+fn selected_skills 2 pid uint ids uint uint do 4 out uint row uint discard uint i int 4
+  set out call arr 0
+  set i 0
+  while lt i call size 1 ids 4
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT id,name,digest,body FROM skills WHERE project=? AND id=? AND active=1" call append 2 call append 2 call arr 0 pid call nth 2 ids i 0
+    set discard call require 2 not call same 2 row 0u call str 1 utf8 "Selected skill was removed"
+    set out call append 2 out row
+    next i
+  ret out
+
+fn seal_current 1 j uint bool do 7 sealed uint pid uint frame uint refs uint part uint row uint i int 9
+  set pid call key 2 j call str 1 utf8 "project"
+  set frame call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "selection"
+  set refs call key 2 frame call str 1 utf8 "parts"
+  set i 0
+  while lt i call size 1 refs 3
+    set part call key 2 call nth 2 refs i call str 1 utf8 "term"
+    if not call same 2 part 0u 2
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS allowed FROM dictionary_links l JOIN dictionaries d ON d.id=l.dictionary WHERE l.project=? AND l.dictionary=? AND l.enabled=1 AND d.archived=0" call append 2 call append 2 call arr 0 pid call key 2 part call str 1 utf8 "dictionary_id" 0
+    if call same 2 row 0u 1
+    ret false
+  0
+  0
+    next i
+  set refs call key 2 frame call str 1 utf8 "skill_instructions"
+  set i 0
+  while lt i call size 1 refs 3
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS allowed FROM skills WHERE id=? AND project=? AND active=1" call append 2 call append 2 call arr 0 call key 2 call nth 2 refs i call str 1 utf8 "id" pid 0
+    if call same 2 row 0u 1
+    ret false
+  0
+    next i
+  ret true

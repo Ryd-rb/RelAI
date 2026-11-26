@@ -1,0 +1,67 @@
+{
+  "name": "RelAI",
+  "modules": [
+    "bindings.fluxr",
+    "store.fluxr",
+    "provider.fluxr",
+    "queue.fluxr",
+    "actions.fluxr",
+    "receive.fluxr",
+    "ui.fluxr",
+    "graph.fluxr",
+    "tools.fluxr",
+    "tool_jobs.fluxr",
+    "knowledge.fluxr",
+    "context.fluxr",
+    "panels.fluxr",
+    "review.fluxr",
+    "services.fluxr"
+  ],
+  "public": [
+    "open_project",
+    "submit",
+    "capture",
+    "save_model",
+    "dashboard",
+    "control",
+    "save_term",
+    "capture_graph",
+    "tool_catalog",
+    "tool_run",
+    "tool_propose",
+    "tool_test",
+    "tool_qualify",
+    "tool_promote",
+    "tool_retire",
+    "tool_revoke",
+    "dictionary",
+    "skill"
+  ],
+  "assets": {
+    "client.js": "text/javascript; charset=utf-8",
+    "style.css": "text/css; charset=utf-8"
+  },
+  "destinations": {
+    "codex": {
+      "transport": "websocket",
+      "url_env": "RELAI_CODEX_URL",
+      "token_file_env": "RELAI_CODEX_TOKEN_FILE"
+    },
+    "anthropic": {
+      "transport": "https",
+      "url": "https://api.anthropic.com/v1/messages",
+      "headers": {
+        "anthropic-version": "2023-06-01"
+      },
+      "key_env": "ANTHROPIC_API_KEY",
+      "key_header": "x-api-key"
+    },
+    "qwen": {
+      "transport": "https",
+      "url_env": "RELAI_QWEN_CHAT_URL",
+      "key_env": "RELAI_QWEN_KEY",
+      "key_header": "Authorization",
+      "optional_key": true
+    }
+  }
+}

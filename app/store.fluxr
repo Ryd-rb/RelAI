@@ -1,0 +1,134 @@
+fluxr 1
+
+fn document 2 path uint body uint uint do 0  1
+  ret call query 2 call str 1 utf8 "INSERT INTO files(path,content,digest) VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 path body call hash 1 body
+
+fn audit 3 project uint kind uint payload uint uint do 0  1
+  ret call query 2 call str 1 utf8 "INSERT INTO events(project,kind,payload) VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 project kind call encode 1 local payload
+
+fn job 6 project uint request uint session uint role uint kind uint body uint uint do 2 jid uint discard uint 3
+  set jid call uid 0
+  set discard call query 2 call str 1 utf8 "INSERT INTO jobs(id,project,request,revision,session,role,kind,input) SELECT ?,?,id,revision,?,?,?,? FROM requests WHERE id=? AND project=?" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 jid project session role kind body request project
+  ret jid
+
+fn project 1 arg uint uint do 2 row uint discard uint 3
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT * FROM projects WHERE id=?" call append 2 call arr 0 call key 2 arg call str 1 utf8 "project" 0
+  set discard call require 2 not call same 2 row 0u call str 1 utf8 "Unknown project"
+  ret row
+
+pub open_project 1 arg uint uint do 4 root uint row uint pid uint discard uint 8
+  set root call canonical 1 call key 2 arg call str 1 utf8 "root"
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT * FROM projects WHERE root=?" call append 2 call arr 0 root 0
+  if not call same 2 row 0u 1
+    ret row
+  0
+  set pid call uid 0
+  set discard call query 2 call str 1 utf8 "INSERT INTO projects VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 pid root call uid 0
+  set discard call dictionary_init 1 pid
+  set discard call audit 3 pid call str 1 utf8 "Project opened" call shape 2 call str 1 utf8 "{\"root\":\"$0\"}" call append 2 call arr 0 root
+  ret call nth 2 call query 2 call str 1 utf8 "SELECT * FROM projects WHERE id=?" call append 2 call arr 0 pid 0
+
+pub capture 1 arg uint uint do 7 p uint info uint meta uint aid uint mime uint name uint discard uint 11
+  set p call key 2 call project 1 arg call str 1 utf8 "id"
+  set name call key 2 arg call str 1 utf8 "name"
+  set discard call require 2 and lt 0 call size 1 name le call size 1 name 255 call str 1 utf8 "Invalid filename"
+  set mime call key 2 arg call str 1 utf8 "mime"
+  set info call baseinfo 1 call key 2 arg call str 1 utf8 "base64"
+  set discard call require 2 not call same 2 call key 2 call resource 1 call str 1 utf8 "media.json" mime 0u call str 1 utf8 "Unsupported attachment type"
+  if call same 2 call key 2 call resource 1 call str 1 utf8 "media.json" mime call str 1 utf8 "text" 1
+    set discard call require 2 not call same 2 call key 2 info call str 1 utf8 "text" 0u call str 1 utf8 "Invalid UTF-8"
+  0
+  set aid call uid 0
+  set meta call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"artifact_id\":\"$0\",\"display_name\":\"$1\",\"media_type\":\"$2\",\"byte_length\":\"$3\",\"digest\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid name mime call key 2 info call str 1 utf8 "size" call key 2 info call str 1 utf8 "digest"
+  set discard call query 2 call str 1 utf8 "INSERT INTO artifacts VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 aid p meta call key 2 arg call str 1 utf8 "base64"
+  ret meta
+
+pub submit 1 arg uint uint do 17 p uint pid uint keyval uint finger uint prior uint rid uint sid uint prompt uint items uint files uint file uint body uint summary uint discard uint reply uint steer uint i int 32
+  set p call project 1 arg
+  set pid call key 2 p call str 1 utf8 "id"
+  set keyval call key 2 arg call str 1 utf8 "key"
+  set discard call require 2 lt 0 call size 1 keyval call str 1 utf8 "Missing idempotency key"
+  set finger call hash 1 call encode 1 arg
+  set prior call nth 2 call query 2 call str 1 utf8 "SELECT id,request,hash FROM submissions WHERE project=? AND key=?" call append 2 call append 2 call arr 0 pid keyval 0
+  if not call same 2 prior 0u 2
+    set discard call require 2 call same 2 call key 2 prior call str 1 utf8 "hash" finger call str 1 utf8 "Idempotency conflict"
+    ret prior
+  0
+  set prompt call key 2 arg call str 1 utf8 "text"
+  set items call key 2 arg call str 1 utf8 "attachments"
+  set discard call require 2 and le call size 1 items 8 le call size 1 prompt 262144 call str 1 utf8 "Submission exceeds limits"
+  set discard call require 2 lt 0 add call size 1 prompt call size 1 items call str 1 utf8 "Enter a message or attach a file"
+  set files call arr 0
+  set i 0
+  while lt i call size 1 items 4
+    set file call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT meta AS \"meta:json\" FROM artifacts WHERE id=? AND project=?" call append 2 call append 2 call arr 0 call nth 2 items i pid 0 call str 1 utf8 "meta"
+    set discard call require 2 not call same 2 file 0u call str 1 utf8 "Unavailable attachment"
+    set files call append 2 files file
+    next i
+  set reply call key 2 arg call str 1 utf8 "reply"
+  set steer call key 2 arg call str 1 utf8 "steer"
+  set rid call uid 0
+  if not call same 2 reply 0u 2
+    set rid call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT r.id FROM requests r JOIN questions q ON q.request=r.id AND q.revision=r.revision WHERE q.id=? AND r.project=? AND r.state='open' AND q.state='open'" call append 2 call append 2 call arr 0 reply pid 0 call str 1 utf8 "id"
+    set discard call require 2 not call same 2 rid 0u call str 1 utf8 "Question unavailable"
+  1
+    if not call same 2 steer 0u 4
+    set rid steer
+    set discard call query 2 call str 1 utf8 "UPDATE requests SET revision=revision+1,intent=? WHERE id=? AND project=? AND state='open'" call append 2 call append 2 call append 2 call arr 0 prompt rid pid
+    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Request unavailable"
+    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded' WHERE request=? AND state IN ('running','queued','sealed','held','uncertain')" call append 2 call arr 0 rid
+  1
+    set discard call query 2 call str 1 utf8 "INSERT INTO requests(id,project,intent) VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 rid pid prompt
+  set sid call uid 0
+  set body call shape 2 call str 1 utf8 "{\"submission\":\"$0\",\"request\":\"$1\",\"text\":\"$2\",\"attachments\":\"$3\",\"reply\":\"$4\",\"steer\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid rid prompt files reply steer
+  set body call put 3 body call str 1 utf8 "skills" call key 2 arg call str 1 utf8 "skills"
+  set discard call selected_skills 2 pid call key 2 body call str 1 utf8 "skills"
+  set discard call query 2 call str 1 utf8 "INSERT INTO submissions VALUES(?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid rid keyval finger body
+  set discard call document 2 call cat 2 call cat 2 call str 1 utf8 "submissions/" sid call str 1 utf8 "/PROMPT.txt" prompt
+  set discard call document 2 call cat 2 call cat 2 call str 1 utf8 "submissions/" sid call str 1 utf8 "/attachments.json" call encode 1 files
+  set summary call str 1 utf8 "Read the prompt."
+  if lt 0 call size 1 files 1
+    set summary call str 1 utf8 "Read the prompt and its attachments."
+  0
+  if eq 0 call size 1 prompt 1
+    set summary call str 1 utf8 "Read the attachments."
+  0
+  set discard call audit 3 pid call str 1 utf8 "Submission" body
+  set discard call job 6 pid rid call key 2 p call str 1 utf8 "discriminator" call str 1 utf8 "discriminator" call str 1 utf8 "intake" body
+  set discard call audit 3 pid call str 1 utf8 "Delivery" call shape 2 call str 1 utf8 "{\"request\":\"$0\",\"summary\":\"$1\"}" call append 2 call append 2 call arr 0 rid summary
+  ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"request\":\"$1\"}" call append 2 call append 2 call arr 0 sid rid
+
+fn preset 2 p uint role uint uint do 1 row uint 3
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT provider,model,effort,scope,rev FROM presets WHERE scope IN (?,'global') AND role=? ORDER BY scope='global' LIMIT 1" call append 2 call append 2 call arr 0 p role 0
+  if not call same 2 row 0u 1
+    ret row
+  0
+  ret call shape 2 call str 1 utf8 "{\"provider\":\"codex\",\"model\":\"gpt-6.2-sol\",\"effort\":\"$0\",\"scope\":\"default\",\"rev\":0}" call append 2 call arr 0 call key 2 call resource 1 call str 1 utf8 "roles.json" role
+
+pub save_model 1 arg uint uint do 7 p uint role uint scope uint provider uint model uint effort uint discard uint 13
+  set p call key 2 call project 1 arg call str 1 utf8 "id"
+  set role call key 2 arg call str 1 utf8 "role"
+  set discard call require 2 not call same 2 call key 2 call resource 1 call str 1 utf8 "roles.json" role 0u call str 1 utf8 "Unknown role"
+  set scope p
+  if call same 2 call key 2 arg call str 1 utf8 "scope" call str 1 utf8 "global" 1
+    set scope call str 1 utf8 "global"
+  0
+  if call same 2 call key 2 arg call str 1 utf8 "operation" call str 1 utf8 "reset" 1
+    ret call query 2 call str 1 utf8 "DELETE FROM presets WHERE scope=? AND role=?" call append 2 call append 2 call arr 0 scope role
+  0
+  set provider call key 2 arg call str 1 utf8 "provider"
+  set discard call require 2 or call same 2 provider call str 1 utf8 "codex" or call same 2 provider call str 1 utf8 "anthropic" call same 2 provider call str 1 utf8 "qwen" call str 1 utf8 "Unknown provider"
+  set effort call key 2 arg call str 1 utf8 "effort"
+  set discard call require 2 or call same 2 effort call str 1 utf8 "low" or call same 2 effort call str 1 utf8 "medium" call same 2 effort call str 1 utf8 "high" call str 1 utf8 "Unknown effort"
+  set model call key 2 arg call str 1 utf8 "model"
+  set discard call require 2 lt 0 call size 1 model call str 1 utf8 "Missing model ID"
+  ret call query 2 call str 1 utf8 "INSERT INTO presets VALUES(?,?,?,?,?,1) ON CONFLICT(scope,role) DO UPDATE SET provider=excluded.provider,model=excluded.model,effort=excluded.effort,rev=presets.rev+1" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 scope role provider model effort
+
+pub init 1 arg uint uint do 1 discard uint 7
+  set discard call schema 1 call asset 1 call str 1 utf8 "schema.sql"
+  set discard call query 2 call str 1 utf8 "UPDATE attempts SET state='uncertain',ended=unixepoch() WHERE state='sending'" call arr 0
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='uncertain',reason='Interrupted during provider call' WHERE state='running'" call arr 0
+  set discard call glossary 0
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='queued' WHERE state='sealing'" call arr 0
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason='Interrupted deterministic job' WHERE state='executing'" call arr 0
+  ret call query 2 call str 1 utf8 "UPDATE files SET verified=0" call arr 0

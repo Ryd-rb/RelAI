@@ -1,0 +1,64 @@
+fluxr 1
+
+fn walk 5 root uint pid uint sid uint dir uint depth int uint do 11 entries uint entry uint name uint path uint body uint info uint hashval uint kind uint countval uint discard uint i int 5
+  set discard call require 2 le depth 32 call str 1 utf8 "Snapshot depth limit reached"
+  set entries call directory 2 root dir
+  set i 0
+  while lt i call size 1 entries 4
+    set entry call nth 2 entries i
+    set name call key 2 entry call str 1 utf8 "name"
+    if not or call same 2 call key 2 entry call str 1 utf8 "link" call decode 1 call str 1 utf8 "true" or call same 2 name call str 1 utf8 ".git" call same 2 name call str 1 utf8 "target" 6
+    set path call pathjoin 2 dir name
+    set kind call str 1 utf8 "directory"
+    set hashval 0u
+    if call same 2 call key 2 entry call str 1 utf8 "directory" call decode 1 call str 1 utf8 "false" 7
+    set kind call str 1 utf8 "file"
+    set countval call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n,coalesce(sum(bytes),0) AS total FROM inventory WHERE snapshot=?" call append 2 call arr 0 sid 0
+    set discard call require 2 and lt call number 1 call key 2 countval call str 1 utf8 "n" 2000 le add call number 1 call key 2 countval call str 1 utf8 "total" call number 1 call key 2 entry call str 1 utf8 "size" 8388608 call str 1 utf8 "Snapshot exceeds 2000 entries or 8 MiB"
+    set body call read64 2 root path
+    set info call baseinfo 1 body
+    set hashval call key 2 info call str 1 utf8 "digest"
+    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO blobs VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 pid hashval body
+  0
+    set discard call query 2 call str 1 utf8 "INSERT INTO inventory VALUES(?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid path dir kind hashval call key 2 entry call str 1 utf8 "size"
+    if call same 2 kind call str 1 utf8 "directory" 1
+    set discard call walk 5 root pid sid path add depth 1
+  0
+  0
+    next i
+  ret 0u
+
+pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint discard uint 8
+  set p call project 1 arg
+  set pid call key 2 p call str 1 utf8 "id"
+  set sid call uid 0
+  set discard call walk 5 call key 2 p call str 1 utf8 "root" pid sid call str 1 utf8 "" 0
+  set nodes call query 2 call str 1 utf8 "SELECT path,parent,kind,digest,bytes FROM inventory WHERE snapshot=? ORDER BY path" call append 2 call arr 0 sid
+  set discard call query 2 call str 1 utf8 "INSERT INTO snapshots VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 sid pid nodes
+  set discard call audit 3 pid call str 1 utf8 "Snapshot captured" call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\",\"entries\":\"$1\"}" call append 2 call append 2 call arr 0 sid call integer 1 call size 1 nodes
+  ret call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\"}" call append 2 call arr 0 sid
+
+fn graph_view 2 arg uint pid uint uint do 7 sid uint rowsval uint components uint node uint body uint a uint discard uint 9
+  set sid call key 2 arg call str 1 utf8 "snapshot"
+  if call same 2 sid 0u 1
+    set sid call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? ORDER BY rowid DESC LIMIT 1" call append 2 call arr 0 pid 0 call str 1 utf8 "id"
+  0
+  set components call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Capture snapshot\",\"op\":\"capture_graph\",\"selectResult\":{\"snapshot\":\"snapshot\"},\"after\":{\"view\":\"graph\"}}" call arr 0
+  if call same 2 sid 0u 1
+    ret components
+  0
+  set rowsval call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT manifest AS \"nodes:json\" FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 sid pid 0 call str 1 utf8 "nodes"
+  set discard call require 2 not call same 2 rowsval 0u call str 1 utf8 "Snapshot unavailable"
+  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"tree\",\"label\":\"Project graph\",\"nodes\":\"$0\",\"navigate\":{\"view\":\"graph\",\"snapshot\":\"$1\"},\"pathField\":\"selected\"}" call append 2 call append 2 call arr 0 rowsval sid
+  if not call same 2 call key 2 arg call str 1 utf8 "selected" 0u 2
+    set node call nth 2 call query 2 call str 1 utf8 "SELECT kind,digest,path FROM inventory WHERE snapshot=? AND path=?" call append 2 call append 2 call arr 0 sid call key 2 arg call str 1 utf8 "selected" 0
+    if call same 2 call key 2 node call str 1 utf8 "kind" call str 1 utf8 "file" 4
+    set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT content FROM blobs WHERE project=? AND digest=?" call append 2 call append 2 call arr 0 pid call key 2 node call str 1 utf8 "digest" 0 call str 1 utf8 "content"
+    set a call key 2 call baseinfo 1 body call str 1 utf8 "text"
+    if call same 2 a 0u 1
+    set a call str 1 utf8 "Binary file"
+  0
+    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"$0\",\"value\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 node call str 1 utf8 "path" a
+  0
+  0
+  ret components

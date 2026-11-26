@@ -1,0 +1,131 @@
+{
+  "destination": "codex",
+  "steps": [
+    {
+      "send": {
+        "id": 1,
+        "method": "initialize",
+        "params": {
+          "clientInfo": {
+            "name": "relai",
+            "title": "RelAI",
+            "version": "0.1.0"
+          },
+          "capabilities": {
+            "experimentalApi": true
+          }
+        }
+      },
+      "wait": {
+        "pointer": "/id",
+        "equals": 1
+      }
+    },
+    {
+      "send": {
+        "method": "initialized"
+      }
+    },
+    {
+      "send": {
+        "id": 2,
+        "method": "account/read",
+        "params": {
+          "refreshToken": false
+        }
+      },
+      "wait": {
+        "pointer": "/id",
+        "equals": 2
+      },
+      "require": {
+        "pointer": "/result/account/type",
+        "equals": "chatgpt",
+        "error": "Sign in to Codex with ChatGPT."
+      }
+    },
+    {
+      "send": {
+        "id": 3,
+        "method": "thread/start",
+        "params": {
+          "ephemeral": true,
+          "model": "$0",
+          "modelProvider": "openai",
+          "allowProviderModelFallback": false,
+          "approvalPolicy": "never",
+          "sandbox": "read-only",
+          "environments": [],
+          "runtimeWorkspaceRoots": [],
+          "selectedCapabilityRoots": [],
+          "dynamicTools": [],
+          "multiAgentMode": "explicitRequestOnly",
+          "baseInstructions": "$1",
+          "developerInstructions": "Only return the required JSON. Do not call Codex tools.",
+          "config": {
+            "features.shell_tool": false,
+            "features.unified_exec": false,
+            "features.multi_agent_v2": false,
+            "features.plugins": false,
+            "features.apps": false,
+            "features.memories": false,
+            "features.hooks": false,
+            "features.skip_host_skill_discovery": true,
+            "web_search": "disabled",
+            "project_doc_max_bytes": 0
+          }
+        }
+      },
+      "wait": {
+        "pointer": "/id",
+        "equals": 3
+      },
+      "require": {
+        "pointer": "/result/model",
+        "equals": "$0",
+        "error": "Codex changed the requested model."
+      },
+      "save": "thread"
+    },
+    {
+      "send": {
+        "id": 4,
+        "method": "turn/start",
+        "params": {
+          "threadId": {
+            "$saved": "/thread/result/thread/id"
+          },
+          "model": "$0",
+          "effort": "$2",
+          "input": "$3",
+          "outputSchema": "$4",
+          "environments": []
+        }
+      },
+      "wait": {
+        "pointer": "/id",
+        "equals": 4
+      }
+    },
+    {
+      "wait": {
+        "pointer": "/params/item/type",
+        "equals": "agentMessage",
+        "method": "item/completed"
+      },
+      "save": "message"
+    },
+    {
+      "wait": {
+        "pointer": "/method",
+        "equals": "turn/completed"
+      },
+      "require": {
+        "pointer": "/params/turn/status",
+        "equals": "completed",
+        "error": "Codex turn did not complete."
+      },
+      "save": "completion"
+    }
+  ]
+}

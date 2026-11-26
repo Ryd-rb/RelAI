@@ -1,0 +1,13 @@
+{
+  "discriminator": "low",
+  "planner": "medium",
+  "designer": "high",
+  "implementer": "medium",
+  "reviewer": "high",
+  "investigator": "high",
+  "test_author": "medium",
+  "tool_author": "high",
+  "knowledge_curator": "low",
+  "synthesizer": "medium",
+  "workflow_improver": "medium"
+}

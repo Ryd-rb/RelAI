@@ -1,0 +1,115 @@
+fluxr 1
+
+fn str 1 x0 list uint uint do 0  1
+  ret host text uint 1 list uint x0
+
+fn decode 1 x0 uint uint do 0  1
+  ret host parse uint 1 uint x0
+
+fn encode 1 x0 uint uint do 0  1
+  ret host stringify uint 1 uint x0
+
+fn integer 1 x0 int uint do 0  1
+  ret host int uint 1 int x0
+
+fn number 1 x0 uint int do 0  1
+  ret host number int 1 uint x0
+
+fn same 2 x0 uint x1 uint bool do 0  1
+  ret host same bool 2 uint x0 uint x1
+
+fn size 1 x0 uint int do 0  1
+  ret host size int 1 uint x0
+
+fn key 2 x0 uint x1 uint uint do 0  1
+  ret host get uint 2 uint x0 uint x1
+
+fn nth 2 x0 uint x1 int uint do 0  1
+  ret host at uint 2 uint x0 int x1
+
+fn put 3 x0 uint x1 uint x2 uint uint do 0  1
+  ret host put uint 3 uint x0 uint x1 uint x2
+
+fn append 2 x0 uint x1 uint uint do 0  1
+  ret host append uint 2 uint x0 uint x1
+
+fn shape 2 x0 uint x1 uint uint do 0  1
+  ret host template uint 2 uint x0 uint x1
+
+fn cat 2 x0 uint x1 uint uint do 0  1
+  ret host concat uint 2 uint x0 uint x1
+
+fn uid 0  uint do 0  1
+  ret host uuid uint 0
+
+fn hash 1 x0 uint uint do 0  1
+  ret host hash uint 1 uint x0
+
+fn require 2 x0 bool x1 uint uint do 0  1
+  ret host require uint 2 bool x0 uint x1
+
+fn asset 1 x0 uint uint do 0  1
+  ret host asset uint 1 uint x0
+
+fn query 2 x0 uint x1 uint uint do 0  1
+  ret host sql uint 2 uint x0 uint x1
+
+fn schema 1 x0 uint uint do 0  1
+  ret host schema uint 1 uint x0
+
+fn canonical 1 x0 uint uint do 0  1
+  ret host canonical uint 1 uint x0
+
+fn directory 2 x0 uint x1 uint uint do 0  1
+  ret host directory uint 2 uint x0 uint x1
+
+fn readtext 2 x0 uint x1 uint uint do 0  1
+  ret host read_file uint 2 uint x0 uint x1
+
+fn named 3 x0 uint x1 uint x2 uint uint do 0  1
+  ret host find_names uint 3 uint x0 uint x1 uint x2
+
+fn publish 2 x0 uint x1 uint uint do 0  1
+  ret host publish uint 2 uint x0 uint x1
+
+fn baseinfo 1 x0 uint uint do 0  1
+  ret host base64_info uint 1 uint x0
+
+fn lower 1 x0 uint uint do 0  1
+  ret host lower uint 1 uint x0
+
+fn contains 2 x0 uint x1 uint bool do 0  1
+  ret host contains bool 2 uint x0 uint x1
+
+fn slice 3 x0 uint x1 int x2 int uint do 0  1
+  ret host slice uint 3 uint x0 int x1 int x2
+
+fn pathjoin 2 x0 uint x1 uint uint do 0  1
+  ret host pathjoin uint 2 uint x0 uint x1
+
+fn check 2 x0 uint x1 uint uint do 0  1
+  ret host validate uint 2 uint x0 uint x1
+
+fn b64 1 x0 uint uint do 0  1
+  ret host base64 uint 1 uint x0
+
+fn arr 0  uint do 0  1
+  ret call decode 1 call str 1 utf8 "[]"
+
+fn obj 0  uint do 0  1
+  ret call decode 1 call str 1 utf8 "{}"
+
+fn resource 1 path uint uint do 0  1
+  ret call decode 1 call asset 1 path
+
+fn rawbytes 1 x0 uint list uint ret host bytes list uint 1 uint x0
+fn read64 2 root uint path uint uint ret host read_base64 uint 2 uint root uint path
+fn bundle 1 path uint uint ret host bundle uint 1 uint path
+fn frontmatter 1 body uint uint ret host frontmatter uint 1 uint body
+fn keys 1 value uint uint ret host keys uint 1 uint value
+fn matches 2 body uint vocab uint uint ret host matches uint 2 uint body uint vocab
+fn unpack_format 2 format uint encoded uint uint ret host decode_format uint 2 uint format uint encoded
+fn pack_format 2 format uint data uint uint ret host encode_format uint 2 uint format uint data
+fn ancestors 2 root uint targets uint uint ret host ancestors uint 2 uint root uint targets
+fn git_read 3 root uint op uint args uint uint ret host git_read uint 3 uint root uint op uint args
+fn stage 3 scope uint op uint args uint uint ret host stage uint 3 uint scope uint op uint args

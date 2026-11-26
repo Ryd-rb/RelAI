@@ -90,6 +90,8 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
     let root = temp.path().join("project");
     let data = temp.path().join("private");
     fs::create_dir(&root).unwrap();
+    let unselected = "UNSELECTED_PROJECT_FILE_CONTENT";
+    fs::write(root.join("README.md"), unselected).unwrap();
     fs::write(
         root.join("Agents.md"),
         "Inspect the supplied text. Keep project files unchanged.\n",
@@ -118,6 +120,22 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
     let intake = next_model(&mut app);
     let intake_details = details(&mut app, &project, &intake);
     let input = frame(&data, &intake);
+    let project_tools = input["project_tools"].as_array().unwrap();
+    for name in ["fs.list", "fs.read", "fs.search"] {
+        let entry = project_tools
+            .iter()
+            .find(|entry| entry["tool"] == name)
+            .unwrap();
+        assert!(entry["arguments"]["path"].is_string());
+        assert!(entry["description"].is_string());
+    }
+    let lookup = project_tools
+        .iter()
+        .find(|entry| entry["tool"] == "tool.find")
+        .unwrap();
+    assert!(lookup["arguments"]["query"].is_string());
+    assert_eq!(project_tools.len(), 4);
+    assert!(!intake["transport"].to_string().contains(unselected));
     assert_eq!(intake_details["role"], "discriminator");
     assert_eq!(intake_details["session"], discriminator);
     assert_eq!(
@@ -160,6 +178,7 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
         let worker = next_model(&mut app);
         let worker_details = details(&mut app, &project, &worker);
         let input = frame(&data, &worker);
+        assert_eq!(input["project_tools"].as_array().unwrap(), project_tools);
         assert_ne!(worker_details["session"], discriminator);
         assert_eq!(input["delivery"]["attachments"], json!([attachment["id"]]));
         assert_eq!(
@@ -274,6 +293,7 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
     let improver = next_model(&mut app);
     let info = details(&mut app, &project, &improver);
     assert_eq!(info["role"], "workflow_improver");
+    assert!(frame(&data, &improver).get("project_tools").is_none());
     assert_eq!(info["session"], improver_record.0);
     assert_eq!(improver["job"], improver_record.1);
     let published = events(&mut app, &project)

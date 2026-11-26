@@ -14,6 +14,8 @@ Select **Choose folder…** to open an existing project. Each project has its ow
 
 RelAI shows your messages, its questions, and its answers in the chat. The composer names the question it will answer when one is open. Use **Reply** to choose between questions. Selecting a suggested answer puts it in the composer so you can edit it before sending. Once the latest request is complete, a follow-up includes the selected request and its answer as context. **New topic** keeps the draft and clears that context. Use **Accept answer** to approve a direct result. **Request options** lets you update or stop work. Open **Activity** for delivery records and diagnostics.
 
+When you ask about the open project, RelAI can list its folders, read a text file or search that file for a phrase. Each read appears in Activity. You can ask about a README or build configuration without attaching it. When you answer a question, the session that asked receives your reply alongside the original request and the exact question.
+
 The launcher starts a capability-token-protected Codex App Server on loopback and checks for a ChatGPT sign-in before each subscription turn. Codex owns the credentials. Each attempt opens a fresh ephemeral thread with its sealed input, model, reasoning effort, and output schema.
 
 The sidebar groups Relay, Activity, Project graph and Tools under **Workspace**. Models and Dictionary are under **Settings**. Each project remembers the tab you selected on each page while the app is open.
@@ -41,7 +43,7 @@ pwsh -File .\Test-RelAI.ps1
 pwsh -File .\Start-RelAI.ps1 -CheckProvider
 ```
 
-The first command checks formatting, runs strict Clippy, and executes the offline integration suite. The Git transport fixture uses Python 3 and Git to run a disposable HTTPS reference server on loopback. The second starts the local Codex service and runs a bounded two-turn subscription test. It accepts the verified attachment result, releases the final delivery and checks that the independent improvement session closes. Anthropic and Qwen integrations have not been exercised against endpoints.
+The first command checks formatting, runs strict Clippy, and executes the offline integration suite. The Git transport fixture uses Python 3 and Git to run a disposable HTTPS reference server on loopback. The second command starts the local Codex service and runs two subscription checks. One verifies an attached word, final delivery and improvement in two model turns. The other resumes an existing upload question in a disposable project. It checks that RelAI routes the reply, reads the project README and returns its unique value within five model turns. Anthropic and Qwen integrations have not been exercised against endpoints.
 
 ## Application and runtime
 

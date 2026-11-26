@@ -36,7 +36,7 @@ fn claim_tool 1 j uint uint do 3 args uint jid uint discard uint 6
   if not call same 2 call key 2 call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" call str 1 utf8 "host_path" 0u 1 ret call shape 2 call str 1 utf8 "{\"local\":\"read_selected_file\",\"job\":\"$0\",\"arguments\":{\"job\":\"$0\"},\"then\":\"tool_done\"}" call append 2 call arr 0 jid 0
   ret call shape 2 call str 1 utf8 "{\"local\":\"$0\",\"job\":\"$1\",\"arguments\":\"$2\",\"then\":\"tool_done\"}" call append 2 call append 2 call append 2 call arr 0 call key 2 args call str 1 utf8 "operation" jid call key 2 args call str 1 utf8 "arguments"
 
-pub tool_done 1 arg uint uint do 5 j uint body uint receipt uint discard uint r uint 13
+pub tool_done 1 arg uint uint do 6 j uint body uint receipt uint discard uint r uint assignment uint 14
   set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\",r.revision AS current_revision FROM jobs j JOIN requests r ON r.id=j.request WHERE j.id=? AND j.state='executing'" call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
   if call same 2 j 0u 1
     ret 0u
@@ -62,4 +62,5 @@ pub tool_done 1 arg uint uint do 5 j uint body uint receipt uint discard uint r 
     set discard call query 2 call str 1 utf8 "UPDATE branches SET report=?,accepted=NULL WHERE id=? AND revision=?" call append 2 call append 2 call append 2 call arr 0 receipt call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "revision"
     ret call review_ready 1 r
   0
-  ret call job 6 call key 2 j call str 1 utf8 "project" r call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call str 1 utf8 "message" call shape 2 call str 1 utf8 "{\"tool_receipt\":\"$0\",\"action\":\"$1\",\"original_assignment\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 receipt call key 2 body call str 1 utf8 "action" call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT input AS \"value:json\" FROM jobs WHERE id=?" call append 2 call arr 0 call key 2 body call str 1 utf8 "source" 0 call str 1 utf8 "value"
+  set assignment call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT coalesce(seal->'$.selection.delivery',input) AS \"value:json\" FROM jobs WHERE id=?" call append 2 call arr 0 call key 2 body call str 1 utf8 "source" 0 call str 1 utf8 "value"
+  ret call job 6 call key 2 j call str 1 utf8 "project" r call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call str 1 utf8 "message" call shape 2 call str 1 utf8 "{\"tool_receipt\":\"$0\",\"action\":\"$1\",\"original_assignment\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 receipt call key 2 body call str 1 utf8 "action" assignment

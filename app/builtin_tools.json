@@ -110,6 +110,18 @@
     "limits": "VM fuel/cells/frames and bounded host inputs"
   },
   {
+    "id": "tool.find",
+    "description": "Find registered operations and project tools by name or description",
+    "input": {
+      "query": "substring in the tool record"
+    },
+    "output": "up to 128 matching tool records",
+    "route": "portable",
+    "effects": [],
+    "reuse": "disabled",
+    "limits": "VM fuel/cells/frames and bounded host inputs"
+  },
+  {
     "id": "tool.inspect",
     "description": "Exact scoped immutable tool contract",
     "input": {

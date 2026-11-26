@@ -11,6 +11,34 @@ fn job 6 project uint request uint session uint role uint kind uint body uint ui
   set discard call query 2 call str 1 utf8 "INSERT INTO jobs(id,project,request,revision,session,role,kind,input) SELECT ?,?,id,revision,?,?,?,? FROM requests WHERE id=? AND project=?" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 jid project session role kind body request project
   ret jid
 
+fn reply_context 2 j uint body uint uint do 3 q uint context uint discard uint 7
+  set q 0u
+  if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "intake" 1
+    set q call key 2 body call str 1 utf8 "reply"
+  0
+  if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "message" 1
+    set q call key 2 body call str 1 utf8 "answer_to"
+  0
+  if call same 2 q 0u 1
+    ret body
+  0
+  set context call nth 2 call query 2 call str 1 @text r#"
+    SELECT r.intent AS quoted_request, q.id AS question_id, q.body->>'$.question' AS question,
+           coalesce(q.body->'$.choices','[]') AS "choices:json", q.session AS recipient,
+           q.role AS recipient_role, r.id AS request, r.revision
+      FROM questions q
+      JOIN requests r ON r.id=q.request AND r.revision=q.revision
+      JOIN projects p ON p.id=r.project
+     WHERE q.id=?1 AND r.project=?2 AND r.id=?3 AND r.revision=?4 AND r.state='open'
+       AND ((?5='intake' AND ?6=p.discriminator AND ?7='discriminator' AND q.state='open')
+         OR (?5='message' AND ?6=q.session AND ?7=q.role AND q.state='answer_queued'))
+  "# @build append 1 7 call arr 0 q
+    call key 2 j call str 1 utf8 "project" call key 2 j call str 1 utf8 "request"
+    call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "kind"
+    call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" 0
+  set discard call require 2 not call same 2 context 0u call str 1 utf8 "Reply context unavailable for this assignment"
+  ret call put 3 body call str 1 utf8 "reply_context" context
+
 fn project 1 arg uint uint do 2 row uint discard uint 3
   set row call nth 2 call query 2 call str 1 utf8 "SELECT * FROM projects WHERE id=?" call append 2 call arr 0 call key 2 arg call str 1 utf8 "project" 0
   set discard call require 2 not call same 2 row 0u call str 1 utf8 "Unknown project"

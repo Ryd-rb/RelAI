@@ -403,6 +403,218 @@ fn nested_review_settles_before_the_parent_review_is_released() {
 }
 
 #[test]
+fn a_selected_reply_quotes_only_its_scoped_persisted_request_and_question() {
+    for recipient_role in ["discriminator", "planner"] {
+        let temp = tempfile::tempdir().unwrap();
+        let files = temp.path().join("repo");
+        let other = temp.path().join("other");
+        fs::create_dir(&files).unwrap();
+        fs::create_dir(&other).unwrap();
+        fs::write(files.join("project.txt"), "Project source evidence.").unwrap();
+        let data = temp.path().join("db");
+        let mut app = App::open(&bundle(), &data).unwrap();
+        let project = app.invoke("open_project", json!({"root":files})).unwrap()["id"].clone();
+        let foreign = app.invoke("open_project", json!({"root":other})).unwrap()["id"].clone();
+        let original = "Improve this project.\nKeep the current behaviour. 🙂";
+        let submitted = app
+            .invoke(
+                "submit",
+                json!({"project":project,"key":"original","text":original,"attachments":[]}),
+            )
+            .unwrap();
+        let first = next(&mut app);
+        let asker = if recipient_role == "planner" {
+            deliver(
+                &mut app,
+                &first,
+                intake(
+                    json!([task("Plan improvements", json!([]))]),
+                    original.len(),
+                ),
+            )
+            .unwrap();
+            next(&mut app)
+        } else {
+            first.clone()
+        };
+        let question = "Do you have a handoff or a source snapshot?\nWhich one?";
+        let ask = json!({"type":"ASK","summary":"Check the available context.","question":question,"work":"Plan improvements","choices":["A handoff","A source snapshot","Neither"]});
+        let mut response = if recipient_role == "discriminator" {
+            intake(json!([ask]), original.len())
+        } else {
+            envelope(json!([ask]))
+        };
+        response["next"] = json!("wait_for");
+        deliver(&mut app, &asker, response).unwrap();
+        let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+        let (q, recipient): (String, String) = sql
+            .query_row("SELECT id,session FROM questions", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        if recipient_role == "planner" {
+            let review = next(&mut app);
+            let id: String = sql
+                .query_row(
+                    "SELECT id FROM reviews WHERE job=?",
+                    [review["job"].as_str().unwrap()],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let mut wait = envelope(json!([]));
+            wait["review_id"] = json!(id);
+            wait["decision"] = json!("wait");
+            wait["achieved"] = json!([]);
+            wait["remaining"] = json!([q]);
+            deliver(&mut app, &review, wait).unwrap();
+        }
+        // Existing databases have no context snapshot on their questions or jobs.
+        // Unrelated fields on those records must never become reply history.
+        sql.execute(
+            "UPDATE questions SET body=json_set(body,'$.internal_note','private-question-field')",
+            [],
+        )
+        .unwrap();
+        sql.execute("UPDATE jobs SET input=json_set(input,'$.old_grant','private-prior-job-field') WHERE id=?", [asker["job"].as_str().unwrap()]).unwrap();
+        drop(app);
+        let mut app = App::open(&bundle(), &data).unwrap();
+        let answer = "Neither.\nPlease use this project. 🙂";
+        let mut args =
+            json!({"project":foreign,"key":"reply","text":answer,"attachments":[],"reply":q});
+        assert!(app.invoke("submit", args.clone()).is_err());
+        args["project"] = project.clone();
+        let reply = app.invoke("submit", args).unwrap();
+        assert_eq!(reply["request"], submitted["request"]);
+        let sealing = app.invoke("poll", Value::Null).unwrap();
+        assert_eq!(sealing["local"], "seal");
+        // A queued reply cannot quote another request, project, or revision.
+        sql.execute("INSERT INTO requests(id,project,intent) VALUES('unrelated-request',?,'unrelated request secret')", [project.as_str().unwrap()]).unwrap();
+        sql.execute(
+            "UPDATE questions SET request='unrelated-request' WHERE id=?",
+            [&q],
+        )
+        .unwrap();
+        assert!(app.invoke("seal", sealing.clone()).is_err());
+        sql.execute(
+            "UPDATE questions SET request=? WHERE id=?",
+            [submitted["request"].as_str().unwrap(), &q],
+        )
+        .unwrap();
+        sql.execute("UPDATE questions SET revision=2 WHERE id=?", [&q])
+            .unwrap();
+        assert!(app.invoke("seal", sealing.clone()).is_err());
+        sql.execute("UPDATE questions SET revision=1 WHERE id=?", [&q])
+            .unwrap();
+        sql.execute(
+            "UPDATE requests SET project=? WHERE id=?",
+            [
+                foreign.as_str().unwrap(),
+                submitted["request"].as_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        assert!(app.invoke("seal", sealing.clone()).is_err());
+        sql.execute(
+            "UPDATE requests SET project=? WHERE id=?",
+            [
+                project.as_str().unwrap(),
+                submitted["request"].as_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        app.invoke("seal", sealing).unwrap();
+        let intake_job = next(&mut app);
+        let sealed = |job: &Value| -> Value {
+            serde_json::from_slice(
+                &fs::read(
+                    data.join("turns")
+                        .join(job["job"].as_str().unwrap())
+                        .join("input.json"),
+                )
+                .unwrap(),
+            )
+            .unwrap()
+        };
+        let input = sealed(&intake_job);
+        let expected = json!({"quoted_request":original,"question_id":q,"question":question,"choices":["A handoff","A source snapshot","Neither"],"recipient":recipient,"recipient_role":recipient_role,"request":submitted["request"],"revision":1});
+        assert_eq!(input["delivery"]["reply_context"], expected);
+        assert_eq!(input["delivery"]["text"], answer);
+        assert_eq!(input["prompt_bytes"], answer.len());
+        let raw: String = sql
+            .query_row(
+                "SELECT input FROM jobs WHERE id=?",
+                [intake_job["job"].as_str().unwrap()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!raw.contains("reply_context"));
+        assert!(!input.to_string().contains("private-question-field"));
+        assert!(!input.to_string().contains("private-prior-job-field"));
+        assert!(!input.to_string().contains("unrelated request secret"));
+        let message = json!({"type":"MESSAGE","summary":"Deliver the selected reply.","destination":recipient,"question":q,"payload":answer,"revision":1,"attachments":[]});
+        deliver(
+            &mut app,
+            &intake_job,
+            intake(json!([message]), answer.len()),
+        )
+        .unwrap();
+        let sealing = app.invoke("poll", Value::Null).unwrap();
+        assert_eq!(sealing["local"], "seal");
+        let message_job = sealing["job"].as_str().unwrap();
+        sql.execute(
+            "UPDATE jobs SET session='unrelated-recipient' WHERE id=?",
+            [message_job],
+        )
+        .unwrap();
+        assert!(app.invoke("seal", sealing.clone()).is_err());
+        sql.execute(
+            "UPDATE jobs SET session=? WHERE id=?",
+            [&recipient, message_job],
+        )
+        .unwrap();
+        app.invoke("seal", sealing).unwrap();
+        let delivered = next(&mut app);
+        let input = sealed(&delivered);
+        assert_eq!(input["role"], recipient_role);
+        assert_eq!(input["delivery"]["reply_context"], expected);
+        assert_eq!(input["delivery"]["payload"], answer);
+        assert!(!input.to_string().contains("private-question-field"));
+        assert!(!input.to_string().contains("private-prior-job-field"));
+        let recorded: String = sql
+            .query_row(
+                "SELECT content FROM submissions WHERE id=?",
+                [reply["id"].as_str().unwrap()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<Value>(&recorded).unwrap()["text"],
+            answer
+        );
+        assert!(!recorded.contains("reply_context"));
+        let read = json!({"type":"RUN_TOOL","summary":"Read the project source.","tool":"fs.read","arguments_json":json!({"path":"project.txt"}).to_string()});
+        let mut response = envelope(json!([read]));
+        response["next"] = json!("wait_for");
+        deliver(&mut app, &delivered, response).unwrap();
+        let local = app.invoke("poll", Value::Null).unwrap();
+        assert_eq!(local["local"], "tool_run");
+        let receipt = app.invoke("tool_run", local["arguments"].clone()).unwrap();
+        assert_eq!(receipt["value"]["text"], "Project source evidence.");
+        app.invoke("tool_done", json!({"job":local["job"],"result":receipt}))
+            .unwrap();
+        let continuation = next(&mut app);
+        let input = sealed(&continuation);
+        assert_eq!(
+            input["delivery"]["original_assignment"]["reply_context"],
+            expected
+        );
+        assert_eq!(input["delivery"]["original_assignment"]["payload"], answer);
+        assert!(!input.to_string().contains("private-question-field"));
+        assert!(!input.to_string().contains("private-prior-job-field"));
+    }
+}
+
+#[test]
 fn a_named_question_survives_restart_and_can_be_reviewed_as_waiting() {
     let temp = tempfile::tempdir().unwrap();
     let files = temp.path().join("repo");

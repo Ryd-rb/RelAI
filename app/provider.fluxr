@@ -40,17 +40,24 @@ fn unpack 2 provider uint response uint uint do 4 parts uint piece uint discard 
     next i
   ret call require 2 false call str 1 utf8 "Provider returned no answer"
 
-pub seal 1 arg uint uint do 21 j uint p uint rid uint role uint k uint presetval uint instructions uint frame uint system uint contract uint schema_name uint items uint content uint a uint meta uint encoded uint plan uint jid uint inputval uint discard uint i int 28
+pub seal 1 arg uint uint do 21 j uint p uint rid uint role uint k uint presetval uint instructions uint frame uint system uint contract uint schema_name uint items uint content uint a uint meta uint encoded uint plan uint jid uint inputval uint discard uint i int 29
   set jid call key 2 arg call str 1 utf8 "job"
   set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\",p.root FROM jobs j JOIN projects p ON p.id=j.project JOIN requests r ON r.id=j.request AND r.revision=j.revision WHERE j.id=? AND j.state='sealing'" call append 2 call arr 0 jid 0
   set discard call require 2 not call same 2 j 0u call str 1 utf8 "Stale seal"
   set p call key 2 j call str 1 utf8 "project"
   set role call key 2 j call str 1 utf8 "role"
   set k call key 2 j call str 1 utf8 "kind"
-  set inputval call key 2 j call str 1 utf8 "body"
+  set inputval call reply_context 2 j call key 2 j call str 1 utf8 "body"
   set presetval call preset 2 p role
   set instructions call instruction_files 2 call key 2 j call str 1 utf8 "root" call key 2 inputval call str 1 utf8 "targets"
   set frame call shape 2 call str 1 utf8 "{\"project_instructions\":\"$0\",\"working_root\":\"$1\",\"role\":\"$2\",\"session\":\"$3\",\"request\":\"$4\",\"revision\":\"$5\",\"delivery\":\"$6\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 instructions call key 2 j call str 1 utf8 "root" role call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" inputval
+  if not call same 2 role call str 1 utf8 "workflow_improver" 1
+    set frame call put 3 frame call str 1 utf8 "project_tools" call query 2 call str 1 @text r#"
+      SELECT value->>'$.id' AS tool, value->>'$.description' AS description, value->'$.input' AS "arguments:json"
+        FROM json_each(?) WHERE value->>'$.id' IN ('fs.list','fs.read','fs.search','tool.find')
+       ORDER BY CAST(key AS INTEGER)
+    "# call append 2 call arr 0 call resource 1 call str 1 utf8 "builtin_tools.json"
+  0
   set frame call put 3 frame call str 1 utf8 "selected_host_files" call query 2 call str 1 utf8 "SELECT path FROM selected_sources WHERE request=? AND revision=? AND session=? ORDER BY path" call append 2 call append 2 call append 2 call arr 0 call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "session"
   set frame call put 3 frame call str 1 utf8 "prompt_bytes" call integer 1 call size 1 call key 2 inputval call str 1 utf8 "text"
   if not call same 2 call key 2 inputval call str 1 utf8 "text" 0u 1

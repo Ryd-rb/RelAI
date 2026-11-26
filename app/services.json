@@ -55,5 +55,12 @@
   "tool.find": "Search built-in and project tool descriptions",
   "monitor.start": "Start a periodic named project read",
   "monitor.status": "Inspect the latest local monitor observation",
-  "monitor.stop": "Cancel a monitor and revoke its future occurrences"
+  "monitor.stop": "Cancel a monitor and revoke its future occurrences",
+  "media.read": "Return a scoped PNG or JPEG artifact with its exact immutable bytes and recorded media type",
+  "tool.promote": "Promote a qualified active version using its current default as a precondition",
+  "workflow.publish": "Publish a qualified correction after reproducing an independent baseline failure",
+  "git.fetch": "Fetch an approved branch tip into its dedicated remote-tracking ref",
+  "git.push": "Fast-forward one approved remote branch from its expected tip",
+  "git.remote_refs": "Read the advertised tip of a registered branch",
+  "git.blame": "Attribute bounded line ranges to commit IDs in an isolated bare object store"
 }

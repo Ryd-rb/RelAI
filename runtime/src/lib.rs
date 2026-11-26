@@ -3,12 +3,16 @@ mod application;
 mod file_effect;
 mod formats;
 mod git;
+mod git_operations;
+mod git_pack;
 pub mod network;
 mod resources;
 mod selection;
+pub mod smart_http;
 mod syntax;
 pub mod transport;
 mod watch;
+mod worktrees;
 use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use fluxr::structured::{
@@ -320,7 +324,11 @@ impl App {
                 value = self.enter(target, value["input"].clone())?;
                 continue;
             }
-            let kind = if value.get("$filesystem").is_some() {
+            let kind = if value.get("$worktree").is_some() {
+                "$worktree"
+            } else if value.get("$git").is_some() {
+                "$git"
+            } else if value.get("$filesystem").is_some() {
                 "$filesystem"
             } else if value.get("$evaluate").is_some() {
                 "$evaluate"
@@ -337,6 +345,8 @@ impl App {
                 "Invalid continuation for {origin}"
             );
             let result = match kind {
+                "$worktree" => worktrees::execute(&value[kind], &self.data),
+                "$git" => git_operations::execute(&value[kind], &self.data),
                 "$filesystem" => file_effect::execute(&value[kind], &self.data),
                 _ => evaluate(&value[kind]),
             };
@@ -461,6 +471,15 @@ impl Bindings<'_> {
                 selection::source(text(get(0)?)?, text(get(1)?)?, get(2)? == true, self.data)?
             }
             "byte_range" => selection::range(text(get(0)?)?, get(1)?)?,
+            "regex_spans" => selection::regex_spans(text(get(0)?)?, text(get(1)?)?)?,
+            "worktree_prepare" => {
+                worktrees::prepare(Path::new(text(get(0)?)?), self.data, get(1)?)?
+            }
+            "worktree_inspect" => worktrees::inspect(Path::new(text(get(0)?)?), self.data)?,
+            "git_inspect" => git_operations::inspect(Path::new(text(get(0)?)?), self.data)?,
+            "git_prepare" => {
+                git_operations::prepare(Path::new(text(get(0)?)?), self.data, get(1)?)?
+            }
             "effect_inspect" => file_effect::inspect(get(0)?, self.data)?,
             "patch_transform" => file_effect::patch(get(0)?)?,
             "decode_format" => formats::decode(text(get(0)?)?, &STANDARD.decode(text(get(1)?)?)?)?,

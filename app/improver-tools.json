@@ -1,1 +1,1 @@
-["project.lookup","workflow.find","workflow.propose","tool.inspect","dictionary.get","dictionary.expand","dictionary.propose","job.receipt","job.trace","daemon.metrics","verify.test","verify.build","verify.lint","verify.format","verify.benchmark","data.summarize"]
+["project.lookup","workflow.find","workflow.propose","tool.inspect","dictionary.get","dictionary.expand","dictionary.propose","job.receipt","job.trace","daemon.metrics","verify.test","verify.build","verify.lint","verify.format","verify.benchmark","data.summarize","workflow.publish"]

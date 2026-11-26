@@ -65,8 +65,17 @@ async fn invoke(app: Arc<Mutex<App>>, name: &str, input: Value) -> Result<Value>
     let export = name.to_owned();
     let v = tokio::task::spawn_blocking(move || worker.lock().unwrap().invoke(&export, input))
         .await??;
-    if name != "tool_run" {
+    if name != "tool_run" && name != "remote" {
         return Ok(v);
+    }
+    if let Some(plan) = v.get("$smart") {
+        let private = app.lock().unwrap().data.clone();
+        let result = fluxr_app_host::smart_http::exchange(plan, &private).await;
+        let receipt = match result {
+            Ok(result) => json!({"state":v["state"],"result":result}),
+            Err(error) => json!({"state":v["state"],"error":format!("{error:#}")}),
+        };
+        return app.lock().unwrap().invoke("guest_transfer_done", receipt);
     }
     if let Some(plan) = v.get("$http") {
         let result = fluxr_app_host::network::exchange(plan).await;

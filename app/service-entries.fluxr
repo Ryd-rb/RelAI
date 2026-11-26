@@ -1,0 +1,19 @@
+fluxr 1
+
+pub git_diff_entry 1 arg uint uint do 2 pid uint arguments uint 3
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set arguments call key 2 arg call str 1 utf8 "arguments"
+  ret call tool_builtin_receipt 5 pid call str 1 utf8 "git.diff" arguments call uid 0 call git_diff 2 pid arguments
+
+pub extended_entry 1 arg uint uint do 3 pid uint name uint arguments uint 5
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set name call key 2 arg call str 1 utf8 "tool"
+  set arguments call key 2 arg call str 1 utf8 "arguments"
+  if call same 2 name call str 1 utf8 "git.diff" 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"git_diff_entry\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0
+  ret call tool_builtin_receipt 5 pid name arguments call uid 0 call extended_run 3 pid name arguments
+
+pub service_run 1 arg uint uint do 3 pid uint name uint arguments uint 4
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set name call key 2 arg call str 1 utf8 "tool"
+  set arguments call key 2 arg call str 1 utf8 "arguments"
+  ret call tool_builtin_receipt 5 pid name arguments call uid 0 call extra_run 3 pid name arguments

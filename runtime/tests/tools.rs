@@ -103,6 +103,51 @@ fn independent_counterexample_keeps_constant_answer_inactive_and_receipts_durabl
 }
 
 #[test]
+fn publication_requires_a_reproduced_defect_and_preserves_the_same_receipt() {
+    let mut f = Fixture::new();
+    let source = "fluxr 1\npub run 1 x int int ret add x 1";
+    let baseline = f.propose(
+        "increment",
+        "fluxr 1\npub run 1 x int int ret 2",
+        "integer.increment",
+    )["version"]
+        .clone();
+    let version = f.propose("increment", source, "integer.increment")["version"].clone();
+    assert_eq!(
+        f.call("tool_qualify", json!({"version":version})).unwrap()["active"],
+        true
+    );
+    let args = json!({"operation":"increment","contract":"integer.increment","source":source,"description":"Correct constant output","checks":["counterexample"],"evidence":["regression"],"version":version,"baseline":baseline});
+    let id = f.run("workflow.propose", args.clone())["value"]["candidate"].clone();
+    let db = rusqlite::Connection::open(f.data.join("state.sqlite3")).unwrap();
+    db.execute(
+        "INSERT INTO requests(id,project,state,intent) VALUES('closed',?,'completed','increment')",
+        [f.project.as_str().unwrap()],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO improvements VALUES('closed','improvement-session','job')",
+        [],
+    )
+    .unwrap();
+    let publish =
+        json!({"tool":"workflow.publish","arguments":{"candidate":id,"request":"closed"}});
+    assert!(f.call("tool_run", publish.clone()).is_err());
+    assert_eq!(
+        f.call("tool_qualify", json!({"version":baseline})).unwrap()["active"],
+        false
+    );
+    let receipt = f.call("tool_run", publish.clone()).unwrap()["value"].clone();
+    assert_eq!(receipt["version"], version);
+    assert!(receipt["independent_check"]["failed"].is_string());
+    assert!(receipt["independent_check"]["passed"].is_string());
+    assert_eq!(receipt, f.call("tool_run", publish).unwrap()["value"]);
+    let mut other = args;
+    other["baseline"] = version;
+    assert_ne!(f.run("workflow.propose", other)["value"]["candidate"], id);
+}
+
+#[test]
 fn active_exact_versions_defaults_and_retirement_use_checked_registry() {
     let mut f = Fixture::new();
     let first = f.propose(
@@ -225,6 +270,16 @@ fn deterministic_file_tools_read_fresh_bytes_and_report_exact_literal_spans() {
     assert_eq!(
         matches,
         json!([{"byte_start":6,"byte_end":9,"line":1,"column":6},{"byte_start":17,"byte_end":20,"line":2,"column":7}])
+    );
+    let snap = f.call("capture_graph", json!({})).unwrap()["snapshot"].clone();
+    let pattern = json!({"path":"readme.md","snapshot":snap,"query":"o[n]+e","mode":"regex"});
+    assert_eq!(f.run("fs.search", pattern)["value"]["matches"], matches);
+    assert!(
+        f.call(
+            "tool_run",
+            json!({"tool":"fs.search","arguments":{"path":"readme.md","query":"[","mode":"regex"}})
+        )
+        .is_err()
     );
     let before = f.run("fs.digest", json!({"path":"readme.md"}))["value"]["digest"].clone();
     fs::write(f.root.join("readme.md"), "changed").unwrap();

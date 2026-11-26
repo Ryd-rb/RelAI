@@ -1,0 +1,31 @@
+fluxr 1
+
+fn definition_receipt_current 2 pid uint receipt uint bool do 2 toolname uint args uint 5
+  set toolname call key 2 receipt call str 1 utf8 "tool"
+  set args call key 2 receipt call str 1 utf8 "arguments"
+  if call same 2 toolname call str 1 utf8 "dictionary.get" 1
+    ret call same 2 call key 2 receipt call str 1 utf8 "value" call nth 2 call expand 2 pid call append 2 call arr 0 call key 2 args call str 1 utf8 "ref" 0
+  0
+  if call same 2 toolname call str 1 utf8 "dictionary.expand" 1
+    ret call same 2 call key 2 receipt call str 1 utf8 "value" call expand 2 pid call key 2 args call str 1 utf8 "refs"
+  0
+  ret true
+
+fn permitted_parts 2 pid uint parts uint uint do 0 1
+  ret call query 2 call str 1 utf8 "SELECT a.value->>'text' AS text,CASE WHEN EXISTS(SELECT 1 FROM dictionary_links l JOIN dictionaries d ON d.id=l.dictionary AND d.archived=0 WHERE l.project=?1 AND l.dictionary=a.value->>'$.term.dictionary_id' AND l.enabled=1) THEN a.value->'term' END AS \"term:json\" FROM json_each(?2) a ORDER BY CAST(a.key AS INTEGER)" call append 2 call append 2 call arr 0 pid parts
+
+pub term_view 1 arg uint uint do 6 pid uint refval uint row uint parts uint owner uint names uint 10
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set refval call key 2 arg call str 1 utf8 "ref"
+  set row call key 2 call nth 2 call expand 2 pid call append 2 call arr 0 refval 0 call str 1 utf8 "definition"
+  if call same 2 row 0u 1
+    ret call shape 2 call str 1 utf8 "{\"available\":false}" call arr 0
+  0
+  set parts call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT parts AS \"parts:json\" FROM definition_parts WHERE entry=? AND revision=?" call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "id" call key 2 row call str 1 utf8 "revision" 0 call str 1 utf8 "parts"
+  if call same 2 parts 0u 1
+    set parts call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"text\":\"$0\"}" call append 2 call arr 0 call key 2 row call str 1 utf8 "definition"
+  0
+  set parts call permitted_parts 2 pid parts
+  set owner call nth 2 call query 2 call str 1 utf8 "SELECT id,name,owner FROM dictionaries WHERE id=?" call append 2 call arr 0 call key 2 row call str 1 utf8 "dictionary" 0
+  set names call query 2 call str 1 utf8 "SELECT p.id,p.root FROM dictionary_links l JOIN projects p ON p.id=l.project WHERE l.dictionary=? AND l.enabled=1 ORDER BY p.root" call append 2 call arr 0 call key 2 row call str 1 utf8 "dictionary"
+  ret call shape 2 call str 1 utf8 "{\"available\":true,\"entry\":\"$0\",\"parts\":\"$1\",\"dictionary\":\"$2\",\"enabled_projects\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 row parts owner names

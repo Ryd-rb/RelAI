@@ -124,7 +124,7 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
   0
   if call same 2 kind call str 1 utf8 "RESULT" 9
     if call same 2 role call str 1 utf8 "workflow_improver" 3
-    if call same 2 call key 2 a call str 1 utf8 "outcome" call str 1 utf8 "published" 1
+    if and call same 2 call key 2 a call str 1 utf8 "outcome" call str 1 utf8 "published" not call published_refs 3 p r call key 2 a call str 1 utf8 "evidence" 1
     ret call str 1 utf8 "Missing verified improvement receipts."
   0
     set discard call record_action 4 j aid a call str 1 utf8 "reported"

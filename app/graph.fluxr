@@ -28,7 +28,7 @@ fn walk 5 root uint pid uint sid uint dir uint depth int uint do 11 entries uint
     next i
   ret 0u
 
-pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint discard uint 10
+pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint discard uint 11
   set p call project 1 arg
   set pid call key 2 p call str 1 utf8 "id"
   set nodes call observe 1 call key 2 p call str 1 utf8 "root"
@@ -44,9 +44,10 @@ pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint disca
   set nodes call query 2 call str 1 utf8 "SELECT path,parent,kind,digest,bytes FROM inventory WHERE snapshot=? ORDER BY path" call append 2 call arr 0 sid
   set discard call query 2 call str 1 utf8 "INSERT INTO snapshots VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 sid pid nodes
   set discard call audit 3 pid call str 1 utf8 "Snapshot captured" call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\",\"entries\":\"$1\"}" call append 2 call append 2 call arr 0 sid call integer 1 call size 1 nodes
+  set discard call query 2 call str 1 utf8 "INSERT INTO graph_cursors SELECT ?,coalesce(max(cursor),0) FROM events WHERE project=?" call append 2 call append 2 call arr 0 sid pid
   ret call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\"}" call append 2 call arr 0 sid
 
-fn graph_view 2 arg uint pid uint uint do 7 sid uint rowsval uint components uint node uint body uint a uint discard uint 9
+fn graph_view 2 arg uint pid uint uint do 7 sid uint rowsval uint components uint node uint body uint a uint discard uint 10
   set sid call key 2 arg call str 1 utf8 "snapshot"
   if call same 2 sid 0u 1
     set sid call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? ORDER BY rowid DESC LIMIT 1" call append 2 call arr 0 pid 0 call str 1 utf8 "id"
@@ -58,8 +59,12 @@ fn graph_view 2 arg uint pid uint uint do 7 sid uint rowsval uint components uin
   set rowsval call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT manifest AS \"nodes:json\" FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 sid pid 0 call str 1 utf8 "nodes"
   set discard call require 2 not call same 2 rowsval 0u call str 1 utf8 "Snapshot unavailable"
   set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"tree\",\"label\":\"Project graph\",\"nodes\":\"$0\",\"navigate\":{\"view\":\"graph\",\"snapshot\":\"$1\"},\"pathField\":\"selected\"}" call append 2 call append 2 call arr 0 rowsval sid
-  if not call same 2 call key 2 arg call str 1 utf8 "selected" 0u 2
+  set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"graph_layers\",\"label\":\"Source relationships and activity\",\"op\":\"graph_layers\",\"snapshot\":\"$0\",\"versions\":\"$1\"}" call append 2 call append 2 call arr 0 sid call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? ORDER BY rowid DESC LIMIT 64" call append 2 call arr 0 pid
+  if not call same 2 call key 2 arg call str 1 utf8 "selected" 0u 3
     set node call nth 2 call query 2 call str 1 utf8 "SELECT kind,digest,path FROM inventory WHERE snapshot=? AND path=?" call append 2 call append 2 call arr 0 sid call key 2 arg call str 1 utf8 "selected" 0
+    if call same 2 call key 2 node call str 1 utf8 "kind" call str 1 utf8 "directory" 1
+    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"data\",\"label\":\"Directory contents\",\"value\":\"$0\"}" call append 2 call arr 0 call query 2 call str 1 utf8 "SELECT path,kind,bytes,digest FROM inventory WHERE snapshot=? AND parent=? ORDER BY path" call append 2 call append 2 call arr 0 sid call key 2 node call str 1 utf8 "path"
+  0
     if call same 2 call key 2 node call str 1 utf8 "kind" call str 1 utf8 "file" 4
     set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT content FROM blobs WHERE project=? AND digest=?" call append 2 call append 2 call arr 0 pid call key 2 node call str 1 utf8 "digest" 0 call str 1 utf8 "content"
     set a call key 2 call baseinfo 1 body call str 1 utf8 "text"

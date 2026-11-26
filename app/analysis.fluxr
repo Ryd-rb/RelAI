@@ -40,7 +40,7 @@ fn semantic_find 2 pid uint args uint uint do 4 snapshot uint terms uint queryte
   set querytext call key 2 args call str 1 utf8 "query"
   set discard call require 2 and lt 0 call size 1 querytext le call size 1 querytext 256 call str 1 utf8 "Invalid search query"
   set terms call matches 2 querytext call vocab 1 pid
-  ret call shape 2 call str 1 utf8 "{\"concepts\":\"$0\",\"paths\":\"$1\"}" call append 2 call append 2 call arr 0 terms call query 2 call str 1 utf8 "WITH names(name) AS (SELECT json_extract(value,'$.ref.name') FROM json_each(?1) UNION SELECT ?2) SELECT path,digest,count(*) AS rank FROM inventory JOIN names ON instr(lower(path),lower(name))>0 WHERE snapshot=?3 GROUP BY path,digest ORDER BY rank DESC,path LIMIT 64" call append 2 call append 2 call append 2 call arr 0 terms querytext snapshot
+  ret call put 3 call shape 2 call str 1 utf8 "{\"concepts\":\"$0\",\"paths\":\"$1\"}" call append 2 call append 2 call arr 0 terms call query 2 call str 1 utf8 "WITH names(name) AS (SELECT json_extract(value,'$.ref.name') FROM json_each(?1) UNION SELECT ?2) SELECT path,digest,count(*) AS rank FROM inventory JOIN names ON instr(lower(path),lower(name))>0 WHERE snapshot=?3 GROUP BY path,digest ORDER BY rank DESC,path LIMIT 64" call append 2 call append 2 call append 2 call arr 0 terms querytext snapshot call str 1 utf8 "passages" call ranked_passages 4 pid snapshot terms querytext
 
 fn data_query 2 pid uint args uint uint do 2 idval uint discard uint 4
   set idval call key 2 args call str 1 utf8 "template"
@@ -52,9 +52,18 @@ fn data_query 2 pid uint args uint uint do 2 idval uint discard uint 4
   0
   ret call require 2 false call str 1 utf8 "Unknown parameterized query template"
 
-fn extended_run 3 pid uint toolname uint args uint uint do 0  13
+fn extended_run 3 pid uint toolname uint args uint uint do 0  15
   if or call same 2 toolname call str 1 utf8 "monitor.start" or call same 2 toolname call str 1 utf8 "monitor.stop" call same 2 toolname call str 1 utf8 "monitor.status" 1
     ret call monitor 3 pid toolname args
+  0
+  if call same 2 toolname call str 1 utf8 "media.read" 1
+    ret call media_read 2 pid args
+  0
+  if call same 2 toolname call str 1 utf8 "tool.promote" 1
+    ret call tool_promote 1 call put 3 args call str 1 utf8 "project" pid
+  0
+  if call same 2 toolname call str 1 utf8 "workflow.publish" 1
+    ret call publish_candidate 2 pid args
   0
   if call same 2 toolname call str 1 utf8 "fs.find" 1
     ret call find_files 2 pid args
@@ -67,9 +76,6 @@ fn extended_run 3 pid uint toolname uint args uint uint do 0  13
   0
   if or call same 2 toolname call str 1 utf8 "code.symbols" or call same 2 toolname call str 1 utf8 "code.definition" or call same 2 toolname call str 1 utf8 "code.references" call same 2 toolname call str 1 utf8 "code.diagnostics" 1
     ret call code_nav 3 pid toolname args
-  0
-  if call same 2 toolname call str 1 utf8 "git.diff" 1
-    ret call git_diff 2 pid args
   0
   if call same 2 toolname call str 1 utf8 "project.semantic_find" 1
     ret call semantic_find 2 pid args
@@ -90,3 +96,9 @@ fn extended_run 3 pid uint toolname uint args uint uint do 0  13
     ret call capture 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"mime\":\"application/json\",\"name\":\"proposal.json\",\"base64\":\"$1\"}" call append 2 call append 2 call arr 0 pid call b64 1 call encode 1 args
   0
   ret call require 2 false call str 1 utf8 "Unknown service"
+
+fn media_read 2 pid uint args uint uint do 3 row uint mime uint discard uint 4
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT meta AS \"meta:json\",encoded AS base64 FROM artifacts WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "artifact" 0
+  set mime call key 2 call key 2 row call str 1 utf8 "meta" call str 1 utf8 "media_type"
+  set discard call require 2 or call same 2 mime call str 1 utf8 "image/png" call same 2 mime call str 1 utf8 "image/jpeg" call str 1 utf8 "Expected an available PNG or JPEG artifact"
+  ret row

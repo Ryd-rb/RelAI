@@ -111,6 +111,9 @@ impl<'ast> Visit<'ast> for RustIndex<'_> {
             Item::Type(v) => self.declare(&v.ident, "type"),
             Item::Const(v) => self.declare(&v.ident, "const"),
             Item::Static(v) => self.declare(&v.ident, "static"),
+            Item::Mod(v) if v.content.is_none() && v.attrs.is_empty() => {
+                self.declare(&v.ident, "external_module")
+            }
             Item::Mod(v) => self.declare(&v.ident, "module"),
             _ => (),
         }

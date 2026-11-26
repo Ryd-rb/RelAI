@@ -94,7 +94,7 @@ pub submit 1 arg uint uint do 17 p uint pid uint keyval uint finger uint prior u
   if eq 0 call size 1 prompt 1
     set summary call str 1 utf8 "Read the attachments."
   0
-  set discard call audit 3 pid call str 1 utf8 "Submission" body
+  set discard call audit 3 pid call str 1 utf8 "Submission" call put 3 body call str 1 utf8 "parts" call annotate_selection 3 pid prompt call key 2 body call str 1 utf8 "markers"
   set discard call job 6 pid rid call key 2 p call str 1 utf8 "discriminator" call str 1 utf8 "discriminator" call str 1 utf8 "intake" body
   set discard call audit 3 pid call str 1 utf8 "Delivery" call shape 2 call str 1 utf8 "{\"request\":\"$0\",\"summary\":\"$1\"}" call append 2 call append 2 call arr 0 rid summary
   ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"request\":\"$1\"}" call append 2 call append 2 call arr 0 sid rid
@@ -125,11 +125,12 @@ pub save_model 1 arg uint uint do 7 p uint role uint scope uint provider uint mo
   set discard call require 2 lt 0 call size 1 model call str 1 utf8 "Missing model ID"
   ret call query 2 call str 1 utf8 "INSERT INTO presets VALUES(?,?,?,?,?,1) ON CONFLICT(scope,role) DO UPDATE SET provider=excluded.provider,model=excluded.model,effort=excluded.effort,rev=presets.rev+1" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 scope role provider model effort
 
-pub init 1 arg uint uint do 1 discard uint 9
+pub init 1 arg uint uint do 1 discard uint 10
   set discard call schema 1 call asset 1 call str 1 utf8 "schema.sql"
   set discard call query 2 call str 1 utf8 "UPDATE attempts SET state='uncertain',ended=unixepoch() WHERE state='sending'" call arr 0
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='uncertain',reason='Interrupted during provider call' WHERE state='running'" call arr 0
   set discard call query 2 call str 1 utf8 "UPDATE occurrences SET state='ready' WHERE state='reserved'" call arr 0
+  set discard call query 2 call str 1 utf8 "UPDATE git_transfers SET state='uncertain' WHERE state='sending'" call arr 0
   set discard call glossary 0
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='queued' WHERE state='sealing'" call arr 0
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason='Interrupted deterministic job' WHERE state='executing'" call arr 0

@@ -1,0 +1,40 @@
+fluxr 1
+
+fn index_graph 2 pid uint sid uint uint do 10 rowsval uint row uint tree uint bytes uint lang uint source uint done uint countval uint discard uint i int 9
+  set done call nth 2 call query 2 call str 1 utf8 "SELECT indexed,total FROM graph_indexes WHERE snapshot=?" call append 2 call arr 0 sid 0
+  if not call same 2 done 0u 1
+    ret done
+  0
+  set rowsval call query 2 call str 1 utf8 "SELECT path,digest,CASE WHEN path GLOB '*.rs' THEN 'rust' ELSE 'fluxr' END AS lang FROM inventory WHERE snapshot=? AND kind='file' AND (path GLOB '*.rs' OR path GLOB '*.fluxr') AND bytes<=65536 ORDER BY path LIMIT 128" call append 2 call arr 0 sid
+  set i 0
+  while lt i call size 1 rowsval 6
+    set row call nth 2 rowsval i
+    set lang call key 2 row call str 1 utf8 "lang"
+    set bytes call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT content FROM blobs WHERE project=? AND digest=?" call append 2 call append 2 call arr 0 pid call key 2 row call str 1 utf8 "digest" 0 call str 1 utf8 "content"
+    set source call key 2 call baseinfo 1 bytes call str 1 utf8 "text"
+    if not call same 2 source 0u 3
+    set tree call syntax 2 lang source
+    set discard call query 2 call str 1 utf8 "INSERT INTO graph_symbols SELECT ?,?,?,?,?,json_extract(value,'$.kind'),json_extract(value,'$.name'),json_extract(value,'$.start'),json_extract(value,'$.end') FROM json_each(?) LIMIT 4096" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid call key 2 row call str 1 utf8 "path" call key 2 row call str 1 utf8 "digest" lang call str 1 utf8 "references" call key 2 tree call str 1 utf8 "references"
+    set discard call query 2 call str 1 utf8 "INSERT INTO graph_symbols SELECT ?,?,?,?,?,json_extract(value,'$.kind'),json_extract(value,'$.name'),json_extract(value,'$.start'),json_extract(value,'$.end') FROM json_each(?) LIMIT 4096" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid call key 2 row call str 1 utf8 "path" call key 2 row call str 1 utf8 "digest" lang call str 1 utf8 "symbols" call key 2 tree call str 1 utf8 "symbols"
+  0
+    next i
+  set countval call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM inventory WHERE snapshot=? AND kind='file' AND (path GLOB '*.rs' OR path GLOB '*.fluxr')" call append 2 call arr 0 sid 0 call str 1 utf8 "n"
+  set discard call query 2 call str 1 utf8 "INSERT INTO graph_indexes VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 sid call integer 1 0 countval
+  set discard call query 2 call str 1 utf8 "UPDATE graph_indexes SET indexed=? WHERE snapshot=?" call append 2 call append 2 call arr 0 call integer 1 call size 1 rowsval sid
+  ret call nth 2 call query 2 call str 1 utf8 "SELECT indexed,total FROM graph_indexes WHERE snapshot=?" call append 2 call arr 0 sid 0
+
+pub graph_layers 1 arg uint uint do 7 pid uint sid uint path uint state uint out uint before uint discard uint 9
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set sid call key 2 arg call str 1 utf8 "snapshot"
+  set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid sid 0 0u call str 1 utf8 "Unknown project snapshot"
+  set state call index_graph 2 pid sid
+  set out call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\",\"coverage\":\"$1\",\"edges\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid state call query 2 call str 1 utf8 "WITH targets AS (SELECT name,min(path) AS path,count(*) AS n FROM graph_symbols WHERE snapshot=?1 AND language='fluxr' AND role='symbols' GROUP BY name), calls AS (SELECT s.path AS source,t.path AS target,s.digest,s.name,s.start,s.end,'call' AS kind FROM graph_symbols s JOIN targets t ON t.name=s.name AND t.n=1 AND t.path<>s.path WHERE s.snapshot=?1 AND s.language='fluxr' AND s.role='references'), modules AS (SELECT s.path AS source,m.path AS target,s.digest,s.name,s.start,s.end,'module' AS kind FROM graph_symbols s JOIN inventory i ON i.snapshot=s.snapshot AND i.path=s.path JOIN inventory m ON m.snapshot=i.snapshot AND m.parent=i.parent AND (m.path=CASE WHEN i.parent='' THEN '' ELSE i.parent||'/' END||s.name||'.rs') WHERE s.snapshot=?1 AND s.kind='external_module' AND (i.path IN ('main.rs','lib.rs','mod.rs') OR i.path GLOB '*/main.rs' OR i.path GLOB '*/lib.rs' OR i.path GLOB '*/mod.rs')) SELECT * FROM (SELECT * FROM calls UNION ALL SELECT * FROM modules) ORDER BY source,start,target LIMIT 512" call append 2 call arr 0 sid
+  set before call key 2 arg call str 1 utf8 "before"
+  if not call same 2 before 0u 4
+    set out call put 3 out call str 1 utf8 "changes" call extra_run 3 pid call str 1 utf8 "snapshot.diff" call shape 2 call str 1 utf8 "{\"before\":\"$0\",\"after\":\"$1\"}" call append 2 call append 2 call arr 0 before sid
+    set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid before 0 0u call str 1 utf8 "Unknown comparison snapshot"
+    set discard call index_graph 2 pid before
+    set out call put 3 out call str 1 utf8 "stale_evidence" call query 2 call str 1 utf8 "SELECT DISTINCT s.path,s.digest AS evidence_digest,n.digest AS current_digest FROM graph_symbols s LEFT JOIN inventory n ON n.snapshot=? AND n.path=s.path WHERE s.snapshot=? AND s.digest IS NOT n.digest ORDER BY s.path LIMIT 256" call append 2 call append 2 call arr 0 sid before
+  0
+  set out call put 3 out call str 1 utf8 "activity" call query 2 call str 1 utf8 "SELECT cursor,kind,payload AS \"details:json\" FROM events WHERE project=? AND cursor<=coalesce((SELECT cursor FROM graph_cursors WHERE snapshot=?),0) AND kind IN ('Filesystem effect','Git effect','Snapshot captured') ORDER BY cursor DESC LIMIT 32" call append 2 call append 2 call arr 0 pid sid
+  ret out

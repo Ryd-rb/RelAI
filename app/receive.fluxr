@@ -1,6 +1,6 @@
 fluxr 1
 
-pub receive 1 arg uint uint do 13 j uint replyval uint actions uint a uint fan uint aid uint reason uint items uint span uint contract uint decision uint discard uint i int 21
+pub receive 1 arg uint uint do 13 j uint replyval uint actions uint a uint fan uint aid uint reason uint items uint span uint contract uint decision uint discard uint i int 22
   set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\",j.seal AS \"sealed:json\",r.revision AS current_revision FROM jobs j JOIN requests r ON r.id=j.request WHERE j.id=? AND j.attempt=?" call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" call key 2 arg call str 1 utf8 "attempt" 0
   set discard call require 2 not call same 2 j 0u call str 1 utf8 "Unknown attempt"
   if not and call same 2 call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "current_revision" call same 2 call key 2 j call str 1 utf8 "state" call str 1 utf8 "running" 2
@@ -50,6 +50,7 @@ pub receive 1 arg uint uint do 13 j uint replyval uint actions uint a uint fan u
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='accepted',receipt=? WHERE id=?" call append 2 call append 2 call arr 0 replyval call key 2 j call str 1 utf8 "id"
   set discard call query 2 call str 1 utf8 "UPDATE attempts SET state='accepted',ended=unixepoch() WHERE id=?" call append 2 call arr 0 call key 2 arg call str 1 utf8 "attempt"
   set discard call query 2 call str 1 utf8 "UPDATE questions SET state='answered' WHERE id=? AND state='answer_queued'" call append 2 call arr 0 call key 2 call key 2 j call str 1 utf8 "body" call str 1 utf8 "answer_to"
+  set j call put 3 j call str 1 utf8 "next" call key 2 replyval call str 1 utf8 "next"
   set fan call uid 0
   set i 0
   while lt i call size 1 actions 5

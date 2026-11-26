@@ -32,6 +32,21 @@ fn file_selection 3 pid uint toolname uint args uint uint do 10 snapshot uint p 
   set out call file_range 2 encoded call key 2 args call str 1 utf8 "range"
   ret call put 3 out call str 1 utf8 "snapshot" snapshot
 
+fn search_file 2 pid uint args uint uint do 6 body uint source uint modeval uint discard uint path uint spans uint 9
+  set discard call require 2 call same 2 call key 2 args call str 1 utf8 "range" 0u call str 1 utf8 "Search uses the full bounded source"
+  set source call file_selection 3 pid call str 1 utf8 "fs.read" args
+  set body call key 2 source call str 1 utf8 "text"
+  set discard call require 2 not call same 2 body 0u call str 1 utf8 "Search requires UTF-8 text"
+  set modeval call key 2 args call str 1 utf8 "mode"
+  if call same 2 modeval call str 1 utf8 "regex" 1
+    set spans call regex_spans 2 body call key 2 args call str 1 utf8 "query"
+  2
+    set discard call require 2 or call same 2 modeval 0u call same 2 modeval call str 1 utf8 "literal" call str 1 utf8 "Choose literal or regex"
+    set spans call tool_search 2 body call key 2 args call str 1 utf8 "query"
+  set path call key 2 args call str 1 utf8 "path"
+  if call same 2 path 0u 1 set path call key 2 args call str 1 utf8 "host_path" 0
+  ret call shape 2 call str 1 utf8 "{\"matches\":\"$0\",\"path\":\"$1\",\"digest\":\"$2\",\"snapshot\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 spans path call key 2 source call str 1 utf8 "digest" call key 2 source call str 1 utf8 "snapshot"
+
 fn find_files 2 pid uint args uint uint do 7 sid uint pattern uint cursor uint limitval uint rowsval uint lastval uint discard uint 13
   set sid call key 2 args call str 1 utf8 "snapshot"
   set cursor call key 2 args call str 1 utf8 "cursor"

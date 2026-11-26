@@ -1,0 +1,139 @@
+fluxr 1
+
+fn worktree_known 1 name uint bool do 0  1
+ret or or or or or call same 2 name call str 1 utf8 "git.worktree_create" call same 2 name call str 1 utf8 "git.worktree_remove" call same 2 name call str 1 utf8 "worktree.list" call same 2 name call str 1 utf8 "worktree.status" call same 2 name call str 1 utf8 "worktree.apply" false
+
+fn worktree_catalog 0  uint do 0  1
+ret call decode 1 call str 1 utf8 "[{\"id\":\"git.worktree_create\",\"authority\":\"Exact immutable proposal and typed user grant; removal additionally requires destructive=true\",\"scope\":\"RelAI-owned private detached linked worktrees only; no owner-selected removal paths\",\"limits\":\"Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only\"},{\"id\":\"git.worktree_remove\",\"authority\":\"Exact immutable proposal and typed user grant; removal additionally requires destructive=true\",\"scope\":\"RelAI-owned private detached linked worktrees only; no owner-selected removal paths\",\"limits\":\"Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only\"},{\"id\":\"worktree.list\",\"authority\":\"Exact immutable proposal and typed user grant; removal additionally requires destructive=true\",\"scope\":\"RelAI-owned private detached linked worktrees only; no owner-selected removal paths\",\"limits\":\"Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only\"},{\"id\":\"worktree.status\",\"authority\":\"Exact immutable proposal and typed user grant; removal additionally requires destructive=true\",\"scope\":\"RelAI-owned private detached linked worktrees only; no owner-selected removal paths\",\"limits\":\"Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only\"},{\"id\":\"worktree.apply\",\"authority\":\"Exact immutable proposal and typed user grant; removal additionally requires destructive=true\",\"scope\":\"RelAI-owned private detached linked worktrees only; no owner-selected removal paths\",\"limits\":\"Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only\"}]"
+
+fn worktree_record 2 pid uint mid uint uint do 2 record uint discard uint 3
+set record call nth 2 call query 2 call str 1 utf8 "SELECT id,project,operation,digest,state,grant_id,request AS \"request:json\",result AS \"result:json\",error FROM managed_worktrees WHERE id=? AND project=?" call append 2 call append 2 call arr 0  mid pid 0
+set discard call require 2 not call same 2 record 0u call str 1 utf8 "Worktree mutation is outside this project or unavailable"
+ret record
+
+pub worktree_get 1 arg uint uint do 1 pid uint 2
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+ret call worktree_record 2 pid call key 2 arg call str 1 utf8 "mutation"
+
+pub worktree_propose 1 arg uint uint do 8 p uint pid uint operation uint nativeop uint prepared uint mid uint digestval uint discard uint 10
+set p call project 1 arg
+set pid call key 2 p call str 1 utf8 "id"
+set operation call key 2 arg call str 1 utf8 "operation"
+set nativeop call key 2 call decode 1 call str 1 utf8 "{\"git.worktree_create\":\"create\",\"git.worktree_remove\":\"remove\"}" operation
+set discard call require 2 not call same 2 nativeop 0u call str 1 utf8 "Unknown managed worktree mutation"
+set prepared call worktree_prepare 2 call key 2 p call str 1 utf8 "root" call put 3 arg call str 1 utf8 "operation" nativeop
+set mid call uid 0
+set digestval call hash 1 call encode 1 prepared
+set discard call query 2 call str 1 utf8 "INSERT INTO managed_worktrees(id,project,operation,request,digest,state) VALUES(?,?,?,?,?,'planned')" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  mid pid operation call encode 1 prepared digestval
+ret call shape 2 call str 1 utf8 "{\"mutation\":\"$0\",\"digest\":\"$1\",\"operation\":\"$2\",\"request\":\"$3\",\"state\":\"planned\",\"requires_user_grant\":true}" call append 2 call append 2 call append 2 call append 2 call arr 0  mid digestval operation prepared
+
+pub worktree_authorize 1 arg uint uint do 4 pid uint record uint gid uint discard uint 10
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set record call worktree_record 2 pid call key 2 arg call str 1 utf8 "mutation"
+set discard call require 2 call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "planned" call str 1 utf8 "Only a pending exact worktree proposal can be authorized"
+set discard call require 2 call same 2 call key 2 record call str 1 utf8 "digest" call key 2 arg call str 1 utf8 "digest" call str 1 utf8 "Worktree proposal digest differs from approval"
+if call same 2 call key 2 record call str 1 utf8 "operation" call str 1 utf8 "git.worktree_remove" 1
+set discard call require 2 call same 2 call key 2 arg call str 1 utf8 "destructive" call decode 1 call str 1 utf8 "true" call str 1 utf8 "Worktree removal requires explicit destructive intent"
+0
+
+set gid call uid 0
+set discard call query 2 call str 1 utf8 "INSERT INTO worktree_grants VALUES(?,?,?,?,'active')" call append 2 call append 2 call append 2 call append 2 call arr 0  gid pid call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "digest"
+set discard call query 2 call str 1 utf8 "UPDATE managed_worktrees SET state='authorized',grant_id=? WHERE id=? AND project=?" call append 2 call append 2 call append 2 call arr 0  gid call key 2 record call str 1 utf8 "id" pid
+set discard call audit 3 pid call str 1 utf8 "Managed worktree user grant" arg
+ret call shape 2 call str 1 utf8 "{\"mutation\":\"$0\",\"grant\":\"$1\",\"digest\":\"$2\",\"state\":\"authorized\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" gid call key 2 record call str 1 utf8 "digest"
+
+pub worktree_revoke 1 arg uint uint do 2 pid uint discard uint 4
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set discard call query 2 call str 1 utf8 "UPDATE worktree_grants SET state='revoked' WHERE id=? AND project=? AND state='active'" call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "grant" pid
+set discard call audit 3 pid call str 1 utf8 "Worktree authority revoked" arg
+ret call decode 1 call str 1 utf8 "{\"revoked\":true}"
+
+fn worktree_defer 3 requestval uint resume uint stateval uint uint do 0  1
+ret call shape 2 call str 1 utf8 "{\"$worktree\":\"$0\",\"resume\":\"$1\",\"state\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  requestval resume stateval
+
+pub worktree_apply 1 arg uint uint do 4 pid uint record uint grantval uint discard uint 8
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set record call worktree_record 2 pid call key 2 arg call str 1 utf8 "mutation"
+if call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "completed" 1
+ret call key 2 record call str 1 utf8 "result"
+0
+
+set grantval call nth 2 call query 2 call str 1 utf8 "SELECT id,state,digest FROM worktree_grants WHERE id=? AND project=? AND worktree=?" call append 2 call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "grant" pid call key 2 record call str 1 utf8 "id" 0
+set discard call require 2 and call same 2 call key 2 grantval call str 1 utf8 "state" call str 1 utf8 "active" and call same 2 call key 2 grantval call str 1 utf8 "digest" call key 2 record call str 1 utf8 "digest" call same 2 call key 2 record call str 1 utf8 "grant_id" call key 2 grantval call str 1 utf8 "id" call str 1 utf8 "Exact active Worktree user grant is unavailable"
+set discard call require 2 or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "authorized" or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "old" or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "failed" call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "unsupported" call str 1 utf8 "Uncertain Worktree outcomes require reconciliation before retry"
+set discard call query 2 call str 1 utf8 "UPDATE managed_worktrees SET state='executing',error=NULL WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" pid
+ret call worktree_defer 3 call key 2 record call str 1 utf8 "request" call str 1 utf8 "guest_worktree_finished" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"mutation\":\"$1\",\"grant\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  pid call key 2 record call str 1 utf8 "id" call key 2 grantval call str 1 utf8 "id"
+
+fn worktree_finish 3 stateval uint nativeval uint errorval uint uint do 4 record uint status uint receipt uint discard uint 8
+set record call worktree_record 2 call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation"
+set status call key 2 nativeval call str 1 utf8 "state"
+if not call same 2 errorval 0u 1
+set status call str 1 utf8 "uncertain"
+0
+
+set receipt call shape 2 call str 1 utf8 "{\"mutation\":\"$0\",\"operation\":\"$1\",\"digest\":\"$2\",\"grant\":\"$3\",\"state\":\"$4\",\"native\":\"$5\",\"error\":\"$6\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "operation" call key 2 record call str 1 utf8 "digest" call key 2 stateval call str 1 utf8 "grant" status nativeval errorval
+set discard call query 2 call str 1 utf8 "UPDATE managed_worktrees SET state=?,result=?,error=? WHERE id=? AND project=?" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  status call encode 1 receipt errorval call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "project"
+if call same 2 status call str 1 utf8 "completed" 1
+set discard call query 2 call str 1 utf8 "UPDATE worktree_grants SET state='consumed' WHERE id=? AND project=? AND state='active'" call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "grant" call key 2 record call str 1 utf8 "project"
+0
+
+set discard call audit 3 call key 2 record call str 1 utf8 "project" call str 1 utf8 "Worktree mutation" receipt
+ret receipt
+
+pub guest_worktree_finished 1 arg uint uint do 0  1
+ret call worktree_finish 3 call key 2 arg call str 1 utf8 "state" call key 2 arg call str 1 utf8 "result" call key 2 arg call str 1 utf8 "error"
+
+pub worktree_recover 1 arg uint uint do 3 pid uint record uint mid uint 5
+set pid call key 2 arg call str 1 utf8 "project"
+set mid call key 2 arg call str 1 utf8 "mutation"
+if call same 2 pid 0u 1
+set record call nth 2 call query 2 call str 1 utf8 "SELECT id,project,state,grant_id,result AS \"result:json\",request AS \"request:json\" FROM managed_worktrees WHERE state IN ('executing','uncertain') AND (? IS NULL OR id=?) ORDER BY rowid LIMIT 1" call append 2 call append 2 call arr 0  mid mid 0
+2
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set record call nth 2 call query 2 call str 1 utf8 "SELECT id,project,state,grant_id,result AS \"result:json\",request AS \"request:json\" FROM managed_worktrees WHERE project=? AND state IN ('executing','uncertain') AND (? IS NULL OR id=?) ORDER BY rowid LIMIT 1" call append 2 call append 2 call append 2 call arr 0  pid mid mid 0
+if call same 2 record 0u 1
+ret call decode 1 call str 1 utf8 "{\"state\":\"idle\"}"
+0
+
+ret call worktree_defer 3 call shape 2 call str 1 utf8 "{\"operation\":\"reconcile\",\"request\":\"$0\"}" call append 2 call arr 0  call key 2 record call str 1 utf8 "request" call str 1 utf8 "guest_worktree_reconciled" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"mutation\":\"$1\",\"grant\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "project" call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "grant_id"
+
+pub guest_worktree_reconciled 1 arg uint uint do 5 stateval uint nativeval uint record uint grantval uint discard uint 6
+set stateval call key 2 arg call str 1 utf8 "state"
+set nativeval call key 2 arg call str 1 utf8 "result"
+if call same 2 call key 2 nativeval call str 1 utf8 "state" call str 1 utf8 "completed" 1
+ret call worktree_finish 3 stateval nativeval call key 2 arg call str 1 utf8 "error"
+0
+
+if call same 2 call key 2 nativeval call str 1 utf8 "state" call str 1 utf8 "old" 4
+set record call worktree_record 2 call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation"
+set grantval call nth 2 call query 2 call str 1 utf8 "SELECT id,state,digest FROM worktree_grants WHERE id=? AND project=? AND worktree=?" call append 2 call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "grant" call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation" 0
+if and call same 2 call key 2 grantval call str 1 utf8 "state" call str 1 utf8 "active" call same 2 call key 2 grantval call str 1 utf8 "digest" call key 2 record call str 1 utf8 "digest" 2
+set discard call query 2 call str 1 utf8 "UPDATE managed_worktrees SET state='old' WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "mutation" call key 2 stateval call str 1 utf8 "project"
+ret call worktree_apply 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"mutation\":\"$1\",\"grant\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation" call key 2 stateval call str 1 utf8 "grant"
+0
+
+set nativeval call shape 2 call str 1 utf8 "{\"state\":\"held\",\"reason\":\"Current Worktree user authority is missing\",\"observed\":\"$0\"}" call append 2 call arr 0  nativeval
+0
+
+if not call same 2 call key 2 arg call str 1 utf8 "error" 0u 1
+set nativeval call shape 2 call str 1 utf8 "{\"state\":\"held\",\"reason\":\"Worktree outcome remains uncertain\",\"error\":\"$0\"}" call append 2 call arr 0  call key 2 arg call str 1 utf8 "error"
+0
+
+ret call worktree_finish 3 stateval nativeval 0u
+
+fn worktree_model 3 pid uint toolname uint args uint uint do 1 p uint 5
+set args call put 3 args call str 1 utf8 "project" pid
+if call same 2 toolname call str 1 utf8 "worktree.list" 2
+set p call project 1 args
+ret call worktree_inspect 1 call key 2 p call str 1 utf8 "root"
+0
+
+if call same 2 toolname call str 1 utf8 "worktree.status" 1
+ret call worktree_get 1 args
+0
+
+if call same 2 toolname call str 1 utf8 "worktree.apply" 1
+ret call worktree_apply 1 args
+0
+
+ret call worktree_propose 1 call put 3 args call str 1 utf8 "operation" toolname

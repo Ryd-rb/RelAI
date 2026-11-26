@@ -58,13 +58,57 @@ function termCompletion(input,label,project,config,draft){
  input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'&&choices.firstChild){e.preventDefault();choices.firstChild.focus()}if(e.key==='Escape'){clearTimeout(timer);++sequence;choices.replaceChildren();description.textContent=''}});
  return ()=>[...(draft.bindings||[])].sort((a,b)=>a.start-b.start).map(m=>({ref:m.ref,start:length(input.value.slice(0,m.start)),end:length(input.value.slice(0,m.end))}));
 }
+function termText(parts,open) {
+ const paragraph=element('p');
+ for(const part of parts) {
+   if(!part.term){paragraph.append(document.createTextNode(part.text));continue}
+   const link=element('button',part.text);link.type='button';link.className='term';link.dataset.kind=part.term.kind;
+   link.setAttribute('aria-label',part.text+' · '+part.term.kind+' definition');link.onclick=()=>open(part.term);paragraph.append(link);
+ }
+ return paragraph;
+}
+function openDefinition(project,first) {
+ const dialog=element('dialog');dialog.setAttribute('aria-label','Term definition');document.body.append(dialog);
+ const stack=[first];let generation=0;dialog.onclose=()=>{++generation;dialog.remove()};dialog.showModal();
+ const display=async()=>{const ticket=++generation;const ref=stack.at(-1);try{
+   const item=await call('term_view',{project,ref});if(ticket!==generation||!dialog.open)return;
+   dialog.replaceChildren();const close=element('button','Close');close.onclick=()=>dialog.close();dialog.append(close);
+   if(stack.length>1){const back=element('button','Back');back.onclick=()=>{stack.pop();display()};dialog.append(back)}
+   if(!item.available){dialog.append(element('p','This definition is unavailable.'));return}
+   dialog.append(element('h2',item.entry.name),element('p',item.dictionary.name+' · '+item.entry.kind+' · revision '+item.entry.revision));
+   dialog.append(termText(item.parts,target=>{if(stack.length>=32)stack.shift();stack.push(target);display()}));
+   if(item.dictionary.owner){
+     const edit=element('details');edit.append(element('summary','Edit owner definition'));
+     const owner=item.enabled_projects.find(p=>p.id===item.dictionary.owner);
+     edit.append(element('p','Dictionary owner · '+(owner?.root||item.dictionary.owner)),element('p','Enabled projects · '+item.enabled_projects.map(p=>p.root).join(', ')));
+     const label=element('label','Definition');const field=element('textarea');field.value=item.entry.definition;label.append(field);edit.append(label);
+     const save=element('button','Save revision');edit.append(save);save.onclick=async()=>{save.disabled=true;try{
+       const r=await call('dictionary',{project:item.dictionary.owner,op:'save',dictionary:item.dictionary.id,id:item.entry.id,revision:item.entry.revision,name:item.entry.name,kind:item.entry.kind,definition:field.value});
+       if(ticket===generation){stack[stack.length-1]=r;await display()}
+     }catch(err){edit.append(element('p',err.message))}finally{save.disabled=false}};dialog.append(edit);
+   }
+ }catch(err){if(ticket===generation){dialog.close();notice(err.message)}}};display();
+}
 function render(spec,project){
+ if(spec.type==='fold'){const fold=element('details');fold.append(element('summary',spec.label));for(const item of spec.items)fold.append(render(item,project));return fold}
+ if(spec.type==='graph_layers'){
+ const section=element('section');section.append(element('h2',spec.label));const select=element('select');select.setAttribute('aria-label','Compare with snapshot');
+ const none=element('option','Current snapshot');none.value='';select.append(none);for(const version of spec.versions||[]){if(version.id===spec.snapshot)continue;const choice=element('option',version.id);choice.value=version.id;select.append(choice)}
+ const load=element('button','Inspect source relationships');const detail=element('div');section.append(select,load,detail);
+ const item=(title,value)=>{const block=element('details');block.append(element('summary',title),element('pre',show(value)));detail.append(block)};
+ let ticket=0;const query=async()=>{const id=++ticket;try{const v=await call(spec.op,{project,snapshot:spec.snapshot,before:select.value||null});if(id!==ticket||!section.isConnected)return;
+ detail.replaceChildren(element('p',v.coverage.indexed+' of '+v.coverage.total+' source files indexed.'));for(const edge of v.edges){const b=element('button',edge.source+' → '+edge.target+' · '+edge.name);b.onclick=()=>navigate({view:'graph',snapshot:spec.snapshot,selected:edge.source});detail.append(b)}
+ if(v.changes){item('Changes since selected snapshot',v.changes);item('Stale source evidence',v.stale_evidence);for(const change of v.changes.filter(c=>c.old)){const b=element('button','Open previous '+change.path);b.onclick=()=>navigate({view:'graph',snapshot:select.value,selected:change.path});detail.append(b)}}
+ item('Recorded activity',v.activity)}catch(err){if(id===ticket)notice(err.message)}};load.onclick=select.onchange=query;return section;
+ }
  if(spec.type==='tree'){
  const container=element('section');container.append(element('h2',spec.label));
  const nodes=spec.nodes||[];const byParent=new Map();
  for(const item of nodes){if(!byParent.has(item.parent))byParent.set(item.parent,[]);byParent.get(item.parent).push(item)}
  const search=element('input');search.type='search';search.setAttribute('aria-label','Filter paths');container.append(search);
  const body=element('div');body.className='tree-body';container.append(body);
+ const pause=element('button',state.graphPaused?'Resume graph':'Pause graph');pause.onclick=()=>{state.graphPaused=!state.graphPaused;pause.textContent=state.graphPaused?'Resume graph':'Pause graph';if(!state.graphPaused)refresh(true)};container.insertBefore(pause,body);
+ let drag;body.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;drag=[e.clientX,e.clientY,body.scrollLeft,body.scrollTop];body.setPointerCapture(e.pointerId)});body.addEventListener('pointermove',e=>{if(drag){body.scrollLeft=drag[2]+drag[0]-e.clientX;body.scrollTop=drag[3]+drag[1]-e.clientY}});body.addEventListener('pointerup',()=>drag=null);body.addEventListener('pointercancel',()=>drag=null);
  let zoom=1;for(const [label,factor] of [['Zoom in',1.2],['Zoom out',1/1.2],['Fit',0]]){const b=element('button',label);b.onclick=()=>{zoom=factor?Math.max(.5,Math.min(3,zoom*factor)):1;body.style.fontSize=zoom+'em'};container.insertBefore(b,body)}
  const draw=()=>{body.replaceChildren();const ul=element('ul');ul.setAttribute('role','tree');body.append(ul);
  const add=(parent,target)=>{for(const item of byParent.get(parent)||[]){if(search.value && !item.path.includes(search.value) && !nodes.some(n=>n.path.startsWith(item.path+'/')&&n.path.includes(search.value)))continue;
@@ -85,7 +129,7 @@ function render(spec,project){
  const label=element('label');label.append(element('span',field.label));let input;
  if(field.type==='select'||field.type==='multi'){input=element('select');input.multiple=field.type==='multi';for(const option of field.choices){const o=element('option',option.label??option);o.value=option.value??option;input.append(o)}}
  else if(field.type==='textarea'||field.type==='json'){input=element('textarea');if(field.type==='json')input.placeholder='{}'}
- else{input=element('input');input.type=field.type==='files'?'file':'text'}
+ else{input=element('input');input.type=field.type==='files'?'file':field.type==='boolean'?'checkbox':'text'}
  input.required=!!field.required;input.name=field.name;
  if(field.type==='files'){
  input.multiple=true;const list=element('ul');const update=()=>{list.replaceChildren();for(const file of draft.files){const li=element('li',file.name+' · '+file.status+' ');const remove=element('button','Remove');remove.type='button';remove.onclick=()=>{draft.files=draft.files.filter(x=>x!==file);update()};li.append(remove);list.append(li)}submit.disabled=pending>0||draft.files.some(x=>!x.id)};
@@ -103,9 +147,10 @@ function render(spec,project){
  form.append(submit);const output=element('pre');form.append(output);
  form.onsubmit=async e=>{e.preventDefault();if(busy||pending)return;busy=true;submit.disabled=true;try{
  const data={project};if(spec.idempotent)data.key=draft.key;
- for(const [name,[field,input]] of fields)data[name]=field.type==='files'?draft.files.map(x=>x.id):field.type==='json'?JSON.parse(input.value||'{}'):field.type==='multi'?Array.from(input.selectedOptions,o=>o.value):input.value;
+ for(const [name,[field,input]] of fields)data[name]=field.type==='boolean'?input.checked:field.type==='files'?draft.files.map(x=>x.id):field.type==='json'?JSON.parse(input.value||'{}'):field.type==='multi'?Array.from(input.selectedOptions,o=>o.value):input.value;
  if(markerList)data[spec.completion.markers]=markerList();
- const result=await execute(spec,data);
+ const payload=spec.jsonPayload?{...data[spec.jsonPayload],project}:data;
+ const result=await execute(spec,payload);
  if(spec.draft){drafts.delete(draftId);state.reply=null;state.steer=null;form.reset()}
  if(spec.showResult){output.textContent=show(result)}else await refresh(true);
  }catch(e){notice(e.message)}finally{busy=false;submit.disabled=false}};return form;
@@ -116,7 +161,7 @@ function render(spec,project){
  const dock=element('button',root.dataset.dock==='left'?'Move tabs to top':'Move tabs to left');
  dock.onclick=()=>{sessionStorage.setItem('dock',root.dataset.dock==='left'?'top':'left');applyDock();dock.textContent=root.dataset.dock==='left'?'Move tabs to top':'Move tabs to left'};node.append(dock);}
  else if(spec.label)node.append(element(spec.type==='card'?'h3':'h2',spec.label));
- if(spec.text)node.append(element('p',spec.text));
+ if(spec.parts?.length)node.append(termText(spec.parts,term=>openDefinition(project,term)));else if(spec.text)node.append(element('p',spec.text));
  if(spec.details){const d=element('details');d.append(element('summary','Details'),element('pre',show(spec.details)));node.append(d)}
  if('value' in spec)node.append(element('pre',show(spec.value)));
  for(const child of spec.items||[])node.append(render(child,project));return node;
@@ -131,4 +176,4 @@ async function refresh(force=false){
  root.replaceChildren(head,...view.components.map(c=>render(c,view.project)));
  }catch(e){notice(e.message)}
 }
-refresh();setInterval(()=>{if(!document.hidden&&!busy)refresh()},2500);
+refresh();setInterval(()=>{if(!document.hidden&&!busy&&!(state.view==='graph'&&state.graphPaused))refresh()},2500);

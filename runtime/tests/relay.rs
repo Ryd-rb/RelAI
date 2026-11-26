@@ -319,3 +319,48 @@ fn a_named_question_survives_restart_and_can_be_reviewed_as_waiting() {
     deliver(&mut app, &review, response).unwrap();
     assert!(app.invoke("poll", Value::Null).unwrap().is_null());
 }
+#[test]
+fn a_direct_checked_tool_result_needs_no_followup_model_turn() {
+    let temp = tempfile::tempdir().unwrap();
+    let data = temp.path().join("db");
+    let root = temp.path().join("repo");
+    fs::create_dir(&root).unwrap();
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let p = app.invoke("open_project", json!({"root":root})).unwrap()["id"].clone();
+    app.invoke(
+        "submit",
+        json!({"project":p,"key":"direct-tool","text":"Count","attachments":[]}),
+    )
+    .unwrap();
+    let first = next(&mut app);
+    deliver(
+        &mut app,
+        &first,
+        intake(json!([task("Count values", json!([]))]), 5),
+    )
+    .unwrap();
+    let worker = next(&mut app);
+    let action = json!({"type":"RUN_TOOL","summary":"Summarize values.","tool":"data.summarize","arguments_json":json!({"values":[2,4,6]}).to_string()});
+    deliver(&mut app, &worker, envelope(json!([action]))).unwrap();
+    let local = app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(local["local"], "tool_run");
+    let receipt = app.invoke("tool_run", local["arguments"].clone()).unwrap();
+    app.invoke("tool_done", json!({"job":local["job"],"result":receipt}))
+        .unwrap();
+    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
+    let db = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+    assert_eq!(
+        2,
+        db.query_row("SELECT count(*) FROM attempts", [], |r| r.get::<_, i64>(0))
+            .unwrap()
+    );
+    assert_eq!(
+        1,
+        db.query_row(
+            "SELECT count(*) FROM branches WHERE report IS NOT NULL AND accepted IS NULL",
+            [],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap()
+    );
+}

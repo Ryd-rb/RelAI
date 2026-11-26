@@ -1,10 +1,13 @@
 fluxr 1
 
 fn tool_runtime 0  uint do 0  1
-  ret call str 1 utf8 "fluxr:69e1898934f8954f6f03a51bd7bc9ffc1ed3b620;portable;source=65536;fuel=100000;cells=262144;frames=64;hosts=none"
+  ret call str 1 utf8 "fluxr:62e412b1b7aa34cad1c8472d7f974e0bfc111552;portable;source=65536;fuel=100000;cells=262144;frames=64;hosts=none"
 
 fn tool_known 1 toolname uint bool do 0  1
-  ret or call effect_known 1 toolname or call extra_known 1 toolname or or or or or or or or or or or or or or or or or or or or or or or or call same 2 toolname call str 1 utf8 "project.info" call same 2 toolname call str 1 utf8 "fs.list" call same 2 toolname call str 1 utf8 "fs.read" call same 2 toolname call str 1 utf8 "fs.digest" call same 2 toolname call str 1 utf8 "fs.count" call same 2 toolname call str 1 utf8 "fs.search" call same 2 toolname call str 1 utf8 "data.parse" call same 2 toolname call str 1 utf8 "data.summarize" call same 2 toolname call str 1 utf8 "data.transform" call same 2 toolname call str 1 utf8 "tool.inspect" call same 2 toolname call str 1 utf8 "dictionary.find" call same 2 toolname call str 1 utf8 "document.read" call same 2 toolname call str 1 utf8 "document.write" call same 2 toolname call str 1 utf8 "sheet.read" call same 2 toolname call str 1 utf8 "sheet.write" call same 2 toolname call str 1 utf8 "notebook.edit" call same 2 toolname call str 1 utf8 "archive.list" call same 2 toolname call str 1 utf8 "archive.create" call same 2 toolname call str 1 utf8 "archive.extract" call same 2 toolname call str 1 utf8 "verify.format" call same 2 toolname call str 1 utf8 "verify.lint" call same 2 toolname call str 1 utf8 "verify.build" call same 2 toolname call str 1 utf8 "verify.test" call same 2 toolname call str 1 utf8 "verify.benchmark" false
+  ret or call worktree_known 1 toolname or call git_ops_known 1 toolname or call effect_known 1 toolname or call extra_known 1 toolname call basic_tool_known 1 toolname
+
+fn basic_tool_known 1 toolname uint bool do 0 1
+  ret or or or or or or or or or or or or or or or or or or or or or or or or call same 2 toolname call str 1 utf8 "project.info" call same 2 toolname call str 1 utf8 "fs.list" call same 2 toolname call str 1 utf8 "fs.read" call same 2 toolname call str 1 utf8 "fs.digest" call same 2 toolname call str 1 utf8 "fs.count" call same 2 toolname call str 1 utf8 "fs.search" call same 2 toolname call str 1 utf8 "data.parse" call same 2 toolname call str 1 utf8 "data.summarize" call same 2 toolname call str 1 utf8 "data.transform" call same 2 toolname call str 1 utf8 "tool.inspect" call same 2 toolname call str 1 utf8 "dictionary.find" call same 2 toolname call str 1 utf8 "document.read" call same 2 toolname call str 1 utf8 "document.write" call same 2 toolname call str 1 utf8 "sheet.read" call same 2 toolname call str 1 utf8 "sheet.write" call same 2 toolname call str 1 utf8 "notebook.edit" call same 2 toolname call str 1 utf8 "archive.list" call same 2 toolname call str 1 utf8 "archive.create" call same 2 toolname call str 1 utf8 "archive.extract" call same 2 toolname call str 1 utf8 "verify.format" call same 2 toolname call str 1 utf8 "verify.lint" call same 2 toolname call str 1 utf8 "verify.build" call same 2 toolname call str 1 utf8 "verify.test" call same 2 toolname call str 1 utf8 "verify.benchmark" false
 
 fn tool_signature 1 capability uint uint do 0  4
   if call same 2 capability call str 1 utf8 "integer.increment" 1
@@ -100,7 +103,7 @@ pub tool_qualify 1 arg uint uint do 3 pid uint entry uint fixtures uint 4
   set fixtures call tool_fixtures 1 call key 2 entry call str 1 utf8 "contract"
   ret call tool_test_start 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"version\":\"$1\",\"case\":\"$2\",\"mode\":\"qualification\",\"fixtures\":\"$3\",\"index\":0,\"passed\":true,\"receipts\":[]}" call append 2 call append 2 call append 2 call append 2 call arr 0  pid call key 2 entry call str 1 utf8 "version" call nth 2 fixtures 0 fixtures
 
-pub guest_tool_tested 1 arg uint uint do 13 state uint entry uint case uint observed uint receipt uint discard uint receipts uint passedval uint passedtext uint evidence uint nextstate uint passed bool idx int 21
+pub guest_tool_tested 1 arg uint uint do 13 state uint entry uint case uint observed uint receipt uint discard uint receipts uint passedval uint passedtext uint evidence uint nextstate uint passed bool idx int 22
   set state call key 2 arg call str 1 utf8 "state"
   set entry call tool_entry 2 call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "version"
   set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "draft" call str 1 utf8 "Draft is no longer eligible for testing"
@@ -117,6 +120,7 @@ pub guest_tool_tested 1 arg uint uint do 13 state uint entry uint case uint obse
   set receipt call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"version\":\"$1\",\"case\":\"$2\",\"expected\":\"$3\",\"observed\":\"$4\",\"passed\":\"$5\",\"error\":\"$6\",\"execution\":\"$7\",\"provisional\":true}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 state call str 1 utf8 "test_id" call key 2 state call str 1 utf8 "version" case call key 2 case call str 1 utf8 "expected" observed passedval call key 2 arg call str 1 utf8 "error" call key 2 arg call str 1 utf8 "result"
   set discard call query 2 call str 1 utf8 "UPDATE tool_tests SET observed=?,outcome=?,receipt=? WHERE id=? AND project=? AND version=? AND outcome='running'" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  observed passedtext call encode 1 receipt call key 2 state call str 1 utf8 "test_id" call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "version"
   set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Test receipt was already delivered or replaced"
+  if call same 2 call key 2 state call str 1 utf8 "mode" call str 1 utf8 "qualification" 1 set discard call query 2 call str 1 utf8 "INSERT INTO verified_checks VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 call key 2 state call str 1 utf8 "test_id" call key 2 state call str 1 utf8 "version" call key 2 state call str 1 utf8 "project" 0
   if call same 2 call key 2 state call str 1 utf8 "mode" call str 1 utf8 "author" 1
   ret receipt
   0
@@ -169,7 +173,7 @@ pub tool_revoke 1 arg uint uint do 0  1
 pub tool_catalog 1 arg uint uint do 4 pid uint items uint more uint i int 6
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set items call decode 1 call str 1 utf8 "[{\"id\":\"project.info\",\"description\":\"Registered project identity and root\",\"input\":{},\"output\":\"project record\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.list\",\"description\":\"Fresh bounded directory inventory\",\"input\":{\"path\":\"relative path; empty selects root\"},\"output\":\"entries\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.read\",\"description\":\"Fresh bounded UTF-8 text\",\"input\":{\"path\":\"relative path\"},\"output\":\"text\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.digest\",\"description\":\"SHA-256 of UTF-8 file bytes\",\"input\":{\"path\":\"relative path\"},\"output\":\"digest\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.count\",\"description\":\"Count bytes, lines, or ASCII-whitespace words\",\"input\":{\"path\":\"relative path\",\"rule\":\"bytes|lines|words\"},\"output\":\"count\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"fs.search\",\"description\":\"Literal search in one UTF-8 file, with byte spans\",\"input\":{\"path\":\"relative path\",\"query\":\"literal UTF-8 text\"},\"output\":\"matches\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"data.parse\",\"description\":\"Parse bounded JSON text\",\"input\":{\"text\":\"JSON text\"},\"output\":\"parsed JSON\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"data.summarize\",\"description\":\"Checked integer sum/count/min/max and rational mean\",\"input\":{\"values\":\"i64 array\"},\"output\":\"summary\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"data.transform\",\"description\":\"Equality row filter and explicit field projection\",\"input\":{\"rows\":\"objects\",\"filter\":\"optional {field,value}\",\"fields\":\"optional field list\"},\"output\":\"rows\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"tool.inspect\",\"description\":\"Exact scoped immutable tool contract\",\"input\":{\"version\":\"exact version\"},\"output\":\"registry record\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"dictionary.find\",\"description\":\"Find exact project terms by case-insensitive substring\",\"input\":{\"query\":\"substring\"},\"output\":\"terms\",\"route\":\"portable\",\"effects\":[],\"reuse\":\"disabled\",\"limits\":\"VM fuel/cells/frames and bounded host inputs\"},{\"id\":\"document.read\",\"description\":\"Read Markdown, DOCX or PDF text from exact file or artifact\",\"input\":{\"path\":\"relative file OR artifact id\",\"format\":\"markdown|docx|pdf\"},\"output\":\"text\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"document.write\",\"description\":\"Create immutable Markdown or DOCX artifact\",\"input\":{\"format\":\"markdown|docx\",\"text\":\"text\",\"name\":\"optional display name\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"sheet.read\",\"description\":\"Read XLSX scalar cell values and formulas\",\"input\":{\"path\":\"relative file OR artifact id\"},\"output\":\"sheets\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"sheet.write\",\"description\":\"Create immutable XLSX values and formula cells\",\"input\":{\"sheets\":\"[{name,cells:[{row,column,value|formula}]}]\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"notebook.edit\",\"description\":\"Derive immutable IPYNB v4 cell edits and clear edited code outputs\",\"input\":{\"path\":\"relative file OR artifact id\",\"edits\":\"[{index,source}]\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"archive.list\",\"description\":\"List safe ZIP entry paths and sizes\",\"input\":{\"path\":\"relative file OR artifact id\"},\"output\":\"entries\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"archive.create\",\"description\":\"Create immutable ZIP artifact\",\"input\":{\"entries\":\"[{path,base64}]\"},\"output\":\"artifact metadata\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"archive.extract\",\"description\":\"Extract safe ZIP entries into immutable artifacts\",\"input\":{\"path\":\"relative file OR artifact id\"},\"output\":\"artifact metadata array\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[\"immutable artifacts\"],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.format\",\"description\":\"Canonicalize pure checked FluxR source without activation\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\"},\"output\":\"canonical source\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.lint\",\"description\":\"Check pure source syntax, types and forbidden native/host imports\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\"},\"output\":\"build result\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.build\",\"description\":\"Compile a pure checked module without activation\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\"},\"output\":\"signature and source digest\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.test\",\"description\":\"Execute exact pure checked case and compare expected VM value\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\",\"arguments\":\"VM values\",\"expected\":\"VM value\"},\"output\":\"provisional test receipt\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"},{\"id\":\"verify.benchmark\",\"description\":\"Measure one bounded pure compilation-and-call\",\"input\":{\"source\":\"exact source OR version\",\"export\":\"entry name\",\"arguments\":\"VM values\"},\"output\":\"measured compile and call microseconds\",\"route\":\"portable\",\"reuse\":\"disabled\",\"effects\":[],\"limits\":\"codec input2MiB, expanded/output8MiB, entries/cells4096; pure VM fuel100000/cells262144/frames64\"}]"
-  set more call add_refs 2 call extra_catalog 0 call effect_catalog 0
+  set more call add_refs 2 call add_refs 2 call add_refs 2 call extra_catalog 0 call effect_catalog 0 call git_ops_catalog 0 call worktree_catalog 0
   set i 0
   while lt i call size 1 more 2
   set items call append 2 items call nth 2 more i
@@ -331,10 +335,9 @@ fn tool_format_mime 1 formatval uint uint do 1 mime uint 3
   ret mime
 
 fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root uint path uint textval uint discard uint entries uint out uint queryval uint formatval uint nameval uint doc uint cells uint item uint edit uint packed uint meta uint i int 18
+  if call same 2 toolname call str 1 utf8 "fs.search" 1 ret call search_file 2 pid arguments 0
   if or call same 2 toolname call str 1 utf8 "fs.read" call same 2 toolname call str 1 utf8 "fs.digest" 1 ret call file_selection 3 pid toolname arguments 0
-  if call extra_known 1 toolname 1
-  ret call extra_run 3 pid toolname arguments
-  0
+
 
   set p call nth 2 call query 2 call str 1 utf8 "SELECT * FROM projects WHERE id=?" call append 2 call arr 0  pid 0
   set root call key 2 p call str 1 utf8 "root"
@@ -351,22 +354,10 @@ fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root u
   ret call directory 2 root path
   0
 
-  if or call same 2 toolname call str 1 utf8 "fs.read" or call same 2 toolname call str 1 utf8 "fs.digest" or call same 2 toolname call str 1 utf8 "fs.count" call same 2 toolname call str 1 utf8 "fs.search" 6
-  set textval call readtext 2 root path
-  set discard call require 2 le call size 1 textval 131072 call str 1 utf8 "File exceeds tool text limit"
-  if call same 2 toolname call str 1 utf8 "fs.read" 1
-  ret call shape 2 call str 1 utf8 "{\"text\":\"$0\",\"encoding\":\"utf-8\",\"fresh\":true}" call append 2 call arr 0  textval
-  0
-
-  if call same 2 toolname call str 1 utf8 "fs.digest" 1
-  ret call shape 2 call str 1 utf8 "{\"algorithm\":\"sha256\",\"digest\":\"$0\"}" call append 2 call arr 0  call hash 1 textval
-  0
-
-  if call same 2 toolname call str 1 utf8 "fs.count" 1
-  ret call shape 2 call str 1 utf8 "{\"count\":\"$0\",\"rule\":\"$1\"}" call append 2 call append 2 call arr 0  call tool_count 2 textval call key 2 arguments call str 1 utf8 "rule" call key 2 arguments call str 1 utf8 "rule"
-  0
-
-  ret call shape 2 call str 1 utf8 "{\"matches\":\"$0\"}" call append 2 call arr 0  call tool_search 2 textval call key 2 arguments call str 1 utf8 "query"
+  if call same 2 toolname call str 1 utf8 "fs.count" 3
+    set textval call readtext 2 root path
+    set discard call require 2 le call size 1 textval 131072 call str 1 utf8 "File exceeds tool text limit"
+    ret call shape 2 call str 1 utf8 "{\"count\":\"$0\",\"rule\":\"$1\"}" call append 2 call append 2 call arr 0 call tool_count 2 textval call key 2 arguments call str 1 utf8 "rule" call key 2 arguments call str 1 utf8 "rule"
   0
 
   if call same 2 toolname call str 1 utf8 "data.parse" 5
@@ -594,7 +585,10 @@ fn tool_markdown_input 2 pid uint arguments uint uint do 15 sid uint snapshotval
 
 pub tool_run 1 arg uint uint do 1 name uint 3
   set name call key 2 arg call str 1 utf8 "tool"
-  if call same 2 call key 2 arg call str 1 utf8 "version" 0u 3
+  if call same 2 call key 2 arg call str 1 utf8 "version" 0u 6
+    if call worktree_known 1 name 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"worktree_run\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0
+    if call has_ref 2 call resource 1 call str 1 utf8 "remote-tools.json" name 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"remote_run\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0
+    if call git_ops_known 1 name 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"git_run\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0
     if call effect_known 1 name 1
     ret call shape 2 call str 1 utf8 "{\"$call\":\"$0\",\"input\":\"$1\"}" call append 2 call append 2 call arr 0 call str 1 utf8 "effect_run" arg
   0
@@ -607,16 +601,30 @@ pub tool_run 1 arg uint uint do 1 name uint 3
   0
   ret call shape 2 call str 1 utf8 "{\"$call\":\"$0\",\"input\":\"$1\"}" call append 2 call append 2 call arr 0 call str 1 utf8 "registered_run" arg
 
-pub builtin_run 1 arg uint uint do 5 pid uint name uint args uint rid uint resultval uint 7
+pub builtin_run 1 arg uint uint do 5 pid uint name uint args uint rid uint resultval uint 9
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set name call key 2 arg call str 1 utf8 "tool"
   set args call key 2 arg call str 1 utf8 "arguments"
+  if call has_ref 2 call resource 1 call str 1 utf8 "extended-tools.json" name 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"extended_entry\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0
+  if call extra_known 1 name 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"service_run\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0
   set rid call uid 0
   if call tool_verify_name 1 name 1
     ret call tool_verify 4 pid name args rid
   0
   set resultval call tool_builtin 3 pid name args
   ret call tool_builtin_receipt 5 pid name args rid resultval
+
+pub worktree_pending 1 cursor uint uint do 0 1
+  ret call query 2 call str 1 utf8 "SELECT id AS mutation,id AS cursor,project FROM managed_worktrees WHERE state IN ('executing','uncertain') AND id>COALESCE(?,'') ORDER BY id LIMIT 64" call append 2 call arr 0 cursor
+
+pub worktree_run 1 arg uint uint do 0 1
+  ret call worktree_model 3 call key 2 call project 1 arg call str 1 utf8 "id" call key 2 arg call str 1 utf8 "tool" call key 2 arg call str 1 utf8 "arguments"
+
+pub git_pending 1 cursor uint uint do 0 1
+  ret call query 2 call str 1 utf8 "SELECT id AS mutation,id AS cursor,project FROM git_mutations WHERE state IN ('executing','uncertain') AND id>COALESCE(?,'') ORDER BY id LIMIT 64" call append 2 call arr 0 cursor
+
+pub git_run 1 arg uint uint do 0 1
+  ret call git_ops_model 3 call key 2 call project 1 arg call str 1 utf8 "id" call key 2 arg call str 1 utf8 "tool" call key 2 arg call str 1 utf8 "arguments"
 
 pub effect_run 1 arg uint uint do 0  1
   ret call effect_model 3 call key 2 call project 1 arg call str 1 utf8 "id" call key 2 arg call str 1 utf8 "tool" call key 2 arg call str 1 utf8 "arguments"

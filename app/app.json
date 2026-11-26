@@ -25,7 +25,17 @@
     "prerequisites.fluxr",
     "effects.fluxr",
     "files.fluxr",
-    "monitoring.fluxr"
+    "monitoring.fluxr",
+    "graph_layers.fluxr",
+    "git-operations.fluxr",
+    "publication.fluxr",
+    "service-entries.fluxr",
+    "remotes.fluxr",
+    "skill_manifest.fluxr",
+    "operations_panel.fluxr",
+    "worktrees.fluxr",
+    "passages.fluxr",
+    "definitions.fluxr"
   ],
   "public": [
     "open_project",
@@ -59,7 +69,23 @@
     "patch_preview",
     "patch_stage",
     "patch_apply",
-    "suggest_terms"
+    "suggest_terms",
+    "graph_layers",
+    "git_propose",
+    "git_authorize",
+    "git_apply",
+    "git_get",
+    "git_revoke",
+    "git_recover",
+    "remote",
+    "skill_draft",
+    "worktree_propose",
+    "worktree_authorize",
+    "worktree_apply",
+    "worktree_get",
+    "worktree_revoke",
+    "worktree_recover",
+    "term_view"
   ],
   "assets": {
     "client.js": "text/javascript; charset=utf-8",
@@ -94,7 +120,10 @@
         "builtin_run",
         "registered_run",
         "effect_run",
-        "network_run"
+        "network_run",
+        "git_run",
+        "remote_run",
+        "worktree_run"
       ]
     },
     "tool_propose": {
@@ -140,6 +169,10 @@
     "builtin_run": {
       "$evaluate": [
         "guest_tool_verified"
+      ],
+      "$call": [
+        "service_run",
+        "extended_entry"
       ]
     },
     "registered_run": {
@@ -156,12 +189,70 @@
       "$filesystem": [
         "guest_effect_finished"
       ]
+    },
+    "git_run": {
+      "$git": [
+        "guest_git_finished"
+      ]
+    },
+    "git_apply": {
+      "$git": [
+        "guest_git_finished"
+      ]
+    },
+    "git_recover": {
+      "$git": [
+        "guest_git_reconciled"
+      ]
+    },
+    "guest_git_reconciled": {
+      "$git": [
+        "guest_git_finished"
+      ]
+    },
+    "skill_draft": {
+      "$call": [
+        "tool_propose"
+      ]
+    },
+    "worktree_run": {
+      "$worktree": [
+        "guest_worktree_finished"
+      ]
+    },
+    "worktree_apply": {
+      "$worktree": [
+        "guest_worktree_finished"
+      ]
+    },
+    "worktree_recover": {
+      "$worktree": [
+        "guest_worktree_reconciled"
+      ]
+    },
+    "guest_worktree_reconciled": {
+      "$worktree": [
+        "guest_worktree_finished"
+      ]
+    },
+    "extended_entry": {
+      "$call": [
+        "git_diff_entry"
+      ]
     }
   },
   "startup_recovery": [
     {
       "page": "recovery_page",
       "apply": "effects_recover"
+    },
+    {
+      "page": "git_pending",
+      "apply": "git_recover"
+    },
+    {
+      "page": "worktree_pending",
+      "apply": "worktree_recover"
     }
   ]
 }

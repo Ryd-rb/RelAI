@@ -1,0 +1,35 @@
+fluxr 1
+
+fn publish_candidate 2 pid uint args uint uint do 10 cid uint rid uint version uint old uint candidate uint proof uint receipt uint prior uint discard uint pubid uint 17
+  set cid call key 2 args call str 1 utf8 "candidate"
+  set rid call key 2 args call str 1 utf8 "request"
+  set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT r.id FROM requests r JOIN improvements i ON i.request=r.id WHERE r.id=? AND r.project=? AND r.state='completed'" call append 2 call append 2 call arr 0 rid pid 0 0u call str 1 utf8 "Publication requires its completed request"
+  set prior call nth 2 call query 2 call str 1 utf8 "SELECT receipt AS \"r:json\" FROM publications WHERE candidate=? AND project=? AND request=?" call append 2 call append 2 call append 2 call arr 0 cid pid rid 0
+  if not call same 2 prior 0u 1
+    ret call key 2 prior call str 1 utf8 "r"
+  0
+  set candidate call nth 2 call query 2 call str 1 utf8 "SELECT v.version,v.baseline,c.operation FROM candidate_versions v JOIN candidates c ON c.id=v.candidate WHERE v.candidate=? AND c.project=? AND c.state='deferred'" call append 2 call append 2 call arr 0 cid pid 0
+  set version call tool_entry 2 pid call key 2 candidate call str 1 utf8 "version"
+  set old call tool_entry 2 pid call key 2 candidate call str 1 utf8 "baseline"
+  set discard call require 2 and call same 2 call key 2 candidate call str 1 utf8 "operation" call key 2 version call str 1 utf8 "name" and call same 2 call key 2 old call str 1 utf8 "name" call key 2 version call str 1 utf8 "name" and call same 2 call key 2 old call str 1 utf8 "contract" call key 2 version call str 1 utf8 "contract" and call same 2 call key 2 version call str 1 utf8 "status" call str 1 utf8 "active" not call same 2 call key 2 version call str 1 utf8 "evidence" 0u call str 1 utf8 "Candidate needs independent qualification for the baseline contract"
+  set proof call nth 2 call query 2 call str 1 utf8 "SELECT old.id AS failed,new.id AS passed,old.request AS \"fixture:json\" FROM tool_tests old JOIN verified_checks vc ON vc.test=old.id JOIN tool_tests new ON new.request=old.request AND new.project=old.project JOIN verified_checks nc ON nc.test=new.id WHERE old.project=? AND old.version=? AND new.version=? AND old.outcome='failed' AND new.outcome='passed' ORDER BY old.id,new.id LIMIT 1" call append 2 call append 2 call append 2 call arr 0 pid call key 2 old call str 1 utf8 "version" call key 2 version call str 1 utf8 "version" 0
+  set discard call require 2 not call same 2 proof 0u call str 1 utf8 "A trusted fixture must reproduce the defect and verify the correction"
+  set pubid call uid 0
+  set receipt call shape 2 call str 1 utf8 "{\"publication\":\"$0\",\"candidate\":\"$1\",\"request\":\"$2\",\"version\":\"$3\",\"baseline\":\"$4\",\"independent_check\":\"$5\",\"qualification\":\"$6\",\"reason\":\"reproduced_defect\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pubid cid rid call key 2 version call str 1 utf8 "version" call key 2 old call str 1 utf8 "version" proof call key 2 version call str 1 utf8 "evidence"
+  set discard call query 2 call str 1 utf8 "INSERT INTO publications VALUES(?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pubid pid rid cid receipt
+  set discard call query 2 call str 1 utf8 "UPDATE candidates SET state='published' WHERE id=?" call append 2 call arr 0 cid
+  set discard call audit 3 pid call str 1 utf8 "Workflow published" receipt
+  ret receipt
+
+fn published_refs 3 pid uint rid uint refs uint bool do 2 row uint i int 4
+  if eq 0 call size 1 refs 1
+    ret false
+  0
+  set i 0
+  while lt i call size 1 refs 3
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT id FROM publications WHERE id=? AND project=? AND request=?" call append 2 call append 2 call append 2 call arr 0 call nth 2 refs i pid rid 0
+    if call same 2 row 0u 1
+    ret false
+  0
+    next i
+  ret true

@@ -16,14 +16,15 @@ fn instruction_files 2 root uint targets uint uint do 5 dirs uint out uint entri
 fn selected_skills 2 pid uint ids uint uint do 4 out uint row uint discard uint i int 4
   set out call arr 0
   set i 0
-  while lt i call size 1 ids 4
+  while lt i call size 1 ids 5
     set row call nth 2 call query 2 call str 1 utf8 "SELECT id,name,digest,body FROM skills WHERE project=? AND id=? AND active=1" call append 2 call append 2 call arr 0 pid call nth 2 ids i 0
     set discard call require 2 not call same 2 row 0u call str 1 utf8 "Selected skill was removed"
+    set discard call require 2 eq 0 call size 1 call missing_skill_tools 2 pid call key 2 row call str 1 utf8 "id" call str 1 utf8 "Required skill tool is unavailable"
     set out call append 2 out row
     next i
   ret out
 
-fn seal_current 1 j uint bool do 7 sealed uint pid uint frame uint refs uint part uint row uint i int 9
+fn seal_current 1 j uint bool do 7 sealed uint pid uint frame uint refs uint part uint row uint i int 12
   set pid call key 2 j call str 1 utf8 "project"
   set frame call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "selection"
   set refs call key 2 frame call str 1 utf8 "parts"
@@ -40,9 +41,14 @@ fn seal_current 1 j uint bool do 7 sealed uint pid uint frame uint refs uint par
   set refs call key 2 frame call str 1 utf8 "skill_instructions"
   set i 0
   while lt i call size 1 refs 3
-    set row call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS allowed FROM skills WHERE id=? AND project=? AND active=1" call append 2 call append 2 call arr 0 call key 2 call nth 2 refs i call str 1 utf8 "id" pid 0
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS allowed FROM skills s WHERE id=? AND project=? AND active=1 AND NOT EXISTS(SELECT 1 FROM skill_dependencies d WHERE d.version=s.id AND d.required=1 AND NOT EXISTS(SELECT 1 FROM tools t WHERE t.project=s.project AND t.version=d.tool_version AND t.name=d.name AND t.status='active'))" call append 2 call append 2 call arr 0 call key 2 call nth 2 refs i call str 1 utf8 "id" pid 0
     if call same 2 row 0u 1
     ret false
   0
     next i
+  set part call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT input AS \"body:json\" FROM jobs WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id" 0 call str 1 utf8 "body"
+  if not call definition_receipt_current 2 pid call key 2 part call str 1 utf8 "tool_receipt" 1 ret false 0
+  if not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT version FROM tools WHERE project=? AND version=? AND status='revoked'" call append 2 call append 2 call arr 0 pid call key 2 call key 2 part call str 1 utf8 "tool_receipt" call str 1 utf8 "version" 0 0u 1
+    ret false
+  0
   ret true

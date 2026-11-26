@@ -1,6 +1,6 @@
 fluxr 1
 
-fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 11
+fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 17
   set role call key 2 j call str 1 utf8 "role"
   set body call key 2 j call str 1 utf8 "body"
   if and call same 2 role call str 1 utf8 "workflow_improver" not call has_ref 2 call resource 1 call str 1 utf8 "improver-tools.json" name 1
@@ -11,6 +11,24 @@ fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint 
   0
   if or call same 2 name call str 1 utf8 "monitor.start" call same 2 name call str 1 utf8 "monitor.stop" 1
     ret call str 1 utf8 "Monitor changes require a typed user instruction."
+  0
+  if and call same 2 name call str 1 utf8 "data.read_query" not call same 2 call key 2 arguments call str 1 utf8 "template" call str 1 utf8 "request_jobs" 1
+    ret call str 1 utf8 "This query requires user scope."
+  0
+  if and or call same 2 name call str 1 utf8 "project.lookup" or call same 2 name call str 1 utf8 "plan.get" call same 2 name call str 1 utf8 "data.read_query" not call same 2 call key 2 arguments call str 1 utf8 "request" call key 2 j call str 1 utf8 "request" 1
+    ret call str 1 utf8 "Select the current request."
+  0
+  if and or call same 2 name call str 1 utf8 "job.receipt" or call same 2 name call str 1 utf8 "job.status" call same 2 name call str 1 utf8 "job.trace" call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM jobs WHERE id=? AND request=? AND (session=? OR ? IN ('discriminator','workflow_improver'))" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 arguments call str 1 utf8 "id" call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" 0 0u 1
+    ret call str 1 utf8 "Job is outside the assigned scope."
+  0
+  if and call same 2 name call str 1 utf8 "task.get" and not call same 2 call key 2 arguments call str 1 utf8 "id" call key 2 j call str 1 utf8 "session" not call same 2 call key 2 j call str 1 utf8 "role" call str 1 utf8 "discriminator" 1
+    ret call str 1 utf8 "Select the assigned branch."
+  0
+  if and call same 2 name call str 1 utf8 "effect.status" not call same 2 call key 2 j call str 1 utf8 "role" call str 1 utf8 "discriminator" 1
+    ret call str 1 utf8 "Effect details require the user or project discriminator."
+  0
+  if and call same 2 name call str 1 utf8 "workflow.publish" not and call same 2 role call str 1 utf8 "workflow_improver" call same 2 call key 2 arguments call str 1 utf8 "request" call key 2 j call str 1 utf8 "request" 1
+    ret call str 1 utf8 "Only the owning improvement session can publish this request."
   0
   set aid call key 2 arguments call str 1 utf8 "artifact"
   if and not call same 2 aid 0u not call has_ref 2 call key 2 body call str 1 utf8 "attachments" aid 1

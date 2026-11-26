@@ -44,7 +44,7 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
     set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Save definition\",\"op\":\"save_term\",\"fields\":[{\"name\":\"name\",\"label\":\"Term\",\"type\":\"text\"},{\"name\":\"definition\",\"label\":\"Definition\",\"type\":\"textarea\"}],\"fixed\":{}}" call arr 0
   1
     if call same 2 viewname call str 1 utf8 "tools" 1
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Run tool\",\"op\":\"tool_run\",\"fields\":[{\"name\":\"tool\",\"label\":\"Tool ID\",\"type\":\"text\"},{\"name\":\"arguments\",\"label\":\"Arguments\",\"type\":\"json\"}],\"fixed\":{}}" call arr 0
+    set components call append 2 components call operations_panel 1 pid
   8
     set rowsval call query 2 call str 1 utf8 "SELECT kind,payload AS \"data:json\",cursor FROM (SELECT * FROM events WHERE project=? ORDER BY cursor DESC LIMIT 100) ORDER BY cursor" call append 2 call arr 0 pid
     set cards call arr 0
@@ -81,7 +81,7 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
     if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Submission" 1
     set controls call append 2 call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Steer\",\"navigate\":{\"view\":\"relay\",\"steer\":\"$0\",\"reply\":null}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "request" call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Stop\",\"op\":\"control\",\"fixed\":{\"op\":\"stop\",\"request\":\"$0\"}}" call append 2 call arr 0 call key 2 eventval call str 1 utf8 "request"
   0
-    set cards call append 2 cards call shape 2 call str 1 utf8 "{\"type\":\"card\",\"label\":\"$0\",\"text\":\"$1\",\"details\":\"$2\",\"items\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "kind" summary eventval controls
+    set cards call append 2 cards call shape 2 call str 1 utf8 "{\"type\":\"card\",\"label\":\"$0\",\"text\":\"$1\",\"details\":\"$2\",\"items\":\"$3\",\"parts\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "kind" summary eventval controls call key 2 eventval call str 1 utf8 "parts"
     next i
     set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"feed\",\"label\":\"Relay\",\"items\":\"$0\"}" call append 2 call arr 0 cards
     set forms call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Send\",\"op\":\"submit\",\"fields\":[{\"name\":\"text\",\"label\":\"Message\",\"type\":\"textarea\"},{\"name\":\"attachments\",\"label\":\"Attach files\",\"type\":\"files\",\"op\":\"capture\"}],\"fixed\":{},\"draft\":true,\"idempotent\":true}" call arr 0

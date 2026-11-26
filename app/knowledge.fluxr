@@ -20,7 +20,7 @@ fn expand 2 pid uint refs uint uint do 6 out uint refval uint seen uint entry ui
   while lt i call size 1 refs 3
     set refval call nth 2 refs i
     if call same 2 call key 2 seen call encode 1 refval 0u 3
-    set entry call nth 2 call query 2 call str 1 utf8 "SELECT e.* FROM entries e JOIN dictionary_links g ON g.dictionary=e.dictionary AND g.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE g.project=? AND e.id=? AND e.revision=? AND e.dictionary=?" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 refval call str 1 utf8 "id" call key 2 refval call str 1 utf8 "revision" call key 2 refval call str 1 utf8 "dictionary_id" 0
+    set entry call nth 2 call query 2 call str 1 utf8 "SELECT e.*,(SELECT json_group_array(json(a.value->'term')) FROM definition_parts f,json_each(f.parts) a JOIN dictionary_links l ON l.dictionary=a.value->>'$.term.dictionary_id' AND l.enabled=1 JOIN dictionaries permitted ON permitted.id=l.dictionary AND permitted.archived=0 WHERE f.entry=e.id AND f.revision=e.revision AND l.project=?1) AS \"links:json\" FROM entries e JOIN dictionary_links g ON g.dictionary=e.dictionary AND g.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE g.project=?1 AND e.id=?2 AND e.revision=?3 AND e.dictionary=?4" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 refval call str 1 utf8 "id" call key 2 refval call str 1 utf8 "revision" call key 2 refval call str 1 utf8 "dictionary_id" 0
     set out call append 2 out call shape 2 call str 1 utf8 "{\"ref\":\"$0\",\"definition\":\"$1\"}" call append 2 call append 2 call arr 0 refval entry
     set seen call put 3 seen call encode 1 refval call integer 1 1
   0
@@ -28,7 +28,7 @@ fn expand 2 pid uint refs uint uint do 6 out uint refval uint seen uint entry ui
   set discard call require 2 le call size 1 call encode 1 out 131072 call str 1 utf8 "Expansion byte limit"
   ret out
 
-pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry uint eid uint revision uint n uint discard uint 23
+pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry uint eid uint revision uint n uint discard uint 24
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set op call key 2 arg call str 1 utf8 "op"
   set did call key 2 arg call str 1 utf8 "dictionary"
@@ -80,6 +80,7 @@ pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry u
   set discard call require 2 and lt 0 call size 1 call key 2 arg call str 1 utf8 "name" le call size 1 call key 2 arg call str 1 utf8 "name" 256 call str 1 utf8 "Invalid term name"
   set discard call require 2 or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "tool" call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "skill" call str 1 utf8 "Unknown entry type"
   set discard call query 2 call str 1 utf8 "INSERT INTO entries VALUES(?,?,?,?,?,?,'user',1)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid revision did call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "kind" call key 2 arg call str 1 utf8 "definition"
+  set discard call query 2 call str 1 utf8 "INSERT INTO definition_parts VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 eid revision call annotate_selection 3 pid call key 2 arg call str 1 utf8 "definition" call key 2 arg call str 1 utf8 "markers"
   ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"dictionary_id\":\"$1\",\"revision\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 eid did revision
 
 fn annotate 2 pid uint body uint uint do 0  1
@@ -113,7 +114,7 @@ fn render_terms 2 body uint matchesval uint uint do 8 out uint span uint term ui
   0
   ret out
 
-pub skill 1 arg uint uint do 11 pid uint op uint pkg uint md uint attrs uint sid uint name uint hashval uint eid uint discard uint found uint 20
+pub skill 1 arg uint uint do 11 pid uint op uint pkg uint md uint attrs uint sid uint name uint hashval uint eid uint discard uint found uint 21
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set op call key 2 arg call str 1 utf8 "op"
   set sid call key 2 arg call str 1 utf8 "id"
@@ -124,19 +125,29 @@ pub skill 1 arg uint uint do 11 pid uint op uint pkg uint md uint attrs uint sid
     ret call query 2 call str 1 utf8 "UPDATE skills SET active=0 WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid sid
   0
   if call same 2 op call str 1 utf8 "inspect" 1
-    ret call nth 2 call query 2 call str 1 utf8 "SELECT id,name,digest,description,body,resources AS \"files:json\",active FROM skills WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid sid 0
+    ret call nth 2 call query 2 call str 1 utf8 "SELECT id,name,digest,description,body,resources AS \"files:json\",active,(SELECT json_group_array(json_object('name',d.name,'version',d.tool_version,'required',d.required,'available',EXISTS(SELECT 1 FROM tools t WHERE t.project=skills.project AND t.name=d.name AND t.version=d.tool_version AND t.status='active'))) FROM skill_dependencies d WHERE d.version=skills.id) AS \"dependencies:json\",(SELECT json_group_array(json_object('path',d.path,'contract',json(d.contract),'tests',json(d.tests))) FROM skill_drafts d WHERE d.version=skills.id) AS \"drafts:json\",(SELECT json_group_array(json(o.source)) FROM skill_origins o WHERE o.version=skills.id) AS \"origins:json\" FROM skills WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid sid 0
   0
-  set discard call require 2 call same 2 op call str 1 utf8 "install" call str 1 utf8 "Unknown skill operation"
-  set pkg call bundle 1 call key 2 arg call str 1 utf8 "path"
+  set discard call require 2 or call same 2 op call str 1 utf8 "install" call same 2 op call str 1 utf8 "install_git" call str 1 utf8 "Unknown skill operation"
+  if call same 2 op call str 1 utf8 "install_git" 5
+    set found call nth 2 call query 2 call str 1 utf8 "SELECT p.root,r.url,r.branch,t.target AS object FROM git_transfers t JOIN git_remotes r ON r.id=t.remote AND r.active=1 JOIN projects p ON p.id=t.project WHERE t.project=? AND t.id=? AND t.state='completed' AND t.operation='fetch'" call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "transfer" 0
+    set discard call require 2 not call same 2 found 0u call str 1 utf8 "A completed approved fetch is required"
+    set found call put 3 found call str 1 utf8 "path" call key 2 arg call str 1 utf8 "path"
+    set pkg call git_read 3 call key 2 found call str 1 utf8 "root" call str 1 utf8 "package" found
+    set found call shape 2 call str 1 utf8 "{\"kind\":\"git\",\"url\":\"$0\",\"branch\":\"$1\",\"commit\":\"$2\",\"path\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 found call str 1 utf8 "url" call key 2 found call str 1 utf8 "branch" call key 2 found call str 1 utf8 "object" call key 2 arg call str 1 utf8 "path"
+  2
+    set pkg call bundle 1 call key 2 arg call str 1 utf8 "path"
+    set found call shape 2 call str 1 utf8 "{\"kind\":\"local\",\"path\":\"$0\"}" call append 2 call arr 0 call key 2 arg call str 1 utf8 "path"
   set md call frontmatter 1 call key 2 pkg call str 1 utf8 "SKILL.md"
   set attrs call key 2 md call str 1 utf8 "attributes"
   set name call key 2 attrs call str 1 utf8 "name"
   set discard call require 2 and lt 0 call size 1 name le call size 1 name 128 call str 1 utf8 "Invalid skill name"
   set discard call require 2 and lt 0 call size 1 call key 2 attrs call str 1 utf8 "description" lt 0 call size 1 call key 2 md call str 1 utf8 "body" call str 1 utf8 "Missing skill description or instructions"
-  set discard call require 2 call same 2 call key 2 pkg call str 1 utf8 "relai-skill.json" 0u call str 1 utf8 "Package tool dependencies require qualification"
+
   set hashval call hash 1 call encode 1 pkg
   set sid call hash 1 call encode 1 call append 2 call append 2 call append 2 call arr 0 pid name hashval
   set discard call query 2 call str 1 utf8 "INSERT INTO skills VALUES(?,?,?,?,?,?,?,1) ON CONFLICT(id) DO UPDATE SET active=1" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid name hashval call key 2 attrs call str 1 utf8 "description" call key 2 md call str 1 utf8 "body" pkg
+  set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO skill_origins VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 sid call hash 1 call encode 1 found found
+  set discard call skill_manifest 2 sid pkg
   set eid call hash 1 call encode 1 call append 2 call append 2 call append 2 call arr 0 pid call str 1 utf8 "skill" name
   set discard call query 2 call str 1 utf8 "INSERT INTO entries SELECT ?1,coalesce(max(revision),0)+1,?2,?3,'skill',coalesce((SELECT definition FROM entries WHERE id=?1 AND human=1 ORDER BY revision DESC LIMIT 1),?4),?5,coalesce(max(human),0) FROM entries WHERE id=?1" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid pid name call key 2 attrs call str 1 utf8 "description" sid
   ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"name\":\"$1\",\"digest\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid name hashval

@@ -1,0 +1,18 @@
+fluxr 1
+
+fn index_passages 2 pid uint sid uint uint do 5 rowsval uint row uint content uint discard uint i int 4
+  set rowsval call query 2 call str 1 utf8 "SELECT DISTINCT b.digest FROM inventory i JOIN blobs b ON b.digest=i.digest AND b.project=? WHERE i.snapshot=? AND i.kind='file' AND i.bytes<=65536 AND NOT EXISTS(SELECT 1 FROM passage_sources s WHERE s.project=b.project AND s.digest=b.digest) ORDER BY b.digest LIMIT 128" call append 2 call append 2 call arr 0 pid sid
+  set i 0
+  while lt i call size 1 rowsval 5
+    set row call key 2 call nth 2 rowsval i call str 1 utf8 "digest"
+    set content call key 2 call baseinfo 1 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT content FROM blobs WHERE project=? AND digest=?" call append 2 call append 2 call arr 0 pid row 0 call str 1 utf8 "content" call str 1 utf8 "text"
+    if not call same 2 content 0u 1
+    set discard call query 2 call str 1 utf8 "WITH RECURSIVE chunks(start,part,remainder) AS (SELECT 0,'',?3 UNION ALL SELECT start+length(CAST(part AS BLOB)),substr(remainder,1,CASE WHEN instr(substr(remainder,1,512),char(10))>0 THEN instr(substr(remainder,1,512),char(10)) ELSE 512 END),substr(remainder,1+CASE WHEN instr(substr(remainder,1,512),char(10))>0 THEN instr(substr(remainder,1,512),char(10)) ELSE 512 END) FROM chunks WHERE length(remainder)>0 LIMIT 2049) INSERT OR IGNORE INTO passages SELECT ?1,?2,start,start+length(CAST(part AS BLOB)),part FROM chunks WHERE length(part)>0" call append 2 call append 2 call append 2 call arr 0 pid row content
+  0
+    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO passage_sources VALUES(?,?)" call append 2 call append 2 call arr 0 pid row
+    next i
+  ret 0u
+
+fn ranked_passages 4 pid uint sid uint terms uint querytext uint uint do 1 discard uint 2
+  set discard call index_passages 2 pid sid
+  ret call query 2 call str 1 utf8 "WITH names(name) AS (SELECT json_extract(value,'$.ref.name') FROM json_each(?3) UNION SELECT ?4), matches AS (SELECT i.path,p.digest,p.start,p.end,p.body,count(DISTINCT name) AS rank FROM inventory i JOIN passages p ON p.project=?1 AND p.digest=i.digest JOIN names ON length(name)>0 AND instr(lower(p.body),lower(name))>0 WHERE i.snapshot=?2 GROUP BY i.path,p.start ORDER BY rank DESC,i.path,p.start LIMIT 64) SELECT ?2 AS snapshot,* FROM matches ORDER BY rank DESC,path,start" call append 2 call append 2 call append 2 call append 2 call arr 0 pid sid terms querytext

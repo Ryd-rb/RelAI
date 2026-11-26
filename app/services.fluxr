@@ -28,9 +28,12 @@ fn git_walk 6 root uint pid uint sid uint oid uint dir uint depth int uint do 9 
     next i
   ret 0u
 
-fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint out uint oid uint sid uint oldid uint newid uint discard uint i int n int 37
+fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint out uint oid uint sid uint oldid uint newid uint discard uint i int n int 38
   set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
   set discard call require 2 not call same 2 root 0u call str 1 utf8 "Unknown project"
+  if call same 2 toolname call str 1 utf8 "git.blame" 1
+    ret call git_read 3 root call str 1 utf8 "blame" args
+  0
   if call same 2 toolname call str 1 utf8 "git.refs" 1
     ret call git_read 3 root call str 1 utf8 "refs" args
   0
@@ -153,9 +156,10 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
     set discard call require 2 call same 2 call key 2 row call str 1 utf8 "revision" call key 2 args call str 1 utf8 "revision" call str 1 utf8 "Request revision conflict"
     ret call query 2 call str 1 utf8 "INSERT INTO plans VALUES(?,?,?,?) ON CONFLICT(project,request) DO UPDATE SET revision=excluded.revision,body=excluded.body" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request" call key 2 args call str 1 utf8 "revision" call encode 1 call key 2 args call str 1 utf8 "plan"
   0
-  if call same 2 toolname call str 1 utf8 "workflow.propose" 3
-    set sid call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "operation" call key 2 args call str 1 utf8 "contract" call key 2 args call str 1 utf8 "source"
+  if call same 2 toolname call str 1 utf8 "workflow.propose" 4
+    set sid call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "operation" call key 2 args call str 1 utf8 "contract" call key 2 args call str 1 utf8 "source" call key 2 args call str 1 utf8 "version" call key 2 args call str 1 utf8 "baseline"
     set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO candidates VALUES(?,?,?,?,?,?,'deferred')" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid call key 2 args call str 1 utf8 "operation" call key 2 args call str 1 utf8 "description" call key 2 args call str 1 utf8 "evidence" call key 2 args call str 1 utf8 "checks"
+    if not call same 2 call key 2 args call str 1 utf8 "version" 0u 1 set discard call query 2 call str 1 utf8 "INSERT INTO candidate_versions VALUES(?,?,?) ON CONFLICT(candidate) DO NOTHING" call append 2 call append 2 call append 2 call arr 0 sid call key 2 args call str 1 utf8 "version" call key 2 args call str 1 utf8 "baseline" 0
     ret call shape 2 call str 1 utf8 "{\"candidate\":\"$0\",\"state\":\"deferred\"}" call append 2 call arr 0 sid
   0
   if call same 2 toolname call str 1 utf8 "dictionary.propose" 3
@@ -166,4 +170,4 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
   if call same 2 toolname call str 1 utf8 "notify.local" 1
     ret call audit 3 pid call str 1 utf8 "Notification" call shape 2 call str 1 utf8 "{\"summary\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "message"
   0
-  ret call extended_run 3 pid toolname args
+  ret call require 2 false call str 1 utf8 "Unknown service"

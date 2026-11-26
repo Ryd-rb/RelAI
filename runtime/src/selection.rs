@@ -43,6 +43,27 @@ pub(super) fn source(root: &str, name: &str, host: bool, private: &Path) -> Resu
     Ok(out)
 }
 
+pub(super) fn regex_spans(body: &str, pattern: &str) -> Result<Value> {
+    ensure!(
+        !pattern.is_empty() && pattern.len() <= 256 && body.len() <= 65536,
+        "Regex input exceeds limits"
+    );
+    let pattern = regex::RegexBuilder::new(pattern)
+        .size_limit(262144)
+        .dfa_size_limit(524288)
+        .nest_limit(24)
+        .build()?;
+    let mut starts = vec![0];
+    starts.extend(body.match_indices('\n').map(|(index, _)| index + 1));
+    let mut matches = Vec::new();
+    for found in pattern.find_iter(body).take(257) {
+        ensure!(matches.len() < 256, "Regex result exceeds 256 matches");
+        let line = starts.partition_point(|pos| *pos <= found.start());
+        matches.push(json!({"byte_start":found.start(),"byte_end":found.end(),"line":line,"column":found.start()-starts[line-1]}));
+    }
+    Ok(Value::Array(matches))
+}
+
 pub(super) fn range(encoded: &str, spec: &Value) -> Result<Value> {
     let data = STANDARD.decode(encoded)?;
     let unit = spec["unit"].as_str().unwrap_or("bytes");

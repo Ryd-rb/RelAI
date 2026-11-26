@@ -1,0 +1,34 @@
+fluxr 1
+
+fn requirement_kind 2 j uint refid uint uint do 0  1
+  ret call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT CASE WHEN EXISTS (SELECT 1 FROM questions WHERE id=?1 AND request=?2 AND revision=?3) THEN 'answer' WHEN EXISTS (SELECT 1 FROM branches WHERE id=?1 AND request=?2 AND revision=?3) THEN 'acceptance' WHEN EXISTS (SELECT 1 FROM artifacts WHERE id=?1 AND project=?4) THEN 'artifact' END AS kind" call append 2 call append 2 call append 2 call append 2 call arr 0 refid call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "project" 0 call str 1 utf8 "kind"
+
+fn valid_requirements 2 j uint a uint uint do 4 kind uint refid uint refset uint i int 5
+  set refset call key 2 a call str 1 utf8 "prerequisites"
+  if lt 16 call size 1 refset 1
+    ret call str 1 utf8 "At most 16 prerequisites are supported."
+  0
+  set i 0
+  while lt i call size 1 refset 6
+    set refid call nth 2 refset i
+    set kind call requirement_kind 2 j refid
+    if call same 2 kind 0u 1
+    ret call str 1 utf8 "Unknown prerequisite for this request revision."
+  0
+    if and call same 2 kind call str 1 utf8 "artifact" not call has_ref 2 call key 2 a call str 1 utf8 "attachments" refid 1
+    ret call str 1 utf8 "A prerequisite artifact must be selected for the assignment."
+  0
+    if and call same 2 kind call str 1 utf8 "acceptance" not call same 2 call nth 2 call query 2 call str 1 utf8 "WITH RECURSIVE ancestors(id,parent) AS (SELECT id,parent FROM branches WHERE id=?1 UNION SELECT b.id,b.parent FROM branches b JOIN ancestors a ON a.parent=b.id) SELECT id FROM ancestors WHERE id=?2" call append 2 call append 2 call arr 0 call key 2 j call str 1 utf8 "session" refid 0 0u 1
+    ret call str 1 utf8 "An assignment may not wait for its own ancestor."
+  0
+    next i
+  ret 0u
+
+fn bind_requirements 3 j uint a uint jid uint uint do 4 refset uint refid uint discard uint i int 4
+  set refset call key 2 a call str 1 utf8 "prerequisites"
+  set i 0
+  while lt i call size 1 refset 3
+    set refid call nth 2 refset i
+    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO prerequisites VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 jid refid call requirement_kind 2 j refid
+    next i
+  ret call query 2 call str 1 utf8 "UPDATE jobs SET state='waiting',reason='Awaiting assignment prerequisites' WHERE id=? AND EXISTS(SELECT 1 FROM current_prerequisites WHERE job=jobs.id AND satisfied=0)" call append 2 call arr 0 jid

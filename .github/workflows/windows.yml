@@ -1,0 +1,16 @@
+name: Windows checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install Rust components
+        shell: pwsh
+        run: rustup component add rustfmt clippy
+      - name: Check the application and runtime
+        shell: pwsh
+        run: ./Test-RelAI.ps1

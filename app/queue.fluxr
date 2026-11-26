@@ -10,7 +10,8 @@ pub hold 1 arg uint uint do 2 j uint discard uint 6
   set discard call audit 3 call key 2 j call str 1 utf8 "project" call str 1 utf8 "Job held" call put 3 arg call str 1 utf8 "request" call key 2 j call str 1 utf8 "request"
   ret 0u
 
-pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint count uint discard uint finalrow uint i int 21
+pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint count uint discard uint finalrow uint i int 24
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='queued',reason=NULL WHERE state='waiting' AND revision=(SELECT revision FROM requests r WHERE r.id=jobs.request AND r.state='open') AND NOT EXISTS(SELECT 1 FROM current_prerequisites c WHERE c.job=jobs.id AND c.satisfied=0)" call arr 0
   set files call query 2 call str 1 utf8 "SELECT path,content FROM files WHERE verified=0 LIMIT 32" call arr 0
   set i 0
   while lt i call size 1 files 4
@@ -29,7 +30,11 @@ pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint cou
   0
   set j call nth 2 call query 2 call str 1 utf8 "SELECT j.id,j.project,j.request,j.state,j.role,j.kind,j.seal AS \"sealed:json\" FROM jobs j JOIN requests r ON r.id=j.request AND r.revision=j.revision WHERE j.state IN ('queued','sealed') AND (r.state='open' OR (r.state='completed' AND j.role='workflow_improver')) AND NOT EXISTS(SELECT 1 FROM jobs b WHERE b.session=j.session AND b.state IN ('running','sealing')) AND NOT EXISTS(SELECT 1 FROM jobs b WHERE j.role='workflow_improver' AND b.project=j.project AND b.role=j.role AND b.state='running') ORDER BY j.role='workflow_improver',j.role!='discriminator',j.rowid LIMIT 1" call arr 0 0
   if call same 2 j 0u 1
-    ret 0u
+    ret call due_occurrence 0
+  0
+  if not call current_review 1 j 2
+    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded',reason='Branch state changed before review' WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id"
+    ret call review_ready 1 call key 2 j call str 1 utf8 "request"
   0
   if call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "tool" 1 ret call claim_tool 1 j 0
   set jid call key 2 j call str 1 utf8 "id"
@@ -46,6 +51,7 @@ pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint cou
     ret call hold 1 call shape 2 call str 1 utf8 "{\"job\":\"$0\",\"error\":\"Request call limit reached\"}" call append 2 call arr 0 jid
   0
   if not call seal_current 1 j 1 ret call hold 1 call shape 2 call str 1 utf8 "{\"job\":\"$0\",\"error\":\"Sealed input access changed. Replace this turn.\"}" call append 2 call arr 0 jid 0
+  set discard call verify_delivery 1 j
   set attempt call uid 0
   set discard call query 2 call str 1 utf8 "INSERT INTO attempts(id,job,state) VALUES(?,?,'sending')" call append 2 call append 2 call arr 0 attempt jid
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='running',attempt=? WHERE id=?" call append 2 call append 2 call arr 0 attempt jid

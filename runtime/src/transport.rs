@@ -64,17 +64,15 @@ pub async fn exchange(plan: &Value, config: &Value) -> Result<Value> {
                         if msg.get("method").is_some() && msg.get("id").is_some() {
                             bail!("Provider requested a tool or approval")
                         }
-                        if msg["method"] == "turn/completed" && filter["method"] == "item/completed"
+                        if let Some(stop) = step.get("until")
+                            && msg.pointer(text(&stop["pointer"])?) == Some(&stop["equals"])
                         {
-                            bail!(
-                                "Codex completed without an answer: {}",
-                                msg["params"]["turn"]["error"]["message"]
-                            )
+                            bail!("{}", text(&stop["error"])?);
                         }
-                        if let Some(method) = filter["method"].as_str() {
-                            if msg["method"] != method {
-                                continue;
-                            }
+                        if let Some(method) = filter["method"].as_str()
+                            && msg["method"] != method
+                        {
+                            continue;
                         }
                         let field = text(&filter["pointer"])?;
                         if msg.pointer(field) != Some(&filter["equals"]) {

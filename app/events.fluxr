@@ -1,0 +1,42 @@
+fluxr 1
+
+pub events 1 arg uint uint do 5 pid uint after uint out uint lastval uint discard uint 8
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set after call key 2 arg call str 1 utf8 "after"
+  if call same 2 after 0u 1
+    set after call integer 1 0
+  0
+  set discard call require 2 le 0 call number 1 after call str 1 utf8 "Invalid event cursor"
+  set out call query 2 call str 1 utf8 "SELECT cursor,kind,payload AS \"payload:json\" FROM events WHERE project=? AND cursor>? ORDER BY cursor LIMIT 100" call append 2 call append 2 call arr 0 pid after
+  set lastval after
+  if lt 0 call size 1 out 1
+    set lastval call key 2 call nth 2 out sub call size 1 out 1 call str 1 utf8 "cursor"
+  0
+  ret call shape 2 call str 1 utf8 "{\"events\":\"$0\",\"cursor\":\"$1\"}" call append 2 call append 2 call arr 0 out lastval
+
+pub job_details 1 arg uint uint do 3 pid uint row uint discard uint 4
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT id,role,kind,state,revision,reason,session,request,json_extract(seal,'$.preset') AS \"preset:json\",json_extract(seal,'$.selection') AS \"selection:json\",receipt AS \"receipt:json\" FROM jobs WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "id" 0
+  set discard call require 2 not call same 2 row 0u call str 1 utf8 "Unknown job"
+  ret call put 3 row call str 1 utf8 "next_preset" call preset 2 pid call key 2 row call str 1 utf8 "role"
+
+fn verify_doc 1 path uint uint do 2 row uint discard uint 4
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT content,digest FROM files WHERE path=?" call append 2 call arr 0 path 0
+  set discard call require 2 not call same 2 row 0u call str 1 utf8 "Required publication no longer available"
+  if not host file_valid bool 2 uint path uint call key 2 row call str 1 utf8 "digest" 1
+    set discard call publish 2 path call key 2 row call str 1 utf8 "content"
+  0
+  ret 0u
+
+fn verify_delivery 1 j uint uint do 4 root uint data uint sid uint discard uint 7
+  set root call cat 2 call str 1 utf8 "turns/" call key 2 j call str 1 utf8 "id"
+  set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/SYSTEM.txt"
+  set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/input.json"
+  set data call key 2 call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "selection" call str 1 utf8 "delivery"
+  set sid call key 2 data call str 1 utf8 "submission"
+  if not call same 2 sid 0u 3
+    set root call cat 2 call str 1 utf8 "submissions/" sid
+    set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/PROMPT.txt"
+    set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/attachments.json"
+  0
+  ret 0u

@@ -53,7 +53,7 @@ pub seal 1 arg uint uint do 21 j uint p uint rid uint role uint k uint presetval
   set frame call shape 2 call str 1 utf8 "{\"project_instructions\":\"$0\",\"working_root\":\"$1\",\"role\":\"$2\",\"session\":\"$3\",\"request\":\"$4\",\"revision\":\"$5\",\"delivery\":\"$6\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 instructions call key 2 j call str 1 utf8 "root" role call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" inputval
   set frame call put 3 frame call str 1 utf8 "prompt_bytes" call integer 1 call size 1 call key 2 inputval call str 1 utf8 "text"
   if not call same 2 call key 2 inputval call str 1 utf8 "text" 0u 1
-    set frame call put 3 frame call str 1 utf8 "parts" call annotate 2 p call key 2 inputval call str 1 utf8 "text"
+    set frame call put 3 frame call str 1 utf8 "parts" call annotate_selection 3 p call key 2 inputval call str 1 utf8 "text" call key 2 inputval call str 1 utf8 "markers"
   0
   if not call same 2 role call str 1 utf8 "discriminator" 1 set frame call put 3 frame call str 1 utf8 "skill_instructions" call selected_skills 2 p call key 2 inputval call str 1 utf8 "skills" 0
   set system call asset 1 call str 1 utf8 "SYSTEM.txt"

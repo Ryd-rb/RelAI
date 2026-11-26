@@ -2,7 +2,7 @@ fluxr 1
 
 fn walk 5 root uint pid uint sid uint dir uint depth int uint do 11 entries uint entry uint name uint path uint body uint info uint hashval uint kind uint countval uint discard uint i int 5
   set discard call require 2 le depth 32 call str 1 utf8 "Snapshot depth limit reached"
-  set entries call directory 2 root dir
+  set entries call fresh_read 3 root dir call str 1 utf8 "directory"
   set i 0
   while lt i call size 1 entries 4
     set entry call nth 2 entries i
@@ -15,7 +15,7 @@ fn walk 5 root uint pid uint sid uint dir uint depth int uint do 11 entries uint
     set kind call str 1 utf8 "file"
     set countval call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n,coalesce(sum(bytes),0) AS total FROM inventory WHERE snapshot=?" call append 2 call arr 0 sid 0
     set discard call require 2 and lt call number 1 call key 2 countval call str 1 utf8 "n" 2000 le add call number 1 call key 2 countval call str 1 utf8 "total" call number 1 call key 2 entry call str 1 utf8 "size" 8388608 call str 1 utf8 "Snapshot exceeds 2000 entries or 8 MiB"
-    set body call read64 2 root path
+    set body call fresh_read 3 root path call str 1 utf8 "base64"
     set info call baseinfo 1 body
     set hashval call key 2 info call str 1 utf8 "digest"
     set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO blobs VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 pid hashval body
@@ -28,11 +28,19 @@ fn walk 5 root uint pid uint sid uint dir uint depth int uint do 11 entries uint
     next i
   ret 0u
 
-pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint discard uint 8
+pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint discard uint 10
   set p call project 1 arg
   set pid call key 2 p call str 1 utf8 "id"
+  set nodes call observe 1 call key 2 p call str 1 utf8 "root"
   set sid call uid 0
   set discard call walk 5 call key 2 p call str 1 utf8 "root" pid sid call str 1 utf8 "" 0
+  if or call same 2 nodes 0u not call same 2 nodes call observe 1 call key 2 p call str 1 utf8 "root" 5
+    set nodes call uid 0
+    set discard call walk 5 call key 2 p call str 1 utf8 "root" pid nodes call str 1 utf8 "" 0
+    set discard call nth 2 call query 2 call str 1 utf8 "WITH changed AS (SELECT path,kind,digest,bytes FROM inventory WHERE snapshot=?1 EXCEPT SELECT path,kind,digest,bytes FROM inventory WHERE snapshot=?2), added AS (SELECT path,kind,digest,bytes FROM inventory WHERE snapshot=?2 EXCEPT SELECT path,kind,digest,bytes FROM inventory WHERE snapshot=?1) SELECT (SELECT count(*) FROM changed)+(SELECT count(*) FROM added) AS changes" call append 2 call append 2 call arr 0 sid nodes 0
+    set discard call require 2 call same 2 call key 2 discard call str 1 utf8 "changes" call integer 1 0 call str 1 utf8 "Snapshot source changed during reconciliation"
+    set discard call query 2 call str 1 utf8 "DELETE FROM inventory WHERE snapshot=?" call append 2 call arr 0 nodes
+  0
   set nodes call query 2 call str 1 utf8 "SELECT path,parent,kind,digest,bytes FROM inventory WHERE snapshot=? ORDER BY path" call append 2 call arr 0 sid
   set discard call query 2 call str 1 utf8 "INSERT INTO snapshots VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 sid pid nodes
   set discard call audit 3 pid call str 1 utf8 "Snapshot captured" call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\",\"entries\":\"$1\"}" call append 2 call append 2 call arr 0 sid call integer 1 call size 1 nodes

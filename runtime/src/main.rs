@@ -36,26 +36,47 @@ async fn command(
     if !access(&s, &h) {
         return Err((StatusCode::FORBIDDEN, "Invalid local session".into()));
     }
-    tokio::task::spawn_blocking(move || {
-        let mut app = s.app.lock().unwrap();
-        if !app.metadata()["public"]
-            .as_array()
-            .unwrap()
-            .contains(&json!(name))
-        {
-            return Err((StatusCode::NOT_FOUND, "Unknown action".into()));
-        }
-        app.invoke(&name, input)
-            .map(Json)
-            .map_err(|e| (StatusCode::BAD_REQUEST, format!("{e:#}")))
-    })
-    .await
-    .map_err(|_| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Worker unavailable".into(),
-        )
-    })?
+    #[cfg(windows)]
+    if name == "choose_folder" {
+        let folder = tokio::task::spawn_blocking(|| rfd::FileDialog::new().pick_folder())
+            .await
+            .map_err(|_| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Folder selection failed".into(),
+                )
+            })?;
+        return Ok(Json(json!({"path":folder})));
+    }
+    if !s.app.lock().unwrap().metadata()["public"]
+        .as_array()
+        .unwrap()
+        .contains(&json!(name))
+    {
+        return Err((StatusCode::NOT_FOUND, "Unknown action".into()));
+    }
+    invoke(s.app, &name, input)
+        .await
+        .map(Json)
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("{e:#}")))
+}
+async fn invoke(app: Arc<Mutex<App>>, name: &str, input: Value) -> Result<Value> {
+    let worker = app.clone();
+    let export = name.to_owned();
+    let v = tokio::task::spawn_blocking(move || worker.lock().unwrap().invoke(&export, input))
+        .await??;
+    if name != "tool_run" {
+        return Ok(v);
+    }
+    if let Some(plan) = v.get("$http") {
+        let result = fluxr_app_host::network::exchange(plan).await;
+        let receipt = match result {
+            Ok(result) => json!({"state":v["state"],"result":result}),
+            Err(e) => json!({"state":v["state"],"error":format!("{e:#}")}),
+        };
+        return app.lock().unwrap().invoke("guest_net_done", receipt);
+    }
+    Ok(v)
 }
 async fn asset(
     State(s): State<Server>,
@@ -93,19 +114,30 @@ async fn work(s: Server) {
                 tokio::spawn(async move {
                     let _slot = permit;
                     if let Some(export) = v["local"].as_str() {
+                        let outcome = invoke(
+                            app.clone(),
+                            export,
+                            v.get("arguments").unwrap_or(&v).clone(),
+                        )
+                        .await;
                         let mut app = app.lock().unwrap();
-                        let outcome = app.invoke(export, v.get("arguments").unwrap_or(&v).clone());
                         if let Some(then) = v["then"].as_str() {
                             let next = match outcome {
-                                Ok(result) => json!({"job":v["job"],"result":result}),
-                                Err(e) => json!({"job":v["job"],"error":format!("{e:#}")}),
+                                Ok(result) => {
+                                    json!({"job":v["job"],"state":v["state"],"result":result})
+                                }
+                                Err(e) => {
+                                    json!({"job":v["job"],"state":v["state"],"error":format!("{e:#}")})
+                                }
                             };
                             if let Err(e) = app.invoke(then, next) {
                                 eprintln!("Local completion: {e:#}")
                             }
                         } else if let Err(e) = outcome {
-                            let _ = app
-                                .invoke("hold", json!({"job":v["job"],"error":format!("{e:#}")}));
+                            let _ = app.invoke(
+                                "hold",
+                                json!({"job":v["job"],"state":v["state"],"error":format!("{e:#}")}),
+                            );
                         }
                         return;
                     }

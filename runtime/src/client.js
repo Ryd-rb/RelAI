@@ -22,6 +22,42 @@ async function execute(control,data){
  return result;
 }
 function show(value){return typeof value==='string'?value:JSON.stringify(value,null,2)}
+function termCompletion(input,label,project,config,draft){
+ const host=element('div');host.className='term-completion';
+ const description=element('div');description.setAttribute('aria-live','polite');
+ const choices=element('div');choices.setAttribute('role','group');choices.setAttribute('aria-label','Matching terms');
+ host.append(description,choices);label.append(host);
+ let sequence=0,timer,prior=input.value;
+ const length=s=>new TextEncoder().encode(s).length;
+ const changed=()=>{
+   const now=input.value;let begin=0,end=0;
+   while(begin<prior.length && begin<now.length && prior[begin]===now[begin])begin++;
+   while(end<prior.length-begin && end<now.length-begin && prior[prior.length-1-end]===now[now.length-1-end])end++;
+   const oldStop=prior.length-end,delta=now.length-prior.length;
+   draft.bindings=(draft.bindings||[]).flatMap(m=>m.end<=begin?[m]:m.start>=oldStop?[{...m,start:m.start+delta,end:m.end+delta}]:[]);
+   prior=now;refreshChoices();
+ };
+ const refreshChoices=()=>{
+   clearTimeout(timer);const id=++sequence;choices.replaceChildren();description.textContent='';
+   const stop=input.selectionStart;const prefix=input.value.slice(0,stop).match(/[\p{L}\p{N}_-]+$/u)?.[0];
+   if(!prefix||input.selectionEnd!==stop)return;
+   const start=stop-prefix.length;
+   timer=setTimeout(async()=>{try{
+     const list=await call(config.action,{project,prefix});if(id!==sequence||input.selectionStart!==stop)return;
+     description.textContent=list[0]?.description||'';
+     for(const hit of list){const button=element('button',hit.name+' · '+hit.kind+' · '+hit.dictionary_name);
+       button.type='button';button.dataset.kind=hit.kind;button.onfocus=button.onmouseenter=()=>{description.textContent=hit.description};
+       button.onclick=()=>{input.setRangeText(hit.name,start,stop,'end');changed();draft.values[input.name]=input.value;
+         const end=start+hit.name.length;draft.bindings=(draft.bindings||[]).filter(m=>m.end<=start||m.start>=end);
+         draft.bindings.push({start,end,ref:{id:hit.id,revision:hit.revision,dictionary_id:hit.dictionary_id}});
+         clearTimeout(timer);++sequence;choices.replaceChildren();description.textContent=hit.description;input.focus();};
+       choices.append(button)}
+   }catch(err){if(id===sequence)description.textContent=err.message}},120);
+ };
+ input.addEventListener('input',changed);
+ input.addEventListener('keydown',e=>{if(e.key==='ArrowDown'&&choices.firstChild){e.preventDefault();choices.firstChild.focus()}if(e.key==='Escape'){clearTimeout(timer);++sequence;choices.replaceChildren();description.textContent=''}});
+ return ()=>[...(draft.bindings||[])].sort((a,b)=>a.start-b.start).map(m=>({ref:m.ref,start:length(input.value.slice(0,m.start)),end:length(input.value.slice(0,m.end))}));
+}
 function render(spec,project){
  if(spec.type==='tree'){
  const container=element('section');container.append(element('h2',spec.label));
@@ -44,7 +80,7 @@ function render(spec,project){
  const form=element('form');const fields=new Map();
  const draftId=JSON.stringify([project,spec.op,spec.fixed]);let draft=drafts.get(draftId)||{values:{},files:[],key:crypto.randomUUID()};
  if(spec.draft){drafts.set(draftId,draft);form.className='composer'}
- let pending=0;const submit=element('button',spec.label);submit.type='submit';
+ let markerList;let pending=0;const submit=element('button',spec.label);submit.type='submit';
  for(const field of spec.fields){
  const label=element('label');label.append(element('span',field.label));let input;
  if(field.type==='select'||field.type==='multi'){input=element('select');input.multiple=field.type==='multi';for(const option of field.choices){const o=element('option',option.label??option);o.value=option.value??option;input.append(o)}}
@@ -60,12 +96,15 @@ function render(spec,project){
  }catch(e){item.status=e.message}finally{pending--;update()}}};
  input.onchange=()=>capture(Array.from(input.files));form.ondragover=e=>e.preventDefault();form.ondrop=e=>{e.preventDefault();capture(Array.from(e.dataTransfer.files))};label.append(input,list);update();
  }else{if(field.name in draft.values)input.value=draft.values[field.name];input.oninput=()=>{draft.values[field.name]=input.value};label.append(input)}
+ if(field.type==='folder'){const pick=element('button','Browse');pick.type='button';pick.onclick=async()=>{try{const choice=await call('choose_folder',{});if(choice.path){input.value=choice.path;draft.values[field.name]=choice.path}}catch(e){notice(e.message)}};label.append(pick)}
+ if(spec.completion?.field===field.name)markerList=termCompletion(input,label,project,spec.completion,draft);
  fields.set(field.name,[field,input]);form.append(label);
  }
  form.append(submit);const output=element('pre');form.append(output);
  form.onsubmit=async e=>{e.preventDefault();if(busy||pending)return;busy=true;submit.disabled=true;try{
  const data={project};if(spec.idempotent)data.key=draft.key;
  for(const [name,[field,input]] of fields)data[name]=field.type==='files'?draft.files.map(x=>x.id):field.type==='json'?JSON.parse(input.value||'{}'):field.type==='multi'?Array.from(input.selectedOptions,o=>o.value):input.value;
+ if(markerList)data[spec.completion.markers]=markerList();
  const result=await execute(spec,data);
  if(spec.draft){drafts.delete(draftId);state.reply=null;state.steer=null;form.reset()}
  if(spec.showResult){output.textContent=show(result)}else await refresh(true);
@@ -73,6 +112,9 @@ function render(spec,project){
  }
  const node=element(spec.type==='nav'?'nav':spec.type==='card'?'article':'section');node.className=spec.type;
  if(spec.type==='nav')node.setAttribute('aria-label',spec.label);
+ if(spec.dockable){const applyDock=()=>{root.dataset.dock=sessionStorage.getItem('dock')||'top'};applyDock();node.dataset.dockable='true';
+ const dock=element('button',root.dataset.dock==='left'?'Move tabs to top':'Move tabs to left');
+ dock.onclick=()=>{sessionStorage.setItem('dock',root.dataset.dock==='left'?'top':'left');applyDock();dock.textContent=root.dataset.dock==='left'?'Move tabs to top':'Move tabs to left'};node.append(dock);}
  else if(spec.label)node.append(element(spec.type==='card'?'h3':'h2',spec.label));
  if(spec.text)node.append(element('p',spec.text));
  if(spec.details){const d=element('details');d.append(element('summary','Details'),element('pre',show(spec.details)));node.append(d)}

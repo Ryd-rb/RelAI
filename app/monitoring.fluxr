@@ -1,0 +1,17 @@
+fluxr 1
+
+fn monitor 3 pid uint toolname uint args uint uint do 5 row uint idval uint discard uint period uint found uint 6
+  set idval call key 2 args call str 1 utf8 "id"
+  if call same 2 toolname call str 1 utf8 "monitor.start" 5
+    set period call key 2 args call str 1 utf8 "period"
+    set discard call require 2 le 1 call number 1 period call str 1 utf8 "A monitor requires a positive interval in seconds"
+    set row call schedule 1 call put 3 call put 3 args call str 1 utf8 "project" pid call str 1 utf8 "op" call str 1 utf8 "create"
+    set discard call query 2 call str 1 utf8 "INSERT INTO monitors(id,project) VALUES(?,?)" call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "id" pid
+    ret row
+  0
+  set found call nth 2 call query 2 call str 1 utf8 "SELECT m.id,m.updated,m.latest AS \"latest:json\",s.state,s.revision,s.due,s.period FROM monitors m JOIN schedules s ON s.id=m.id WHERE m.project=? AND m.id=?" call append 2 call append 2 call arr 0 pid idval 0
+  set discard call require 2 not call same 2 found 0u call str 1 utf8 "Unknown project monitor"
+  if call same 2 toolname call str 1 utf8 "monitor.stop" 1
+    ret call schedule 1 call put 3 call put 3 args call str 1 utf8 "project" pid call str 1 utf8 "op" call str 1 utf8 "cancel"
+  0
+  ret found

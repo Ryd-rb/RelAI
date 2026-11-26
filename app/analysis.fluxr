@@ -1,0 +1,92 @@
+fluxr 1
+
+fn code_nav 3 pid uint toolname uint args uint uint do 12 root uint source uint lang uint tree uint listval uint out uint elementval uint symbol uint path uint digestval uint discard uint i int 15
+  set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
+  set path call key 2 args call str 1 utf8 "path"
+  set lang call key 2 args call str 1 utf8 "language"
+  set source call readtext 2 root path
+  set tree call syntax 2 lang source
+  set digestval call key 2 tree call str 1 utf8 "source_digest"
+  if call same 2 toolname call str 1 utf8 "code.diagnostics" 1
+    ret call shape 2 call str 1 utf8 "{\"path\":\"$0\",\"digest\":\"$1\",\"diagnostics\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 path digestval call key 2 tree call str 1 utf8 "diagnostics"
+  0
+  if call same 2 toolname call str 1 utf8 "code.symbols" 1
+    ret call shape 2 call str 1 utf8 "{\"path\":\"$0\",\"digest\":\"$1\",\"symbols\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 path digestval call key 2 tree call str 1 utf8 "symbols"
+  0
+  set listval call key 2 tree call str 1 utf8 "symbols"
+  if call same 2 toolname call str 1 utf8 "code.references" 1
+    set listval call key 2 tree call str 1 utf8 "references"
+  0
+  set out call arr 0
+  set symbol call key 2 args call str 1 utf8 "symbol"
+  set i 0
+  while lt i call size 1 listval 3
+    set elementval call nth 2 listval i
+    if call same 2 call key 2 elementval call str 1 utf8 "name" symbol 1
+    set out call append 2 out elementval
+  0
+    next i
+  ret call shape 2 call str 1 utf8 "{\"path\":\"$0\",\"source_digest\":\"$1\",\"candidates\":\"$2\",\"resolution\":\"single_source_syntax\"}" call append 2 call append 2 call append 2 call arr 0 path digestval out
+
+fn git_diff 2 pid uint args uint uint do 6 root uint before uint after uint oid uint snap uint discard uint 4
+  set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
+  set before call key 2 call extra_run 3 pid call str 1 utf8 "git.snapshot" call shape 2 call str 1 utf8 "{\"object\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "old" call str 1 utf8 "snapshot"
+  set after call key 2 call extra_run 3 pid call str 1 utf8 "git.snapshot" call shape 2 call str 1 utf8 "{\"object\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "new" call str 1 utf8 "snapshot"
+  ret call extra_run 3 pid call str 1 utf8 "snapshot.diff" call shape 2 call str 1 utf8 "{\"before\":\"$0\",\"after\":\"$1\"}" call append 2 call append 2 call arr 0 before after
+
+fn semantic_find 2 pid uint args uint uint do 4 snapshot uint terms uint querytext uint discard uint 6
+  set snapshot call key 2 args call str 1 utf8 "snapshot"
+  set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid snapshot 0 0u call str 1 utf8 "Unknown snapshot"
+  set querytext call key 2 args call str 1 utf8 "query"
+  set discard call require 2 and lt 0 call size 1 querytext le call size 1 querytext 256 call str 1 utf8 "Invalid search query"
+  set terms call matches 2 querytext call vocab 1 pid
+  ret call shape 2 call str 1 utf8 "{\"concepts\":\"$0\",\"paths\":\"$1\"}" call append 2 call append 2 call arr 0 terms call query 2 call str 1 utf8 "WITH names(name) AS (SELECT json_extract(value,'$.ref.name') FROM json_each(?1) UNION SELECT ?2) SELECT path,digest,count(*) AS rank FROM inventory JOIN names ON instr(lower(path),lower(name))>0 WHERE snapshot=?3 GROUP BY path,digest ORDER BY rank DESC,path LIMIT 64" call append 2 call append 2 call append 2 call arr 0 terms querytext snapshot
+
+fn data_query 2 pid uint args uint uint do 2 idval uint discard uint 4
+  set idval call key 2 args call str 1 utf8 "template"
+  if call same 2 idval call str 1 utf8 "recent_events" 1
+    ret call query 2 call str 1 utf8 "SELECT cursor,kind,payload AS \"payload:json\" FROM events WHERE project=? AND cursor>? ORDER BY cursor LIMIT 100" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "after"
+  0
+  if call same 2 idval call str 1 utf8 "request_jobs" 1
+    ret call query 2 call str 1 utf8 "SELECT id,role,kind,state FROM jobs WHERE project=? AND request=? ORDER BY rowid LIMIT 100" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request"
+  0
+  ret call require 2 false call str 1 utf8 "Unknown parameterized query template"
+
+fn extended_run 3 pid uint toolname uint args uint uint do 0  13
+  if or call same 2 toolname call str 1 utf8 "monitor.start" or call same 2 toolname call str 1 utf8 "monitor.stop" call same 2 toolname call str 1 utf8 "monitor.status" 1
+    ret call monitor 3 pid toolname args
+  0
+  if call same 2 toolname call str 1 utf8 "fs.find" 1
+    ret call find_files 2 pid args
+  0
+  if call same 2 toolname call str 1 utf8 "fs.stat" 1
+    ret call file_selection 3 pid toolname args
+  0
+  if call same 2 toolname call str 1 utf8 "tool.find" 1
+    ret call find_tools 2 pid args
+  0
+  if or call same 2 toolname call str 1 utf8 "code.symbols" or call same 2 toolname call str 1 utf8 "code.definition" or call same 2 toolname call str 1 utf8 "code.references" call same 2 toolname call str 1 utf8 "code.diagnostics" 1
+    ret call code_nav 3 pid toolname args
+  0
+  if call same 2 toolname call str 1 utf8 "git.diff" 1
+    ret call git_diff 2 pid args
+  0
+  if call same 2 toolname call str 1 utf8 "project.semantic_find" 1
+    ret call semantic_find 2 pid args
+  0
+  if call same 2 toolname call str 1 utf8 "data.read_query" 1
+    ret call data_query 2 pid args
+  0
+  if call same 2 toolname call str 1 utf8 "schedule.create" 1
+    ret call schedule 1 call put 3 call put 3 args call str 1 utf8 "project" pid call str 1 utf8 "op" call str 1 utf8 "create"
+  0
+  if call same 2 toolname call str 1 utf8 "schedule.cancel" 1
+    ret call schedule 1 call put 3 call put 3 args call str 1 utf8 "project" pid call str 1 utf8 "op" call str 1 utf8 "cancel"
+  0
+  if call same 2 toolname call str 1 utf8 "resource.find" 1
+    ret call connector 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"op\":\"list\"}" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "repo.pr_propose" 1
+    ret call capture 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"mime\":\"application/json\",\"name\":\"proposal.json\",\"base64\":\"$1\"}" call append 2 call append 2 call arr 0 pid call b64 1 call encode 1 args
+  0
+  ret call require 2 false call str 1 utf8 "Unknown service"

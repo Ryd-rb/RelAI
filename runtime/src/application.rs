@@ -74,10 +74,10 @@ pub fn link(bundle: &Path, config: &Value) -> Result<BTreeMap<String, Module>> {
 fn dependencies(node: &Value, out: &mut BTreeSet<String>) {
     match node {
         Value::Object(obj) => {
-            if obj.get("op").is_some_and(|v| v == "call") {
-                if let Some(name) = obj["name"].as_str() {
-                    out.insert(name.into());
-                }
+            if obj.get("op").is_some_and(|v| v == "call")
+                && let Some(name) = obj["name"].as_str()
+            {
+                out.insert(name.into());
             }
             for value in obj.values() {
                 dependencies(value, out)

@@ -1,9 +1,14 @@
 //! Generic application bindings for the portable FluxR interpreter.
 mod application;
+mod file_effect;
 mod formats;
 mod git;
+pub mod network;
 mod resources;
+mod selection;
+mod syntax;
 pub mod transport;
+mod watch;
 use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use fluxr::structured::{
@@ -28,12 +33,59 @@ fn hex(b: &[u8]) -> String {
 }
 pub fn read(path: &Path) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
-    let file = fs::File::open(path).with_context(|| path.display().to_string())?;
+    let mut file = fs::File::open(path).with_context(|| path.display().to_string())?;
     ensure!(file.metadata()?.is_file(), "Expected regular file");
-    file.take(LIMIT as u64 + 1).read_to_end(&mut bytes)?;
+    let identifier = same_file::Handle::from_file(file.try_clone()?)?;
+    check_file_handle(&file, path)?;
+    let before = file.metadata()?;
+    (&mut file).take(LIMIT as u64 + 1).read_to_end(&mut bytes)?;
     ensure!(bytes.len() <= LIMIT, "File exceeds limit");
+    let after = file.metadata()?;
+    ensure!(
+        before.modified()? == after.modified()?
+            && after.len() == bytes.len() as u64
+            && identifier == same_file::Handle::from_path(path)?,
+        "File changed while reading"
+    );
     Ok(bytes)
 }
+#[cfg(windows)]
+fn check_file_handle(file: &fs::File, path: &Path) -> Result<()> {
+    use std::os::windows::{ffi::OsStringExt, io::AsRawHandle};
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle, GetFinalPathNameByHandleW,
+    };
+    let handle = file.as_raw_handle().cast();
+    let mut info = std::mem::MaybeUninit::<BY_HANDLE_FILE_INFORMATION>::uninit();
+    // The kernel fills this POD on success. The File owns the handle throughout.
+    ensure!(
+        unsafe { GetFileInformationByHandle(handle, info.as_mut_ptr()) } != 0,
+        "File identity unavailable"
+    );
+    ensure!(
+        unsafe { info.assume_init() }.nNumberOfLinks == 1,
+        "Unexpected hard-linked file"
+    );
+    let mut buffer = vec![0u16; 32768];
+    let n =
+        unsafe { GetFinalPathNameByHandleW(handle, buffer.as_mut_ptr(), buffer.len() as u32, 0) }
+            as usize;
+    ensure!(n > 0 && n < buffer.len(), "Final file path unavailable");
+    let actual = PathBuf::from(std::ffi::OsString::from_wide(&buffer[..n]));
+    ensure!(
+        actual == path.canonicalize()?,
+        "File path changed while opening"
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+fn check_file_handle(file: &fs::File, _: &Path) -> Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    ensure!(file.metadata()?.nlink() == 1, "Unexpected hard-linked file");
+    Ok(())
+}
+
 pub fn text(v: &Value) -> Result<&str> {
     v.as_str().context("Expected text")
 }
@@ -188,6 +240,7 @@ pub struct App {
     db: Connection,
     pub data: PathBuf,
     pub bundle: PathBuf,
+    live: Mutex<watch::LiveSources>,
     _lock: fs::File,
 }
 impl App {
@@ -219,9 +272,33 @@ impl App {
             db,
             bundle,
             data,
+            live: Default::default(),
             _lock: lock,
         };
         app.invoke("init", Value::Null)?;
+        for hook in app.config["startup_recovery"]
+            .as_array()
+            .cloned()
+            .unwrap_or_default()
+        {
+            let mut cursor = Value::Null;
+            loop {
+                let page = app.invoke(text(&hook["page"])?, cursor.clone())?;
+                let items = page.as_array().context("Invalid startup recovery page")?;
+                if items.is_empty() {
+                    break;
+                }
+                for item in items {
+                    let id = text(&item["cursor"])?;
+                    ensure!(
+                        cursor.as_str().is_none_or(|previous| previous < id),
+                        "Recovery cursor did not advance"
+                    );
+                    app.invoke(text(&hook["apply"])?, item.clone())?;
+                    cursor = json!(id);
+                }
+            }
+        }
         Ok(app)
     }
     pub fn metadata(&self) -> &Value {
@@ -229,16 +306,41 @@ impl App {
     }
     pub fn invoke(&mut self, name: &str, input: Value) -> Result<Value> {
         let mut value = self.enter(name, input)?;
+        let mut origin = name.to_owned();
         for _ in 0..16 {
-            let Some(request) = value.get("$evaluate") else {
+            if let Some(call) = value.get("$call") {
+                let target = text(call)?;
+                ensure!(
+                    self.config["continuations"][&origin]["$call"]
+                        .as_array()
+                        .is_some_and(|allowed| allowed.contains(call)),
+                    "Invalid application call"
+                );
+                origin = target.to_owned();
+                value = self.enter(target, value["input"].clone())?;
+                continue;
+            }
+            let kind = if value.get("$filesystem").is_some() {
+                "$filesystem"
+            } else if value.get("$evaluate").is_some() {
+                "$evaluate"
+            } else {
                 return Ok(value);
             };
-            let result = evaluate(request);
             let next = text(&value["resume"])?.to_owned();
+            let allowed = &self.config["continuations"][&origin][kind];
             ensure!(
-                next.starts_with("guest_") && self.modules.contains_key(&next),
-                "Unknown continuation"
+                allowed
+                    .as_array()
+                    .is_some_and(|set| set.contains(&json!(next)))
+                    && self.modules.contains_key(&next),
+                "Invalid continuation for {origin}"
             );
+            let result = match kind {
+                "$filesystem" => file_effect::execute(&value[kind], &self.data),
+                _ => evaluate(&value[kind]),
+            };
+            origin.clone_from(&next);
             let reply = match result {
                 Ok(v) => json!({"state":value["state"],"result":v,"error":null}),
                 Err(e) => json!({"state":value["state"],"result":null,"error":format!("{e:#}")}),
@@ -256,6 +358,7 @@ impl App {
         self.db.execute_batch("BEGIN IMMEDIATE")?;
         let executed = (|| -> Result<Value> {
             let host = Bindings {
+                live: &self.live,
                 arena: Mutex::new(arena),
                 db: Mutex::new(&mut self.db),
                 data: &self.data,
@@ -321,6 +424,7 @@ impl Arena {
     }
 }
 struct Bindings<'a> {
+    live: &'a Mutex<watch::LiveSources>,
     arena: Mutex<Arena>,
     db: Mutex<&'a mut Connection>,
     data: &'a Path,
@@ -353,6 +457,12 @@ impl Bindings<'_> {
                     b.iter().map(|v| Vm::U64(*v as u64)).collect(),
                 )));
             }
+            "source_path" => {
+                selection::source(text(get(0)?)?, text(get(1)?)?, get(2)? == true, self.data)?
+            }
+            "byte_range" => selection::range(text(get(0)?)?, get(1)?)?,
+            "effect_inspect" => file_effect::inspect(get(0)?, self.data)?,
+            "patch_transform" => file_effect::patch(get(0)?)?,
             "decode_format" => formats::decode(text(get(0)?)?, &STANDARD.decode(text(get(1)?)?)?)?,
             "encode_format" => {
                 let format = text(get(0)?)?;
@@ -571,6 +681,20 @@ impl Bindings<'_> {
                 self.db.lock().unwrap().execute_batch(text(get(0)?)?)?;
                 Value::Null
             }
+            "observe" => self
+                .live
+                .lock()
+                .unwrap()
+                .observe(Path::new(text(get(0)?)?))?,
+            "cache_get" => self.live.lock().unwrap().get(text(get(0)?)?),
+            "cache_put" => {
+                self.live
+                    .lock()
+                    .unwrap()
+                    .put(text(get(0)?)?.into(), get(1)?.clone())?;
+                Value::Null
+            }
+            "syntax" => syntax::index(text(get(0)?)?, text(get(1)?)?)?,
             "canonical" => {
                 let p = Path::new(text(get(0)?)?).canonicalize()?;
                 ensure!(
@@ -660,6 +784,13 @@ impl Bindings<'_> {
                     }
                 }
                 json!(items)
+            }
+            "file_valid" => {
+                let p = join(self.data, text(get(0)?)?)?;
+                return Ok(Vm::Bool(match read(&p) {
+                    Ok(b) => hex(&b) == text(get(1)?)?,
+                    Err(_) => false,
+                }));
             }
             "publish" => {
                 let p = join(self.data, text(get(0)?)?)?;

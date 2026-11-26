@@ -4,8 +4,10 @@ fn schedule_tool 3 j uint aid uint a uint uint do 6 kind uint op uint args uint 
   set kind call key 2 a call str 1 utf8 "type"
   set p call key 2 j call str 1 utf8 "project"
   set op call str 1 utf8 "tool_run"
-  if call same 2 kind call str 1 utf8 "RUN_TOOL" 1
+  if call same 2 kind call str 1 utf8 "RUN_TOOL" 3
     set args call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"tool\":\"$1\",\"arguments\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 p call key 2 a call str 1 utf8 "tool" call decode 1 call key 2 a call str 1 utf8 "arguments_json"
+    set discard call allowed_tool 3 j call key 2 a call str 1 utf8 "tool" call key 2 args call str 1 utf8 "arguments"
+    if not call same 2 discard 0u 1 ret discard 0
   1
     if call same 2 kind call str 1 utf8 "PROPOSE_TOOL" 3
     set op call str 1 utf8 "tool_propose"

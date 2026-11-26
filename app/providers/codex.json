@@ -113,7 +113,12 @@
         "equals": "agentMessage",
         "method": "item/completed"
       },
-      "save": "message"
+      "save": "message",
+      "until": {
+        "pointer": "/method",
+        "equals": "turn/completed",
+        "error": "Codex completed the turn without an answer"
+      }
     },
     {
       "wait": {

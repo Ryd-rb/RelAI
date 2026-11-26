@@ -1,0 +1,63 @@
+fluxr 1
+
+fn file_selection 3 pid uint toolname uint args uint uint do 10 snapshot uint p uint root uint path uint value uint encoded uint meta uint discard uint absolute uint out uint 10
+  set snapshot call key 2 args call str 1 utf8 "snapshot"
+  set path call key 2 args call str 1 utf8 "path"
+  set absolute call key 2 args call str 1 utf8 "host_path"
+  set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
+  if not call same 2 snapshot 0u 5
+    set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 snapshot pid 0 0u call str 1 utf8 "Snapshot unavailable for this project"
+    set discard call require 2 call same 2 absolute 0u call str 1 utf8 "Choose a single source"
+    set meta call nth 2 call query 2 call str 1 utf8 "SELECT i.path,i.kind,i.bytes AS size,i.digest,b.content AS base64 FROM inventory i LEFT JOIN blobs b ON b.project=? AND b.digest=i.digest WHERE i.snapshot=? AND i.path=?" call append 2 call append 2 call append 2 call arr 0 pid snapshot path 0
+    set discard call require 2 not call same 2 meta 0u call str 1 utf8 "Unknown snapshot path"
+    set encoded call key 2 meta call str 1 utf8 "base64"
+  1
+    if not call same 2 absolute 0u 2
+    set meta call scoped_path 3 root absolute call decode 1 call str 1 utf8 "true"
+    set encoded call key 2 meta call str 1 utf8 "base64"
+  1
+    if call same 2 toolname call str 1 utf8 "fs.stat" 2
+    set meta call scoped_path 3 root path call decode 1 call str 1 utf8 "false"
+    set encoded call key 2 meta call str 1 utf8 "base64"
+  2
+    set encoded call read64 2 root path
+    set meta call baseinfo 1 encoded
+  if call same 2 toolname call str 1 utf8 "fs.stat" 1
+    ret call shape 2 call str 1 utf8 "{\"path\":\"$0\",\"host_path\":\"$1\",\"snapshot\":\"$2\",\"kind\":\"$3\",\"size\":\"$4\",\"digest\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 path absolute snapshot call key 2 meta call str 1 utf8 "kind" call key 2 meta call str 1 utf8 "size" call key 2 meta call str 1 utf8 "digest"
+  0
+  set discard call require 2 not call same 2 encoded 0u call str 1 utf8 "A regular file is required"
+  if call same 2 toolname call str 1 utf8 "fs.digest" 1
+    ret call shape 2 call str 1 utf8 "{\"algorithm\":\"sha256\",\"digest\":\"$0\"}" call append 2 call arr 0 call key 2 meta call str 1 utf8 "digest"
+  0
+  set out call file_range 2 encoded call key 2 args call str 1 utf8 "range"
+  ret call put 3 out call str 1 utf8 "snapshot" snapshot
+
+fn find_files 2 pid uint args uint uint do 7 sid uint pattern uint cursor uint limitval uint rowsval uint lastval uint discard uint 13
+  set sid call key 2 args call str 1 utf8 "snapshot"
+  set cursor call key 2 args call str 1 utf8 "cursor"
+  if call same 2 sid 0u 2
+    set discard call require 2 call same 2 cursor 0u call str 1 utf8 "A continuation requires its original snapshot"
+    set sid call key 2 call capture_graph 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid call str 1 utf8 "snapshot"
+  0
+  set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 sid pid 0 0u call str 1 utf8 "Snapshot unavailable for this project"
+  set pattern call key 2 args call str 1 utf8 "pattern"
+  set discard call require 2 and lt 0 call size 1 pattern le call size 1 pattern 256 call str 1 utf8 "Expected a bounded glob pattern"
+  set limitval call key 2 args call str 1 utf8 "limit"
+  if call same 2 limitval 0u 1
+    set limitval call integer 1 100
+  0
+  set discard call require 2 and lt 0 call number 1 limitval le call number 1 limitval 256 call str 1 utf8 "Limit must be between 1 and 256"
+  set rowsval call query 2 call str 1 utf8 "SELECT path,kind,bytes,digest FROM inventory WHERE snapshot=? AND path GLOB ? AND path>COALESCE(?,'') ORDER BY path LIMIT ?" call append 2 call append 2 call append 2 call append 2 call arr 0 sid pattern cursor limitval
+  set lastval 0u
+  if and lt 0 call size 1 rowsval eq call size 1 rowsval call number 1 limitval 2
+    set lastval call key 2 call nth 2 rowsval sub call size 1 rowsval 1 call str 1 utf8 "path"
+    if call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT path FROM inventory WHERE snapshot=? AND path GLOB ? AND path>? LIMIT 1" call append 2 call append 2 call append 2 call arr 0 sid pattern lastval 0 0u 1
+    set lastval 0u
+  0
+  0
+  ret call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\",\"entries\":\"$1\",\"cursor\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid rowsval lastval
+
+fn find_tools 2 pid uint args uint uint do 2 listval uint querytext uint 3
+  set listval call tool_catalog 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid
+  set querytext call key 2 args call str 1 utf8 "query"
+  ret call query 2 call str 1 utf8 "WITH items(item) AS (SELECT value FROM json_each(?1,'$.builtins') UNION ALL SELECT value FROM json_each(?1,'$.versions')) SELECT json(item) AS \"entry:json\" FROM items WHERE instr(lower(item),lower(coalesce(?2,'')))>0 LIMIT 128" call append 2 call append 2 call arr 0 listval querytext

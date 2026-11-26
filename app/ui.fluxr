@@ -19,10 +19,10 @@ pub dashboard 1 arg uint uint do 21 projects uint p uint pid uint components uin
     set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"$0\",\"navigate\":{\"project\":\"$1\",\"view\":\"relay\",\"reply\":null,\"steer\":null}}" call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "root" call key 2 row call str 1 utf8 "id"
     next i
   set tabs call append 2 tabs call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Open project\",\"navigate\":{\"view\":\"open\"}}" call arr 0
-  set components call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"nav\",\"label\":\"Projects\",\"items\":\"$0\"}" call append 2 call arr 0 tabs
+  set components call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"nav\",\"label\":\"Projects\",\"dockable\":true,\"items\":\"$0\"}" call append 2 call arr 0 tabs
   set viewname call key 2 arg call str 1 utf8 "view"
   if or call same 2 pid 0u call same 2 viewname call str 1 utf8 "open" 2
-    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Open project\",\"op\":\"open_project\",\"fields\":[{\"name\":\"root\",\"label\":\"Existing project folder\",\"type\":\"text\",\"required\":true}],\"fixed\":{},\"selectResult\":{\"project\":\"id\"}}" call arr 0
+    set components call append 2 components call shape 2 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Open project\",\"op\":\"open_project\",\"fields\":[{\"name\":\"root\",\"label\":\"Existing project folder\",\"type\":\"folder\",\"required\":true}],\"fixed\":{},\"selectResult\":{\"project\":\"id\"}}" call arr 0
     ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"Project relay\",\"components\":\"$0\"}" call append 2 call arr 0 components
   0
   set p call project 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid

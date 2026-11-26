@@ -1,10 +1,12 @@
 fluxr 1
 
-fn review_refs 2 revinput uint envelopeval uint uint do 8 known uint branches uint b uint achieved uint remaining uint decision uint discard uint i int 9
+fn review_refs 2 revinput uint envelopeval uint uint do 8 known uint branches uint b uint achieved uint remaining uint decision uint discard uint i int 11
+  set discard call valid_review_decision 2 revinput envelopeval
   set branches call key 2 revinput call str 1 utf8 "branches"
   set achieved call key 2 envelopeval call str 1 utf8 "achieved"
   set remaining call key 2 envelopeval call str 1 utf8 "remaining"
-  set known call arr 0
+  set discard call require 2 call same 2 call key 2 revinput call str 1 utf8 "branches" call query 2 call str 1 utf8 "SELECT b.id AS criterion_id,b.role,b.report,b.accepted AS \"acceptance:json\",b.task AS \"task:json\",b.result AS \"result:json\",b.questions AS \"questions:json\",b.waits AS \"waits:json\",b.holds AS \"holds:json\" FROM branch_outcomes b WHERE b.fan=? ORDER BY b.id" call append 2 call arr 0 call key 2 revinput call str 1 utf8 "fan" call str 1 utf8 "Branch outcomes changed before review admission"
+  set known call review_conditions 2 revinput envelopeval
   set i 0
   while lt i call size 1 branches 5
     set b call nth 2 branches i
@@ -18,3 +20,59 @@ fn review_refs 2 revinput uint envelopeval uint uint do 8 known uint branches ui
   set discard call require 2 call subset 2 achieved known call str 1 utf8 "Unknown achieved reference"
   set discard call require 2 call subset 2 remaining known call str 1 utf8 "Unknown remaining reference"
   ret 0u
+
+fn add_refs 2 out uint items uint uint do 1 idx int 3
+  set idx 0
+  while lt idx call size 1 items 2
+    set out call append 2 out call nth 2 items idx
+    next idx
+  ret out
+
+fn review_conditions 2 body uint envelopeval uint uint do 7 known uint rowsval uint b uint waits uint dec uint typeval uint i int 6
+  set dec call key 2 envelopeval call str 1 utf8 "decision"
+  set rowsval call key 2 body call str 1 utf8 "branches"
+  set known call arr 0
+  set i 0
+  while lt i call size 1 rowsval 4
+    set b call nth 2 rowsval i
+    set known call add_refs 2 known call key 2 b call str 1 utf8 "questions"
+    set known call add_refs 2 known call key 2 b call str 1 utf8 "waits"
+    next i
+  ret known
+
+fn valid_review_decision 2 body uint answer uint uint do 8 dec uint actions uint remaining uint waits uint kind uint total int i int discard uint 12
+  set dec call key 2 answer call str 1 utf8 "decision"
+  set actions call key 2 answer call str 1 utf8 "actions"
+  set remaining call key 2 answer call str 1 utf8 "remaining"
+  set waits call review_conditions 2 body answer
+  set i 0
+  set total 0
+  while lt i call size 1 actions 4
+    set kind call key 2 call nth 2 actions i call str 1 utf8 "type"
+    if call same 2 kind call str 1 utf8 "TASK" 1
+    next total
+  0
+    if call same 2 dec call str 1 utf8 "wait" 1
+    set discard call require 2 call same 2 kind call str 1 utf8 "ASK" call str 1 utf8 "A wait may ask for a missing answer"
+  0
+    next i
+  if call same 2 dec call str 1 utf8 "continue" 1
+    set discard call require 2 lt 0 total call str 1 utf8 "A continuation requires a new assignment"
+  0
+  if call same 2 dec call str 1 utf8 "wait" 1
+    set discard call require 2 or lt 0 call size 1 actions and lt 0 call size 1 remaining call subset 2 remaining waits call str 1 utf8 "A wait needs an open condition"
+  0
+  if call same 2 dec call str 1 utf8 "settle" 1
+    set discard call require 2 eq 0 call size 1 actions call str 1 utf8 "A settled review cannot dispatch work"
+  0
+  if call same 2 dec call str 1 utf8 "finish" 1
+    set discard call require 2 and call same 2 call key 2 body call str 1 utf8 "parent" 0u eq 0 call size 1 remaining call str 1 utf8 "Finish requires a first-level review with no remaining work"
+  0
+  ret 0u
+
+fn current_review 1 j uint bool do 1 body uint 3
+  if not call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" 1
+    ret true
+  0
+  set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT input AS \"body:json\" FROM jobs WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id" 0 call str 1 utf8 "body"
+  ret and call same 2 call key 2 body call str 1 utf8 "branches" call query 2 call str 1 utf8 "SELECT b.id AS criterion_id,b.role,b.report,b.accepted AS \"acceptance:json\",b.task AS \"task:json\",b.result AS \"result:json\",b.questions AS \"questions:json\",b.waits AS \"waits:json\",b.holds AS \"holds:json\" FROM branch_outcomes b WHERE b.fan=? ORDER BY b.id" call append 2 call arr 0 call key 2 body call str 1 utf8 "fan" call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 FROM branch_outcomes WHERE fan=? AND busy=1 LIMIT 1" call append 2 call arr 0 call key 2 body call str 1 utf8 "fan" 0 0u

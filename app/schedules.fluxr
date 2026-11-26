@@ -1,0 +1,68 @@
+fluxr 1
+
+pub schedule 1 arg uint uint do 10 pid uint op uint sid uint rev uint period uint due uint action uint toolname uint discard uint now uint 17
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set op call key 2 arg call str 1 utf8 "op"
+  if call same 2 op call str 1 utf8 "list" 1
+    ret call query 2 call str 1 utf8 "SELECT * FROM schedules WHERE project=? ORDER BY due" call append 2 call arr 0 pid
+  0
+  set sid call key 2 arg call str 1 utf8 "id"
+  if call same 2 op call str 1 utf8 "cancel" 3
+    set discard call query 2 call str 1 utf8 "UPDATE schedules SET state='cancelled',revision=revision+1 WHERE id=? AND project=? AND revision=? AND state='active'" call append 2 call append 2 call append 2 call arr 0 sid pid call key 2 arg call str 1 utf8 "revision"
+    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Schedule changed before cancellation"
+    ret call audit 3 pid call str 1 utf8 "Schedule cancelled" call shape 2 call str 1 utf8 "{\"schedule\":\"$0\"}" call append 2 call arr 0 sid
+  0
+  set discard call require 2 call same 2 op call str 1 utf8 "create" call str 1 utf8 "Unknown schedule operation"
+  set due call key 2 arg call str 1 utf8 "due"
+  set period call key 2 arg call str 1 utf8 "period"
+  set discard call require 2 and le 0 call number 1 due le 0 call number 1 period call str 1 utf8 "Invalid planned instant or interval"
+  set discard call require 2 or eq 0 call number 1 period le 1 call number 1 period call str 1 utf8 "Invalid interval"
+  set action call key 2 arg call str 1 utf8 "action"
+  set toolname call key 2 action call str 1 utf8 "tool"
+  set discard call require 2 call has_ref 2 call resource 1 call str 1 utf8 "schedule-tools.json" toolname call str 1 utf8 "Schedule requires a repeatable project read"
+  set sid call uid 0
+  set discard call query 2 call str 1 utf8 "INSERT INTO schedules VALUES(?,?,1,?,?,?,'active')" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid due period action
+  set discard call audit 3 pid call str 1 utf8 "Schedule created" call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"due\":\"$1\",\"period\":\"$2\",\"timezone\":\"UTC\",\"action\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 sid due period action
+  ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"revision\":1}" call append 2 call arr 0 sid
+
+fn due_occurrence 0  uint do 5 row uint idval uint atval uint rev uint discard uint 10
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT o.schedule AS id,s.project,o.revision,o.instant AS due FROM occurrences o JOIN schedules s ON o.schedule=s.id AND o.revision=s.revision WHERE o.state='ready' AND s.state IN ('active','dispatched') ORDER BY o.instant,o.schedule LIMIT 1" call arr 0 0
+  if not call same 2 row 0u 2
+    set discard call query 2 call str 1 utf8 "UPDATE occurrences SET state='reserved' WHERE schedule=? AND revision=? AND instant=? AND state='ready'" call append 2 call append 2 call append 2 call arr 0 call key 2 row call str 1 utf8 "id" call key 2 row call str 1 utf8 "revision" call key 2 row call str 1 utf8 "due"
+    ret call schedule_plan 1 row
+  0
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT s.*,s.action AS \"target:json\" FROM schedules s WHERE s.state='active' AND s.due<=unixepoch() ORDER BY s.due,s.id LIMIT 1" call arr 0 0
+  if call same 2 row 0u 1
+    ret 0u
+  0
+  set idval call key 2 row call str 1 utf8 "id"
+  set atval call key 2 row call str 1 utf8 "due"
+  set rev call key 2 row call str 1 utf8 "revision"
+  set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO occurrences VALUES(?,?,?,'reserved')" call append 2 call append 2 call append 2 call arr 0 idval rev atval
+  set discard call query 2 call str 1 utf8 "UPDATE schedules SET due=CASE WHEN period=0 THEN due ELSE due+(1+max(0,(unixepoch()-due)/period))*period END,state=CASE WHEN period=0 THEN 'dispatched' ELSE 'active' END WHERE id=?" call append 2 call arr 0 idval
+  ret call schedule_plan 1 row
+
+pub scheduled_read 1 arg uint uint do 3 row uint target uint discard uint 4
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT s.action AS \"target:json\" FROM schedules s JOIN occurrences o ON o.schedule=s.id AND o.revision=s.revision WHERE s.id=? AND s.project=? AND s.revision=? AND s.state IN ('active','dispatched') AND o.instant=? AND o.state='reserved'" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "id" call key 2 arg call str 1 utf8 "project" call key 2 arg call str 1 utf8 "revision" call key 2 arg call str 1 utf8 "instant" 0
+  set discard call require 2 not call same 2 row 0u call str 1 utf8 "Occurrence no longer authorized"
+  set target call key 2 row call str 1 utf8 "target"
+  ret call tool_run 1 call put 3 target call str 1 utf8 "project" call key 2 arg call str 1 utf8 "project"
+
+pub scheduled_done 1 arg uint uint do 3 st uint resultval uint discard uint 6
+  set st call key 2 arg call str 1 utf8 "state"
+  set resultval call key 2 arg call str 1 utf8 "result"
+  if not call same 2 call key 2 arg call str 1 utf8 "error" 0u 1
+    set resultval call shape 2 call str 1 utf8 "{\"error\":\"$0\"}" call append 2 call arr 0 call key 2 arg call str 1 utf8 "error"
+  0
+  set discard call query 2 call str 1 utf8 "UPDATE occurrences SET state='finished' WHERE schedule=? AND revision=? AND instant=? AND state='reserved'" call append 2 call append 2 call append 2 call arr 0 call key 2 st call str 1 utf8 "id" call key 2 st call str 1 utf8 "revision" call key 2 st call str 1 utf8 "instant"
+  if call same 2 discard call integer 1 1 2
+    set discard call query 2 call str 1 utf8 "UPDATE monitors SET latest=?,updated=unixepoch() WHERE id=? AND project=? AND EXISTS(SELECT 1 FROM schedules s WHERE s.id=monitors.id AND s.revision=? AND s.state IN ('active','dispatched'))" call append 2 call append 2 call append 2 call append 2 call arr 0 resultval call key 2 st call str 1 utf8 "id" call key 2 st call str 1 utf8 "project" call key 2 st call str 1 utf8 "revision"
+    set discard call audit 3 call key 2 st call str 1 utf8 "project" call str 1 utf8 "Scheduled outcome" call shape 2 call str 1 utf8 "{\"occurrence\":\"$0\",\"result\":\"$1\"}" call append 2 call append 2 call arr 0 st resultval
+  0
+  ret 0u
+
+fn schedule_plan 1 row uint uint do 3 idval uint atval uint rev uint 4
+  set idval call key 2 row call str 1 utf8 "id"
+  set rev call key 2 row call str 1 utf8 "revision"
+  set atval call key 2 row call str 1 utf8 "due"
+  ret call shape 2 call str 1 utf8 "{\"local\":\"scheduled_read\",\"job\":\"$0\",\"arguments\":{\"id\":\"$0\",\"project\":\"$1\",\"revision\":\"$2\",\"instant\":\"$3\"},\"then\":\"scheduled_done\",\"state\":{\"id\":\"$0\",\"project\":\"$1\",\"revision\":\"$2\",\"instant\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 idval call key 2 row call str 1 utf8 "project" rev atval

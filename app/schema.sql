@@ -31,4 +31,28 @@ CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY,project TEXT NOT NULL,e
 CREATE TABLE IF NOT EXISTS plans(project TEXT NOT NULL,request TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(project,request));
 CREATE TABLE IF NOT EXISTS candidates(id TEXT PRIMARY KEY,project TEXT NOT NULL,operation TEXT NOT NULL,description TEXT NOT NULL,evidence TEXT NOT NULL,checks TEXT NOT NULL,state TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schedules(id TEXT PRIMARY KEY,project TEXT NOT NULL,revision INTEGER NOT NULL,due INTEGER NOT NULL,period INTEGER NOT NULL,action TEXT NOT NULL,state TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS monitors(id TEXT PRIMARY KEY REFERENCES schedules,project TEXT NOT NULL REFERENCES projects,latest TEXT,updated INTEGER);
 CREATE TABLE IF NOT EXISTS occurrences(schedule TEXT NOT NULL,revision INTEGER NOT NULL,instant INTEGER NOT NULL,state TEXT NOT NULL,PRIMARY KEY(schedule,revision,instant));
+CREATE TABLE IF NOT EXISTS prerequisites(job TEXT NOT NULL REFERENCES jobs, reference TEXT NOT NULL, kind TEXT NOT NULL, PRIMARY KEY(job,reference));
+CREATE VIEW IF NOT EXISTS current_prerequisites AS
+ SELECT j.id AS job,p.reference,p.kind,
+ CASE p.kind WHEN 'answer' THEN EXISTS(SELECT 1 FROM questions q WHERE q.id=p.reference AND q.request=j.request AND q.revision=j.revision AND q.state='answered')
+ WHEN 'acceptance' THEN EXISTS(SELECT 1 FROM branches b WHERE b.id=p.reference AND b.request=j.request AND b.revision=j.revision AND b.accepted IS NOT NULL)
+ WHEN 'artifact' THEN EXISTS(SELECT 1 FROM artifacts a WHERE a.id=p.reference AND a.project=j.project)
+ ELSE 0 END AS satisfied FROM prerequisites p JOIN jobs j ON j.id=p.job;
+CREATE VIEW IF NOT EXISTS branch_outcomes AS
+ SELECT b.*,a.payload AS result,
+ (SELECT json_group_array(id) FROM (SELECT id FROM questions q WHERE q.session=b.id AND q.request=b.request AND q.revision=b.revision AND q.state!='answered' ORDER BY id)) AS questions,
+ (SELECT json_group_array(reference) FROM (SELECT c.reference FROM current_prerequisites c JOIN jobs w ON c.job=w.id WHERE w.session=b.id AND w.request=b.request AND w.revision=b.revision AND w.state='waiting' AND c.satisfied=0 ORDER BY c.reference)) AS waits,
+ (SELECT json_group_array(json_object('job',id,'state',state,'reason',reason)) FROM (SELECT id,state,reason FROM jobs j WHERE j.session=b.id AND j.request=b.request AND j.revision=b.revision AND j.state IN ('held','uncertain') ORDER BY id)) AS holds,
+ EXISTS(SELECT 1 FROM jobs j WHERE j.session=b.id AND j.request=b.request AND j.revision=b.revision AND j.state IN ('running','queued','sealing','sealed','executing')) AS busy
+ FROM branches b LEFT JOIN actions a ON a.id=b.report;
+CREATE VIEW IF NOT EXISTS branch_descendants AS
+ WITH RECURSIVE tree(ancestor,child) AS (SELECT parent,id FROM branches WHERE parent IS NOT NULL UNION SELECT t.ancestor,b.id FROM tree t JOIN branches b ON b.parent=t.child) SELECT ancestor,child FROM tree;
+CREATE TABLE IF NOT EXISTS git_mutations(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,operation TEXT NOT NULL,request TEXT NOT NULL,digest TEXT NOT NULL,state TEXT NOT NULL,grant_id TEXT,result TEXT,error TEXT);
+CREATE TABLE IF NOT EXISTS git_grants(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,mutation TEXT NOT NULL REFERENCES git_mutations,digest TEXT NOT NULL,state TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS file_effects(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,operation TEXT NOT NULL,request TEXT NOT NULL,digest TEXT NOT NULL,state TEXT NOT NULL,grant_id TEXT,result TEXT,error TEXT);
+CREATE TABLE IF NOT EXISTS file_grants(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,effect TEXT NOT NULL REFERENCES file_effects,digest TEXT NOT NULL,destructive INTEGER NOT NULL,state TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS patch_stages(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,request TEXT NOT NULL,digest TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS connectors(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,name TEXT NOT NULL,definition TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS network_effects(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,connector TEXT NOT NULL REFERENCES connectors,arguments TEXT NOT NULL,state TEXT NOT NULL,receipt TEXT);

@@ -1,0 +1,257 @@
+fluxr 1
+
+fn effect_known 1 name uint bool do 0  1
+ret or or or or or or or or or or call same 2 name call str 1 utf8 "fs.mkdir" call same 2 name call str 1 utf8 "fs.write" call same 2 name call str 1 utf8 "fs.copy" call same 2 name call str 1 utf8 "fs.move" call same 2 name call str 1 utf8 "fs.remove" call same 2 name call str 1 utf8 "patch.preview" call same 2 name call str 1 utf8 "patch.stage" call same 2 name call str 1 utf8 "patch.apply" call same 2 name call str 1 utf8 "effect.apply" call same 2 name call str 1 utf8 "effect.status" false
+
+fn effect_catalog 0  uint do 0  1
+ret call decode 1 call str 1 utf8 "[{\"id\":\"fs.mkdir\",\"description\":\"Propose creation of one absent directory\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"fs.write\",\"description\":\"Propose publishing immutable artifact bytes to one exact expected file\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"fs.copy\",\"description\":\"Propose copying one exact source to one expected destination\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"fs.move\",\"description\":\"Propose a same-volume move of one exact regular file\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"fs.remove\",\"description\":\"Propose removing one exact file or empty directory\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"patch.preview\",\"description\":\"Transform an immutable base artifact with a unified text patch\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"patch.stage\",\"description\":\"Stage immutable patched file versions against one checkout revision\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"patch.apply\",\"description\":\"Propose one protected transaction for an exact staged patch\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"effect.apply\",\"description\":\"Execute one exact previously authorized effect\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"},{\"id\":\"effect.status\",\"description\":\"Read the scoped effect intent and durable receipt\",\"route\":\"portable\",\"authority\":\"Exact immutable proposal plus typed user grant; model tool calls cannot authorize\",\"limits\":\"Windows TxF only; local regular files or empty directories;8MiB;64-file patches; same-volume moves\"}]"
+
+fn effect_row 2 pid uint eid uint uint do 2 record uint discard uint 3
+set record call nth 2 call query 2 call str 1 utf8 "SELECT id,project,operation,digest,state,grant_id,request AS \"request:json\",result AS \"result:json\",error FROM file_effects WHERE id=? AND project=?" call append 2 call append 2 call arr 0  eid pid 0
+set discard call require 2 not call same 2 record 0u call str 1 utf8 "Effect is outside this project or unavailable"
+ret record
+
+pub effect_get 1 arg uint uint do 1 pid uint 2
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+ret call effect_row 2 pid call key 2 arg call str 1 utf8 "effect"
+
+fn effect_expect 2 observed uint expected uint uint do 1 discard uint 5
+set discard call require 2 call same 2 call key 2 observed call str 1 utf8 "kind" call key 2 expected call str 1 utf8 "kind" call str 1 utf8 "Expected target kind changed"
+if call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "file" 1
+set discard call require 2 call same 2 call key 2 observed call str 1 utf8 "digest" call key 2 expected call str 1 utf8 "digest" call str 1 utf8 "Expected file digest changed"
+0
+
+if not call same 2 call key 2 expected call str 1 utf8 "file_id" 0u 1
+set discard call require 2 call same 2 call key 2 observed call str 1 utf8 "file_id" call key 2 expected call str 1 utf8 "file_id" call str 1 utf8 "Expected file identity changed"
+0
+
+if not call same 2 call key 2 expected call str 1 utf8 "empty" 0u 1
+set discard call require 2 call same 2 call key 2 observed call str 1 utf8 "empty" call key 2 expected call str 1 utf8 "empty" call str 1 utf8 "Expected directory state changed"
+0
+
+ret 0u
+
+fn effect_record 3 pid uint operation uint requestval uint uint do 3 eid uint hashval uint discard uint 4
+set eid call uid 0
+set hashval call hash 1 call encode 1 requestval
+set discard call query 2 call str 1 utf8 "INSERT INTO file_effects(id,project,operation,request,digest,state) VALUES(?,?,?,?,?,'planned')" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  eid pid operation call encode 1 requestval hashval
+ret call shape 2 call str 1 utf8 "{\"effect\":\"$0\",\"digest\":\"$1\",\"state\":\"planned\",\"operation\":\"$2\",\"request\":\"$3\",\"requires_user_grant\":true}" call append 2 call append 2 call append 2 call append 2 call arr 0  eid hashval operation requestval
+
+pub effect_propose 1 arg uint uint do 11 pid uint operation uint nativeop uint requestval uint inspection uint observed uint sourceval uint intended uint body uint destructive uint discard uint 19
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set operation call key 2 arg call str 1 utf8 "operation"
+set nativeop call key 2 call decode 1 call str 1 utf8 "{\"fs.mkdir\":\"mkdir\",\"fs.write\":\"write\",\"fs.copy\":\"copy\",\"fs.move\":\"move\",\"fs.remove\":\"remove\"}" operation
+set discard call require 2 not call same 2 nativeop 0u call str 1 utf8 "Unknown live filesystem operation"
+set requestval call shape 2 call str 1 utf8 "{\"operation\":\"$0\",\"path\":\"$1\",\"source\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  nativeop call key 2 arg call str 1 utf8 "path" call key 2 arg call str 1 utf8 "source"
+set inspection call effect_inspect 1 requestval
+set observed call key 2 inspection call str 1 utf8 "state"
+set discard call require 2 call same 2 call key 2 inspection call str 1 utf8 "checkout" 0u call str 1 utf8 "Checkout writes require an exact staged patch"
+set discard call effect_expect 2 observed call key 2 arg call str 1 utf8 "expected"
+set requestval call put 3 call put 3 requestval call str 1 utf8 "path" call key 2 inspection call str 1 utf8 "path" call str 1 utf8 "expected" observed
+set intended 0u
+set destructive call decode 1 call str 1 utf8 "false"
+if not call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "absent" 1
+set destructive call decode 1 call str 1 utf8 "true"
+0
+
+if call same 2 nativeop call str 1 utf8 "write" 5
+set discard call require 2 or call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "file" call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "absent" call str 1 utf8 "Writes require a regular file or absent destination"
+set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT encoded FROM artifacts WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "artifact" pid 0 call str 1 utf8 "encoded"
+set discard call require 2 not call same 2 body 0u call str 1 utf8 "Immutable output artifact is outside this project"
+set intended call shape 2 call str 1 utf8 "{\"kind\":\"file\",\"digest\":\"$0\"}" call append 2 call arr 0  call key 2 call baseinfo 1 body call str 1 utf8 "digest"
+set requestval call put 3 requestval call str 1 utf8 "base64" body
+0
+
+if or call same 2 nativeop call str 1 utf8 "copy" call same 2 nativeop call str 1 utf8 "move" 6
+set sourceval call key 2 inspection call str 1 utf8 "source_state"
+set discard call require 2 call same 2 call key 2 sourceval call str 1 utf8 "kind" call str 1 utf8 "file" call str 1 utf8 "Copy and move accept one regular source file"
+set discard call effect_expect 2 sourceval call key 2 arg call str 1 utf8 "source_expected"
+set requestval call put 3 call put 3 requestval call str 1 utf8 "source" call key 2 inspection call str 1 utf8 "source" call str 1 utf8 "source_expected" sourceval
+set intended call shape 2 call str 1 utf8 "{\"kind\":\"file\",\"digest\":\"$0\"}" call append 2 call arr 0  call key 2 sourceval call str 1 utf8 "digest"
+if call same 2 nativeop call str 1 utf8 "move" 3
+set discard call require 2 call same 2 call key 2 inspection call str 1 utf8 "source_checkout" 0u call str 1 utf8 "Moving checkout files requires a staged patch"
+set discard call require 2 call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "absent" call str 1 utf8 "Move destination must be absent"
+set destructive call decode 1 call str 1 utf8 "true"
+0
+
+0
+
+if call same 2 nativeop call str 1 utf8 "mkdir" 2
+set discard call require 2 call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "absent" call str 1 utf8 "Directory destination must be absent"
+set intended call decode 1 call str 1 utf8 "{\"kind\":\"directory\"}"
+0
+
+if call same 2 nativeop call str 1 utf8 "remove" 3
+set discard call require 2 or call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "file" and call same 2 call key 2 observed call str 1 utf8 "kind" call str 1 utf8 "directory" call same 2 call key 2 observed call str 1 utf8 "empty" call decode 1 call str 1 utf8 "true" call str 1 utf8 "Removal accepts one file or one empty directory"
+set intended call decode 1 call str 1 utf8 "{\"kind\":\"absent\"}"
+set destructive call decode 1 call str 1 utf8 "true"
+0
+
+set requestval call put 3 call put 3 requestval call str 1 utf8 "intended" intended call str 1 utf8 "destructive" destructive
+ret call effect_record 3 pid operation requestval
+
+pub effect_authorize 1 arg uint uint do 4 pid uint record uint grantval uint discard uint 10
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set record call effect_row 2 pid call key 2 arg call str 1 utf8 "effect"
+set discard call require 2 call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "planned" call str 1 utf8 "Only an exact pending proposal can be authorized"
+set discard call require 2 call same 2 call key 2 record call str 1 utf8 "digest" call key 2 arg call str 1 utf8 "digest" call str 1 utf8 "Effect digest changed before user authorization"
+set discard call require 2 or call same 2 call key 2 arg call str 1 utf8 "destructive" call decode 1 call str 1 utf8 "true" call same 2 call key 2 arg call str 1 utf8 "destructive" call decode 1 call str 1 utf8 "false" call str 1 utf8 "User destructive intent must be an explicit boolean"
+set discard call require 2 or not call same 2 call key 2 call key 2 record call str 1 utf8 "request" call str 1 utf8 "destructive" call decode 1 call str 1 utf8 "true" call same 2 call key 2 arg call str 1 utf8 "destructive" call decode 1 call str 1 utf8 "true" call str 1 utf8 "Destructive scope requires explicit typed user intent"
+set grantval call uid 0
+set discard call query 2 call str 1 utf8 "INSERT INTO file_grants VALUES(?,?,?,?,?,'active')" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  grantval pid call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "digest" call key 2 arg call str 1 utf8 "destructive"
+set discard call query 2 call str 1 utf8 "UPDATE file_effects SET state='authorized',grant_id=? WHERE id=? AND project=? AND state='planned'" call append 2 call append 2 call append 2 call arr 0  grantval call key 2 record call str 1 utf8 "id" pid
+ret call shape 2 call str 1 utf8 "{\"effect\":\"$0\",\"grant\":\"$1\",\"digest\":\"$2\",\"state\":\"authorized\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" grantval call key 2 record call str 1 utf8 "digest"
+
+pub effect_revoke 1 arg uint uint do 2 pid uint discard uint 3
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set discard call query 2 call str 1 utf8 "UPDATE file_grants SET state='revoked' WHERE id=? AND project=? AND state='active'" call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "grant" pid
+ret call shape 2 call str 1 utf8 "{\"revoked\":\"$0\"}" call append 2 call arr 0  discard
+
+fn effect_defer 3 requestval uint resume uint state uint uint do 0  1
+ret call shape 2 call str 1 utf8 "{\"$filesystem\":\"$0\",\"resume\":\"$1\",\"state\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  requestval resume state
+
+pub effect_apply 1 arg uint uint do 4 pid uint record uint grantval uint discard uint 8
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set record call effect_row 2 pid call key 2 arg call str 1 utf8 "effect"
+if call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "completed" 1
+ret call key 2 record call str 1 utf8 "result"
+0
+
+set grantval call nth 2 call query 2 call str 1 utf8 "SELECT id,digest,state FROM file_grants WHERE id=? AND project=? AND effect=?" call append 2 call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "grant" pid call key 2 record call str 1 utf8 "id" 0
+set discard call require 2 and call same 2 call key 2 grantval call str 1 utf8 "state" call str 1 utf8 "active" and call same 2 call key 2 grantval call str 1 utf8 "digest" call key 2 record call str 1 utf8 "digest" call same 2 call key 2 record call str 1 utf8 "grant_id" call key 2 grantval call str 1 utf8 "id" call str 1 utf8 "Exact current user grant is missing or revoked"
+set discard call require 2 or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "authorized" or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "old" or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "failed" call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "unsupported" call str 1 utf8 "Uncertain or conflicting effects require reconciliation before retry"
+set discard call query 2 call str 1 utf8 "UPDATE file_effects SET state='executing',error=NULL WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" pid
+ret call effect_defer 3 call key 2 record call str 1 utf8 "request" call str 1 utf8 "guest_effect_finished" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"effect\":\"$1\",\"grant\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  pid call key 2 record call str 1 utf8 "id" call key 2 grantval call str 1 utf8 "id"
+
+fn effect_finish 3 stateval uint nativeval uint errorval uint uint do 4 record uint receipt uint status uint discard uint 8
+set record call effect_row 2 call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "effect"
+set status call key 2 nativeval call str 1 utf8 "state"
+if not call same 2 errorval 0u 1
+set status call str 1 utf8 "uncertain"
+0
+
+set receipt call shape 2 call str 1 utf8 "{\"effect\":\"$0\",\"operation\":\"$1\",\"digest\":\"$2\",\"grant\":\"$3\",\"state\":\"$4\",\"native\":\"$5\",\"error\":\"$6\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "operation" call key 2 record call str 1 utf8 "digest" call key 2 stateval call str 1 utf8 "grant" status nativeval errorval
+set discard call query 2 call str 1 utf8 "UPDATE file_effects SET state=?,result=?,error=? WHERE id=? AND project=?" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  status call encode 1 receipt errorval call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "project"
+if call same 2 status call str 1 utf8 "completed" 1
+set discard call query 2 call str 1 utf8 "UPDATE file_grants SET state='consumed' WHERE id=? AND project=? AND state='active'" call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "grant" call key 2 record call str 1 utf8 "project"
+0
+
+set discard call audit 3 call key 2 record call str 1 utf8 "project" call str 1 utf8 "Filesystem effect" receipt
+ret receipt
+
+pub guest_effect_finished 1 arg uint uint do 0  1
+ret call effect_finish 3 call key 2 arg call str 1 utf8 "state" call key 2 arg call str 1 utf8 "result" call key 2 arg call str 1 utf8 "error"
+
+pub recovery_page 1 cursor uint uint do 0 1
+ret call query 2 call str 1 utf8 "SELECT id AS effect,id AS cursor,project FROM file_effects WHERE state IN ('executing','uncertain') AND id>COALESCE(?,'') ORDER BY id LIMIT 64" call append 2 call arr 0 cursor
+
+pub effects_recover 1 arg uint uint do 2 pid uint record uint 4
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set record call nth 2 call query 2 call str 1 utf8 "SELECT id,project,grant_id,request AS \"request:json\" FROM file_effects WHERE project=?1 AND state IN ('executing','uncertain') AND (?2 IS NULL OR id=?2) ORDER BY id LIMIT 1" call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "effect" 0
+if call same 2 record 0u 1
+ret call decode 1 call str 1 utf8 "{\"state\":\"idle\"}"
+0
+
+ret call effect_defer 3 call shape 2 call str 1 utf8 "{\"operation\":\"reconcile\",\"request\":\"$0\"}" call append 2 call arr 0  call key 2 record call str 1 utf8 "request" call str 1 utf8 "guest_effect_reconciled" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"effect\":\"$1\",\"grant\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "project" call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "grant_id"
+
+pub guest_effect_reconciled 1 arg uint uint do 6 stateval uint nativeval uint status uint grantval uint record uint discard uint 7
+set stateval call key 2 arg call str 1 utf8 "state"
+set nativeval call key 2 arg call str 1 utf8 "result"
+set status call key 2 nativeval call str 1 utf8 "state"
+if call same 2 status call str 1 utf8 "completed" 1
+ret call effect_finish 3 stateval nativeval call key 2 arg call str 1 utf8 "error"
+0
+
+if call same 2 status call str 1 utf8 "old" 4
+set record call effect_row 2 call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "effect"
+set grantval call nth 2 call query 2 call str 1 utf8 "SELECT id,state,digest FROM file_grants WHERE id=? AND project=? AND effect=?" call append 2 call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "grant" call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "effect" 0
+if and call same 2 call key 2 grantval call str 1 utf8 "state" call str 1 utf8 "active" call same 2 call key 2 grantval call str 1 utf8 "digest" call key 2 record call str 1 utf8 "digest" 2
+set discard call query 2 call str 1 utf8 "UPDATE file_effects SET state='old' WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "effect" call key 2 stateval call str 1 utf8 "project"
+ret call effect_apply 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"effect\":\"$1\",\"grant\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "effect" call key 2 stateval call str 1 utf8 "grant"
+0
+
+set nativeval call shape 2 call str 1 utf8 "{\"state\":\"held\",\"reason\":\"Current user authority is missing\",\"observed\":\"$0\"}" call append 2 call arr 0  call key 2 nativeval call str 1 utf8 "observed"
+0
+
+if not call same 2 call key 2 arg call str 1 utf8 "error" 0u 1
+set nativeval call shape 2 call str 1 utf8 "{\"state\":\"held\",\"reason\":\"Filesystem reconciliation remains uncertain\",\"error\":\"$0\"}" call append 2 call arr 0  call key 2 arg call str 1 utf8 "error"
+0
+
+ret call effect_finish 3 stateval nativeval 0u
+
+pub patch_preview 1 arg uint uint do 4 pid uint body uint transformed uint discard uint 5
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT encoded FROM artifacts WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "base_artifact" pid 0 call str 1 utf8 "encoded"
+set discard call require 2 not call same 2 body 0u call str 1 utf8 "Patch base artifact is outside this project"
+set transformed call patch_transform 1 call shape 2 call str 1 utf8 "{\"base64\":\"$0\",\"patch\":\"$1\"}" call append 2 call append 2 call arr 0  body call key 2 arg call str 1 utf8 "patch"
+ret call shape 2 call str 1 utf8 "{\"base_artifact\":\"$0\",\"base_digest\":\"$1\",\"intended_digest\":\"$2\",\"preview\":\"$3\",\"size\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "base_artifact" call key 2 transformed call str 1 utf8 "base_digest" call key 2 transformed call str 1 utf8 "digest" call key 2 transformed call str 1 utf8 "preview" call key 2 transformed call str 1 utf8 "size"
+
+pub patch_stage 1 arg uint uint do 13 pid uint projectval uint entries uint entry uint body uint transformed uint operationsval uint previews uint requestval uint sid uint digestval uint discard uint i int 14
+set projectval call project 1 arg
+set pid call key 2 projectval call str 1 utf8 "id"
+set discard call require 2 call same 2 call key 2 arg call str 1 utf8 "checkout" pid call str 1 utf8 "Exact checkout ID is required"
+set entries call key 2 arg call str 1 utf8 "files"
+set discard call require 2 and lt 0 call size 1 entries le call size 1 entries 64 call str 1 utf8 "Patch must name 1..64 exact files"
+set operationsval call arr 0
+set previews call arr 0
+set i 0
+while lt i call size 1 entries 7
+set entry call nth 2 entries i
+set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT encoded FROM artifacts WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "base_artifact" pid 0 call str 1 utf8 "encoded"
+set discard call require 2 not call same 2 body 0u call str 1 utf8 "Patch base artifact is outside this project"
+set transformed call patch_transform 1 call shape 2 call str 1 utf8 "{\"base64\":\"$0\",\"patch\":\"$1\"}" call append 2 call append 2 call arr 0  body call key 2 entry call str 1 utf8 "patch"
+set operationsval call append 2 operationsval call shape 2 call str 1 utf8 "{\"operation\":\"write\",\"path\":\"$0\",\"expected\":{\"kind\":\"file\",\"digest\":\"$1\"},\"intended\":{\"kind\":\"file\",\"digest\":\"$2\"},\"base64\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  call pathjoin 2 call key 2 projectval call str 1 utf8 "root" call key 2 entry call str 1 utf8 "path" call key 2 transformed call str 1 utf8 "base_digest" call key 2 transformed call str 1 utf8 "digest" call key 2 transformed call str 1 utf8 "base64"
+set previews call append 2 previews call shape 2 call str 1 utf8 "{\"path\":\"$0\",\"base_digest\":\"$1\",\"intended_digest\":\"$2\",\"preview\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "path" call key 2 transformed call str 1 utf8 "base_digest" call key 2 transformed call str 1 utf8 "digest" call key 2 transformed call str 1 utf8 "preview"
+next i
+set requestval call shape 2 call str 1 utf8 "{\"operation\":\"batch\",\"operations\":\"$0\",\"checkout\":{\"root\":\"$1\",\"revision\":\"$2\"},\"destructive\":true}" call append 2 call append 2 call append 2 call arr 0  operationsval call key 2 projectval call str 1 utf8 "root" call key 2 arg call str 1 utf8 "revision"
+set sid call uid 0
+set digestval call hash 1 call encode 1 requestval
+set discard call query 2 call str 1 utf8 "INSERT INTO patch_stages VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0  sid pid call encode 1 requestval digestval
+ret call shape 2 call str 1 utf8 "{\"stage\":\"$0\",\"digest\":\"$1\",\"checkout\":\"$2\",\"revision\":\"$3\",\"files\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  sid digestval pid call key 2 arg call str 1 utf8 "revision" previews
+
+pub patch_apply 1 arg uint uint do 10 pid uint staged uint requestval uint inspection uint operationsval uint entries uint entry uint observed uint discard uint i int 14
+set pid call key 2 call project 1 arg call str 1 utf8 "id"
+set discard call require 2 call same 2 call key 2 arg call str 1 utf8 "checkout" pid call str 1 utf8 "Exact checkout ID is required"
+set staged call nth 2 call query 2 call str 1 utf8 "SELECT request AS \"request:json\",digest FROM patch_stages WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "stage" pid 0
+set discard call require 2 not call same 2 staged 0u call str 1 utf8 "Exact staged patch is unavailable"
+set discard call require 2 call same 2 call key 2 staged call str 1 utf8 "digest" call key 2 arg call str 1 utf8 "digest" call str 1 utf8 "Expected staged patch digest differs"
+set requestval call key 2 staged call str 1 utf8 "request"
+set discard call require 2 call same 2 call key 2 call key 2 requestval call str 1 utf8 "checkout" call str 1 utf8 "revision" call key 2 arg call str 1 utf8 "revision" call str 1 utf8 "Expected checkout revision differs from staged patch"
+set inspection call effect_inspect 1 requestval
+set entries call key 2 requestval call str 1 utf8 "operations"
+set operationsval call arr 0
+set i 0
+while lt i call size 1 entries 7
+set entry call nth 2 entries i
+set observed call nth 2 call key 2 inspection call str 1 utf8 "operations" i
+set discard call effect_expect 2 call key 2 observed call str 1 utf8 "state" call key 2 entry call str 1 utf8 "expected"
+set discard call require 2 call same 2 call key 2 observed call str 1 utf8 "checkout" call key 2 call key 2 requestval call str 1 utf8 "checkout" call str 1 utf8 "root" call str 1 utf8 "Patch targets must resolve into the exact checkout"
+set entry call put 3 call put 3 entry call str 1 utf8 "path" call key 2 observed call str 1 utf8 "path" call str 1 utf8 "expected" call key 2 observed call str 1 utf8 "state"
+set operationsval call append 2 operationsval entry
+next i
+set requestval call put 3 call put 3 requestval call str 1 utf8 "operations" operationsval call str 1 utf8 "stage" call key 2 arg call str 1 utf8 "stage"
+ret call effect_record 3 pid call str 1 utf8 "patch.apply" requestval
+
+fn effect_model 3 pid uint toolname uint args uint uint do 0  7
+set args call put 3 args call str 1 utf8 "project" pid
+if call same 2 toolname call str 1 utf8 "patch.preview" 1
+ret call patch_preview 1 args
+0
+
+if call same 2 toolname call str 1 utf8 "patch.stage" 1
+ret call patch_stage 1 args
+0
+
+if call same 2 toolname call str 1 utf8 "patch.apply" 1
+ret call patch_apply 1 args
+0
+
+if call same 2 toolname call str 1 utf8 "effect.apply" 1
+ret call effect_apply 1 args
+0
+
+if call same 2 toolname call str 1 utf8 "effect.status" 1
+ret call effect_get 1 args
+0
+
+ret call effect_propose 1 call put 3 args call str 1 utf8 "operation" toolname

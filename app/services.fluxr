@@ -166,4 +166,4 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
   if call same 2 toolname call str 1 utf8 "notify.local" 1
     ret call audit 3 pid call str 1 utf8 "Notification" call shape 2 call str 1 utf8 "{\"summary\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "message"
   0
-  ret call require 2 false call str 1 utf8 "Unknown service"
+  ret call extended_run 3 pid toolname args

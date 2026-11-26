@@ -10,7 +10,7 @@ Install Git, Rust with the MSVC build tools, PowerShell 7, and Codex CLI. Sign i
 pwsh -File .\Start-RelAI.ps1
 ```
 
-Open the local URL printed by the launcher. Its fragment contains the session credential. Choose **Open project**, enter the folder, and send a message. The launcher starts a capability-token-protected Codex App Server on loopback. RelAI checks that Codex reports a ChatGPT account before each subscription turn. Codex owns account credentials. Each attempt starts a fresh ephemeral thread with its sealed model, reasoning effort, input, and output schema. A pending direct model result appears with an **Accept result** control.
+Open the local URL printed by the launcher. Its fragment contains the session credential. Choose **Open project**, browse to the folder, and send a message. The launcher starts a capability-token-protected Codex App Server on loopback. RelAI checks that Codex reports a ChatGPT account before each subscription turn. Codex owns account credentials. Each attempt starts a fresh ephemeral thread with its sealed model, reasoning effort, input, and output schema. A pending direct model result appears with an **Accept result** control.
 
 A project can select a different provider for each role under **Models**. Set the provider environment variables before starting RelAI. The application records a job error when the selected deployment rejects its model or input.
 
@@ -25,14 +25,20 @@ Use HTTPS for remote deployments. A local Qwen server can use loopback HTTP. Sel
 ## Tests
 
 ```powershell
-cargo test --workspace --locked
+pwsh -File .\Test-RelAI.ps1
 pwsh -File .\Start-RelAI.ps1 -CheckProvider
 ```
 
-The first command runs offline checks. The second starts the local Codex service and runs a bounded subscription test with a captured text attachment. Anthropic and Qwen integrations have not been exercised against endpoints.
+The first command checks formatting, runs strict Clippy, and executes the offline integration suite. The second starts the local Codex service and runs a bounded subscription test with a captured text attachment. Anthropic and Qwen integrations have not been exercised against endpoints.
 
-## Implementation status
+## Application and runtime
 
-This is a developing implementation of [the design](DESIGN.md). The checked application owns project admission, idempotent submissions, model settings, turn sealing, action admission, fan-out receipts and review, final publication, and improvement-session creation. The source for the language changes is pinned in Cargo.lock. The Rust host runs hostless user tool modules in a fresh bounded invocation. The initial user interface provides project navigation, captured attachments, request controls, models, a dictionary, and a snapshot tree.
+The source under `app/` contains the checked FluxR relay, scheduler, provider adapters, dictionary, tools, and view definitions. The application manifest declares public commands, provider destinations, and permitted continuations. The host under `runtime/` supplies SQLite, the portable interpreter, operating-system services, codecs, HTTP/JSON-RPC transport, and a browser renderer. User-authored tools execute in a separate bounded portable invocation with no native imports.
 
-The full tool catalog and acceptance suite are outstanding. In particular, this version has limited draft qualification, review conditions, dictionary and skill workflows, effect recovery, Git transport, live cache invalidation, and graph layers. A passed scripted scenario establishes the tested path only. See the tests and the published commit for the exact implementation.
+Write tools first produce an immutable proposal. The local user supplies a separate typed grant for its digest. Windows file effects use TxF for supported local volumes. Protected checkout patches currently require a detached HEAD or a loose branch reference. Named HTTP connectors have a fixed destination, method and argument schema. A POST requires an exact operation grant. Schedules and monitors can run selected read tools without a model call.
+
+Use `-ExternalProvider` to launch without starting a Codex service when using only Anthropic or Qwen. Project state, grant records, and artifact bytes are local. Keep the launch URL and the state directory private.
+
+## Acceptance
+
+[Implementation and test coverage](ACCEPTANCE.md) records the verified behavior and remaining work against the [design](DESIGN.md).

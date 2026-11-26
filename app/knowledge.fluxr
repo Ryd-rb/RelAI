@@ -82,8 +82,10 @@ pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry u
   set discard call query 2 call str 1 utf8 "INSERT INTO entries VALUES(?,?,?,?,?,?,'user',1)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid revision did call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "kind" call key 2 arg call str 1 utf8 "definition"
   ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"dictionary_id\":\"$1\",\"revision\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 eid did revision
 
-fn annotate 2 pid uint body uint uint do 9 matchesval uint out uint span uint term uint mark uint i int pos int start int end int 7
-  set matchesval call matches 2 body call vocab 1 pid
+fn annotate 2 pid uint body uint uint do 0  1
+  ret call render_terms 2 body call matches 2 body call vocab 1 pid
+
+fn render_terms 2 body uint matchesval uint uint do 8 out uint span uint term uint mark uint i int pos int start int end int 6
   set out call arr 0
   set i 0
   set pos 0
@@ -138,3 +140,35 @@ pub skill 1 arg uint uint do 11 pid uint op uint pkg uint md uint attrs uint sid
   set eid call hash 1 call encode 1 call append 2 call append 2 call append 2 call arr 0 pid call str 1 utf8 "skill" name
   set discard call query 2 call str 1 utf8 "INSERT INTO entries SELECT ?1,coalesce(max(revision),0)+1,?2,?3,'skill',coalesce((SELECT definition FROM entries WHERE id=?1 AND human=1 ORDER BY revision DESC LIMIT 1),?4),?5,coalesce(max(human),0) FROM entries WHERE id=?1" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid pid name call key 2 attrs call str 1 utf8 "description" sid
   ret call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"name\":\"$1\",\"digest\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid name hashval
+
+fn explicit_terms 3 pid uint body uint selected uint uint do 11 marker uint accepted uint terms uint startval uint endval uint r uint refval uint out uint discard uint i int lastpos int 6
+  set discard call require 2 le call size 1 selected 128 call str 1 utf8 "Too many selected terms"
+  set out call arr 0
+  set i 0
+  set lastpos 0
+  while lt i call size 1 selected 10
+    set marker call nth 2 selected i
+    set startval call key 2 marker call str 1 utf8 "start"
+    set endval call key 2 marker call str 1 utf8 "end"
+    set discard call require 2 and le lastpos call number 1 startval lt call number 1 startval call number 1 endval call str 1 utf8 "Invalid or overlapping selected term"
+    set r call key 2 marker call str 1 utf8 "ref"
+    set refval call nth 2 call query 2 call str 1 utf8 "SELECT e.id,e.revision,e.name,e.kind,e.dictionary AS dictionary_id FROM entries e JOIN dictionary_links l ON l.dictionary=e.dictionary AND l.enabled=1 JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 WHERE l.project=? AND e.id=? AND e.revision=? AND e.dictionary=?" call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 r call str 1 utf8 "id" call key 2 r call str 1 utf8 "revision" call key 2 r call str 1 utf8 "dictionary_id" 0
+    set discard call require 2 and not call same 2 refval 0u call same 2 call slice 3 body call number 1 startval call number 1 endval call key 2 refval call str 1 utf8 "name" call str 1 utf8 "Selected span or dictionary access changed"
+    set out call append 2 out call shape 2 call str 1 utf8 "{\"start\":\"$0\",\"end\":\"$1\",\"ref\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 startval endval refval
+    set lastpos call number 1 endval
+    next i
+  ret out
+
+fn annotate_selection 3 pid uint body uint selected uint uint do 2 chosen uint automatic uint 4
+  if eq 0 call size 1 selected 1
+    ret call annotate 2 pid body
+  0
+  set chosen call explicit_terms 3 pid body selected
+  set automatic call matches 2 body call vocab 1 pid
+  ret call render_terms 2 body call query 2 call str 1 utf8 "WITH chosen AS (SELECT value FROM json_each(?1)), automatic AS (SELECT value FROM json_each(?2) a WHERE NOT EXISTS(SELECT 1 FROM chosen c WHERE c.value->>'start'<a.value->>'end' AND a.value->>'start'<c.value->>'end')) SELECT json_extract(value,'$.start') AS start,json_extract(value,'$.end') AS end,json_extract(value,'$.ref') AS \"ref:json\" FROM (SELECT value FROM chosen UNION ALL SELECT value FROM automatic) ORDER BY start" call append 2 call append 2 call arr 0 chosen automatic
+
+pub suggest_terms 1 arg uint uint do 3 pid uint prefix uint discard uint 4
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set prefix call key 2 arg call str 1 utf8 "prefix"
+  set discard call require 2 and lt 0 call size 1 prefix le call size 1 prefix 100 call str 1 utf8 "Enter a term prefix"
+  ret call query 2 call str 1 utf8 "SELECT e.id,e.revision,e.dictionary AS dictionary_id,d.name AS dictionary_name,e.name,e.kind,substr(e.definition,1,240) AS description FROM entries e JOIN dictionaries d ON d.id=e.dictionary AND d.archived=0 JOIN dictionary_links l ON l.dictionary=d.id AND l.enabled=1 WHERE l.project=?1 AND e.revision=(SELECT max(revision) FROM entries v WHERE v.id=e.id) AND instr(lower(e.name),lower(?2))=1 ORDER BY e.name,e.dictionary,e.id LIMIT 12" call append 2 call append 2 call arr 0 pid prefix

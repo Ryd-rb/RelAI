@@ -34,6 +34,38 @@ pub fn decode(format: &str, bytes: &[u8]) -> Result<Value> {
     ensure!(bytes.len() <= INPUT, "Input exceeds codec limit");
     bounded(match format {
         "markdown" | "text" => json!({"text":std::str::from_utf8(bytes)?}),
+        "markdown.links" => {
+            use pulldown_cmark::{Event, Options, Parser, Tag};
+            let source = std::str::from_utf8(bytes)?;
+            let mut links = Vec::new();
+            for (event, span) in Parser::new_ext(source, Options::all()).into_offset_iter() {
+                if let Event::Start(Tag::Link { dest_url, .. } | Tag::Image { dest_url, .. }) =
+                    event
+                {
+                    ensure!(links.len() < ITEMS, "Markdown link count limit");
+                    let path = dest_url.split(['#', '?']).next().unwrap_or("");
+                    let mut decoded = Vec::new();
+                    let mut bytes = path.bytes();
+                    while let Some(byte) = bytes.next() {
+                        if byte == b'%' {
+                            let high = bytes.next().context("Truncated percent escape")?;
+                            let low = bytes.next().context("Truncated percent escape")?;
+                            let high = (high as char)
+                                .to_digit(16)
+                                .context("Invalid percent escape")?;
+                            let low = (low as char)
+                                .to_digit(16)
+                                .context("Invalid percent escape")?;
+                            decoded.push((high * 16 + low) as u8);
+                        } else {
+                            decoded.push(byte);
+                        }
+                    }
+                    links.push(json!({"target":dest_url.as_ref(),"path":String::from_utf8(decoded)?,"start":span.start,"end":span.end}));
+                }
+            }
+            json!({"links":links})
+        }
         "json" => serde_json::from_slice(bytes)?,
         "csv" => {
             let mut reader = csv::ReaderBuilder::new()
@@ -144,9 +176,10 @@ fn archive(bytes: &[u8]) -> Result<zip::ZipArchive<Cursor<&[u8]>>> {
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes))?;
     ensure!(archive.len() <= ITEMS, "ZIP entry limit");
     let mut total = 0u64;
+    let mut actual = 0usize;
     let mut names = BTreeSet::new();
     for i in 0..archive.len() {
-        let file = archive.by_index(i)?;
+        let mut file = archive.by_index(i)?;
         safe_entry(file.name())?;
         ensure!(
             names.insert(file.name().trim_end_matches('/').to_lowercase()),
@@ -161,6 +194,25 @@ fn archive(bytes: &[u8]) -> Result<zip::ZipArchive<Cursor<&[u8]>>> {
             .checked_add(file.size())
             .context("ZIP size overflow")?;
         ensure!(total <= EXPANDED as u64, "Expanded ZIP limit");
+        // Verify the actual stream before downstream parsers allocate from ZIP
+        // metadata. A forged uncompressed-size field must not relax the bound.
+        let mut buffer = [0u8; 16 * 1024];
+        let mut produced = 0usize;
+        loop {
+            let remaining = EXPANDED.saturating_sub(actual);
+            let capacity = buffer.len().min(remaining.saturating_add(1));
+            let read = file.read(&mut buffer[..capacity])?;
+            if read == 0 {
+                break;
+            }
+            actual += read;
+            produced += read;
+            ensure!(actual <= EXPANDED, "Actual ZIP expansion exceeds limit");
+        }
+        ensure!(
+            produced as u64 == file.size(),
+            "ZIP entry size differs from content"
+        );
     }
     Ok(archive)
 }
@@ -271,6 +323,7 @@ fn read_docx(bytes: &[u8]) -> Result<Value> {
 }
 fn write_docx(text: &str) -> Result<Vec<u8>> {
     ensure!(text.len() <= INPUT, "Document text limit");
+    ensure!(text.chars().all(|c|matches!(c,'\t'|'\n'|'\r'|'\u{20}'..='\u{d7ff}'|'\u{e000}'..='\u{fffd}'|'\u{10000}'..='\u{10ffff}')), "Text contains a character forbidden by XML 1.0");
     let paragraphs = text
         .split('\n')
         .map(|line| {
@@ -284,6 +337,10 @@ fn write_docx(text: &str) -> Result<Vec<u8>> {
     let document = format!(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{}<w:sectPr/></w:body></w:document>"#,
         paragraphs.join("")
+    );
+    ensure!(
+        document.len().saturating_add(2048) <= EXPANDED,
+        "Expanded DOCX exceeds limit"
     );
     let entries = [
         (

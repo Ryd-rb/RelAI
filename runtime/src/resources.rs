@@ -118,8 +118,8 @@ pub fn matches(input: &str, names: &Value) -> Result<Value> {
             continue;
         }
         let mut best = None;
-        for j in i..segments.len() {
-            let end = segments[j].0 + segments[j].1.len();
+        for (j, (offset, word)) in segments.iter().enumerate().skip(i) {
+            let end = offset + word.len();
             if end - start > 512 {
                 break;
             }

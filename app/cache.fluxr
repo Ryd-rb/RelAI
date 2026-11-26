@@ -1,0 +1,40 @@
+fluxr 1
+
+fn observe 1 root uint uint do 0  1
+  ret host observe uint 1 uint root
+
+fn cacheget 1 cachekey uint uint do 0  1
+  ret host cache_get uint 1 uint cachekey
+
+fn cacheput 2 cachekey uint value uint uint do 0  1
+  ret host cache_put uint 2 uint cachekey uint value
+
+fn fresh_read 3 root uint path uint kind uint uint do 0  3
+  if call same 2 kind call str 1 utf8 "directory" 1
+    ret host directory uint 2 uint root uint path
+  0
+  if call same 2 kind call str 1 utf8 "text" 1
+    ret host read_file uint 2 uint root uint path
+  0
+  ret host read_base64 uint 2 uint root uint path
+
+fn cached_read 3 root uint path uint kind uint uint do 5 generation uint after uint cachekey uint value uint discard uint 8
+  set generation call observe 1 root
+  set cachekey call encode 1 call append 2 call append 2 call append 2 call append 2 call arr 0 root generation path kind
+  if not call same 2 generation 0u 2
+    set value call cacheget 1 cachekey
+    if not call same 2 value 0u 1
+    ret value
+  0
+  0
+  set value call fresh_read 3 root path kind
+  set after call observe 1 root
+  if not call same 2 after generation 3
+    set discard call fresh_read 3 root path kind
+    set discard call require 2 call same 2 value discard call str 1 utf8 "Source changed during read"
+    ret value
+  0
+  if not call same 2 generation 0u 1
+    set discard call cacheput 2 cachekey value
+  0
+  ret value

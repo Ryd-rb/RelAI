@@ -63,13 +63,14 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
   if not call subset 2 call key 2 a call str 1 utf8 "attachments" call key 2 payloadval call str 1 utf8 "attachments" 1
     ret call str 1 utf8 "Attachment selection exceeds this assignment."
   0
-  if call same 2 kind call str 1 utf8 "TASK" 11
+  if call same 2 kind call str 1 utf8 "TASK" 13
     if not call subset 2 call key 2 a call str 1 utf8 "skills" call key 2 payloadval call str 1 utf8 "skills" 1 ret call str 1 utf8 "The user did not select this skill." 0
     if or eq 0 call size 1 call key 2 a call str 1 utf8 "criterion" eq 0 call size 1 call key 2 a call str 1 utf8 "deliverable" 1
     ret call str 1 utf8 "A task needs a criterion and deliverable."
   0
-    if lt 0 call size 1 call key 2 a call str 1 utf8 "prerequisites" 1
-    ret call str 1 utf8 "Task prerequisites require verification."
+    set discard call valid_requirements 2 j a
+    if not call same 2 discard 0u 1
+    ret discard
   0
     set n call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM branches WHERE request=?" call append 2 call arr 0 r 0 call str 1 utf8 "n"
     if le 32 call number 1 n 1
@@ -81,7 +82,8 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
   0
     set discard call record_action 4 j aid a call str 1 utf8 "admitted"
     set discard call query 2 call str 1 utf8 "INSERT INTO branches(id,request,revision,fan,parent,role,task) VALUES(?,?,?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid r rev fan parent call key 2 a call str 1 utf8 "role" a
-    set discard call job 6 p r aid call key 2 a call str 1 utf8 "role" call str 1 utf8 "assignment" a
+    set task call job 6 p r aid call key 2 a call str 1 utf8 "role" call str 1 utf8 "assignment" a
+    set discard call bind_requirements 3 j a task
     ret 0u
   0
   if call same 2 kind call str 1 utf8 "ASK" 3
@@ -155,14 +157,14 @@ fn review_ready 1 r uint uint do 11 info uint fans uint fan uint branches uint s
   if call same 2 info 0u 1
     ret 0u
   0
-  set fans call query 2 call str 1 utf8 "SELECT fan,parent FROM branches WHERE request=? AND revision=? GROUP BY fan,parent HAVING count(*)=count(accepted) ORDER BY min(rowid) DESC" call append 2 call append 2 call arr 0 r call key 2 info call str 1 utf8 "revision"
+  set fans call query 2 call str 1 utf8 "SELECT b.fan,b.parent FROM branch_outcomes b WHERE b.request=? AND b.revision=? GROUP BY b.fan,b.parent HAVING max(b.busy)=0 AND min(b.accepted IS NOT NULL OR b.questions!='[]' OR b.waits!='[]' OR b.holds!='[]')=1 ORDER BY max((SELECT rowid FROM branches x WHERE x.id=b.id)) DESC" call append 2 call append 2 call arr 0 r call key 2 info call str 1 utf8 "revision"
   set i 0
   while lt i call size 1 fans 6
     set fan call nth 2 fans i
-    set branches call query 2 call str 1 utf8 "SELECT b.id AS criterion_id,b.role,b.report,b.accepted AS \"acceptance:json\",b.task AS \"task:json\",a.payload AS \"result:json\" FROM branches b JOIN actions a ON a.id=b.report WHERE b.fan=? ORDER BY b.id" call append 2 call arr 0 call key 2 fan call str 1 utf8 "fan"
+    set branches call query 2 call str 1 utf8 "SELECT b.id AS criterion_id,b.role,b.report,b.accepted AS \"acceptance:json\",b.task AS \"task:json\",b.result AS \"result:json\",b.questions AS \"questions:json\",b.waits AS \"waits:json\",b.holds AS \"holds:json\" FROM branch_outcomes b WHERE b.fan=? ORDER BY b.id" call append 2 call arr 0 call key 2 fan call str 1 utf8 "fan"
     set sig call hash 1 call encode 1 branches
     set prior call nth 2 call query 2 call str 1 utf8 "SELECT id FROM reviews WHERE fan=? AND signature=? AND revision=?" call append 2 call append 2 call append 2 call arr 0 call key 2 fan call str 1 utf8 "fan" sig call key 2 info call str 1 utf8 "revision" 0
-    if call same 2 prior 0u 5
+    if and call same 2 prior 0u call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 FROM branch_descendants d JOIN branches b ON b.id=d.child JOIN branches top ON top.id=d.ancestor WHERE top.fan=? AND NOT EXISTS(SELECT 1 FROM reviews rv JOIN jobs j ON j.id=rv.job WHERE rv.fan=b.fan AND j.state='accepted') LIMIT 1" call append 2 call arr 0 call key 2 fan call str 1 utf8 "fan" 0 0u 5
     set rid call uid 0
     set body call shape 2 call str 1 utf8 "{\"review_id\":\"$0\",\"parent\":\"$1\",\"fan\":\"$2\",\"branches\":\"$3\",\"intent\":\"$4\",\"summary\":\"Review the fan-out.\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 rid call key 2 fan call str 1 utf8 "parent" call key 2 fan call str 1 utf8 "fan" branches call key 2 info call str 1 utf8 "intent"
     set jobid call job 6 call key 2 info call str 1 utf8 "project" r call key 2 info call str 1 utf8 "discriminator" call str 1 utf8 "discriminator" call str 1 utf8 "review" body

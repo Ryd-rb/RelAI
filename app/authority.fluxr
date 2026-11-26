@@ -1,0 +1,32 @@
+fluxr 1
+
+fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 11
+  set role call key 2 j call str 1 utf8 "role"
+  set body call key 2 j call str 1 utf8 "body"
+  if and call same 2 role call str 1 utf8 "workflow_improver" not call has_ref 2 call resource 1 call str 1 utf8 "improver-tools.json" name 1
+    ret call str 1 utf8 "Improvement scope excludes this operation."
+  0
+  if or call same 2 name call str 1 utf8 "schedule.create" call same 2 name call str 1 utf8 "schedule.cancel" 1
+    ret call str 1 utf8 "Schedule changes need a typed user instruction."
+  0
+  if or call same 2 name call str 1 utf8 "monitor.start" call same 2 name call str 1 utf8 "monitor.stop" 1
+    ret call str 1 utf8 "Monitor changes require a typed user instruction."
+  0
+  set aid call key 2 arguments call str 1 utf8 "artifact"
+  if and not call same 2 aid 0u not call has_ref 2 call key 2 body call str 1 utf8 "attachments" aid 1
+    ret call str 1 utf8 "Artifact outside the selected assignment."
+  0
+  if call same 2 name call str 1 utf8 "artifact.list" 1
+    ret call str 1 utf8 "Inspect the selected attachment manifest in this turn."
+  0
+  if call same 2 name call str 1 utf8 "skill.read" 1
+    if not call has_ref 2 call key 2 body call str 1 utf8 "skills" call key 2 arguments call str 1 utf8 "id" 1
+    ret call str 1 utf8 "Skill version was not selected for this assignment."
+  0
+  0
+  if call same 2 name call str 1 utf8 "plan.update" 1
+    if not call same 2 call key 2 arguments call str 1 utf8 "request" call key 2 j call str 1 utf8 "request" 1
+    ret call str 1 utf8 "Plan outside the current request."
+  0
+  0
+  ret 0u

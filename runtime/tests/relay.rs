@@ -194,3 +194,128 @@ fn two_workers_require_separate_receipts_before_review() {
             .unwrap()
     );
 }
+fn task(name: &str, prerequisites: Value) -> Value {
+    json!({"type":"TASK","summary":name,"role":"planner","assignment":name,"deliverable":name,"criterion":name,"constraints":[],"skills":[],"targets":[],"attachments":[],"prerequisites":prerequisites,"sources":[]})
+}
+
+#[test]
+fn nested_review_settles_before_the_parent_review_is_released() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = temp.path().join("repo");
+    fs::create_dir(&files).unwrap();
+    let data = temp.path().join("db");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let p = app.invoke("open_project", json!({"root":files})).unwrap()["id"].clone();
+    app.invoke(
+        "submit",
+        json!({"project":p,"key":"nested","text":"Build","attachments":[]}),
+    )
+    .unwrap();
+    let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+    let first = next(&mut app);
+    deliver(
+        &mut app,
+        &first,
+        intake(json!([task("Parent", json!([]))]), 5),
+    )
+    .unwrap();
+    let parent = next(&mut app);
+    deliver(
+        &mut app,
+        &parent,
+        envelope(json!([
+            task("Child", json!([])),
+            result("report", "Parent evidence")
+        ])),
+    )
+    .unwrap();
+    let accept = |app: &mut App| {
+        let a: String = sql
+            .query_row("SELECT id FROM actions WHERE state='evidence'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        app.invoke("control", json!({"project":p,"op":"accept","action":a}))
+            .unwrap();
+    };
+    accept(&mut app);
+    assert_eq!(
+        sql.query_row("SELECT count(*) FROM reviews", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    let child = next(&mut app);
+    deliver(
+        &mut app,
+        &child,
+        envelope(json!([result("report", "Child evidence")])),
+    )
+    .unwrap();
+    accept(&mut app);
+    let review = next(&mut app);
+    let (review_id, root): (String, Option<String>) = sql
+        .query_row(
+            "SELECT rv.id,b.parent FROM reviews rv JOIN branches b USING(fan) WHERE rv.job=?",
+            [review["job"].as_str().unwrap()],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert!(root.is_some());
+    let mut body = envelope(json!([]));
+    body["decision"] = json!("settle");
+    body["review_id"] = json!(review_id);
+    body["achieved"] = json!([]);
+    body["remaining"] = json!([]);
+    deliver(&mut app, &review, body).unwrap();
+    let ancestor = next(&mut app);
+    let root: Option<String> = sql
+        .query_row(
+            "SELECT b.parent FROM reviews rv JOIN branches b USING(fan) WHERE rv.job=?",
+            [ancestor["job"].as_str().unwrap()],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(root.is_none());
+}
+
+#[test]
+fn a_named_question_survives_restart_and_can_be_reviewed_as_waiting() {
+    let temp = tempfile::tempdir().unwrap();
+    let files = temp.path().join("repo");
+    fs::create_dir(&files).unwrap();
+    let data = temp.path().join("db");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let p = app.invoke("open_project", json!({"root":files})).unwrap()["id"].clone();
+    app.invoke(
+        "submit",
+        json!({"project":p,"key":"ask","text":"Check","attachments":[]}),
+    )
+    .unwrap();
+    let first = next(&mut app);
+    deliver(
+        &mut app,
+        &first,
+        intake(json!([task("Check files", json!([]))]), 5),
+    )
+    .unwrap();
+    let worker = next(&mut app);
+    let mut ask = envelope(
+        json!([{"type":"ASK","summary":"Choose scope.","question":"Include examples?","work":"Check links","choices":["Yes","No"]}]),
+    );
+    ask["next"] = json!("wait_for");
+    deliver(&mut app, &worker, ask).unwrap();
+    drop(app);
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let review = next(&mut app);
+    let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+    let (rid,q):(String,String)=sql.query_row("SELECT rv.id,q.id FROM reviews rv JOIN questions q ON rv.request=q.request WHERE rv.job=?",[review["job"].as_str().unwrap()],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    let mut response = envelope(json!([]));
+    response["decision"] = json!("wait");
+    response["review_id"] = json!(rid);
+    response["achieved"] = json!([]);
+    response["remaining"] = json!(["missing-condition"]);
+    assert!(deliver(&mut app, &review, response.clone()).is_err());
+    response["remaining"] = json!([q]);
+    deliver(&mut app, &review, response).unwrap();
+    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
+}

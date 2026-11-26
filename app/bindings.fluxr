@@ -61,10 +61,10 @@ fn canonical 1 x0 uint uint do 0  1
   ret host canonical uint 1 uint x0
 
 fn directory 2 x0 uint x1 uint uint do 0  1
-  ret host directory uint 2 uint x0 uint x1
+  ret call cached_read 3 x0 x1 call str 1 utf8 "directory"
 
 fn readtext 2 x0 uint x1 uint uint do 0  1
-  ret host read_file uint 2 uint x0 uint x1
+  ret call cached_read 3 x0 x1 call str 1 utf8 "text"
 
 fn named 3 x0 uint x1 uint x2 uint uint do 0  1
   ret host find_names uint 3 uint x0 uint x1 uint x2
@@ -103,7 +103,7 @@ fn resource 1 path uint uint do 0  1
   ret call decode 1 call asset 1 path
 
 fn rawbytes 1 x0 uint list uint ret host bytes list uint 1 uint x0
-fn read64 2 root uint path uint uint ret host read_base64 uint 2 uint root uint path
+fn read64 2 root uint path uint uint ret call cached_read 3 root path call str 1 utf8 "base64"
 fn bundle 1 path uint uint ret host bundle uint 1 uint path
 fn frontmatter 1 body uint uint ret host frontmatter uint 1 uint body
 fn keys 1 value uint uint ret host keys uint 1 uint value
@@ -113,3 +113,9 @@ fn pack_format 2 format uint data uint uint ret host encode_format uint 2 uint f
 fn ancestors 2 root uint targets uint uint ret host ancestors uint 2 uint root uint targets
 fn git_read 3 root uint op uint args uint uint ret host git_read uint 3 uint root uint op uint args
 fn stage 3 scope uint op uint args uint uint ret host stage uint 3 uint scope uint op uint args
+fn syntax 2 language uint source uint uint ret host syntax uint 2 uint language uint source
+fn git_inspect 1 root uint uint ret host git_inspect uint 1 uint root
+fn scoped_path 3 root uint path uint absolute uint uint ret host source_path uint 3 uint root uint path uint absolute
+fn file_range 2 encoded uint spec uint uint ret host byte_range uint 2 uint encoded uint spec
+fn patch_transform 1 arg uint uint ret host patch_transform uint 1 uint arg
+fn effect_inspect 1 arg uint uint ret host effect_inspect uint 1 uint arg

@@ -15,7 +15,17 @@
     "context.fluxr",
     "panels.fluxr",
     "review.fluxr",
-    "services.fluxr"
+    "services.fluxr",
+    "cache.fluxr",
+    "schedules.fluxr",
+    "authority.fluxr",
+    "events.fluxr",
+    "analysis.fluxr",
+    "connectors.fluxr",
+    "prerequisites.fluxr",
+    "effects.fluxr",
+    "files.fluxr",
+    "monitoring.fluxr"
   ],
   "public": [
     "open_project",
@@ -35,7 +45,21 @@
     "tool_retire",
     "tool_revoke",
     "dictionary",
-    "skill"
+    "skill",
+    "schedule",
+    "events",
+    "job_details",
+    "connector",
+    "effect_get",
+    "effect_propose",
+    "effect_authorize",
+    "effect_apply",
+    "effect_revoke",
+    "effects_recover",
+    "patch_preview",
+    "patch_stage",
+    "patch_apply",
+    "suggest_terms"
   ],
   "assets": {
     "client.js": "text/javascript; charset=utf-8",
@@ -63,5 +87,81 @@
       "key_header": "Authorization",
       "optional_key": true
     }
-  }
+  },
+  "continuations": {
+    "tool_run": {
+      "$call": [
+        "builtin_run",
+        "registered_run",
+        "effect_run",
+        "network_run"
+      ]
+    },
+    "tool_propose": {
+      "$evaluate": [
+        "guest_tool_admit"
+      ]
+    },
+    "tool_qualify": {
+      "$evaluate": [
+        "guest_tool_tested"
+      ]
+    },
+    "tool_test": {
+      "$evaluate": [
+        "guest_tool_tested"
+      ]
+    },
+    "guest_tool_tested": {
+      "$evaluate": [
+        "guest_tool_tested"
+      ]
+    },
+    "effect_apply": {
+      "$filesystem": [
+        "guest_effect_finished"
+      ]
+    },
+    "effects_recover": {
+      "$filesystem": [
+        "guest_effect_reconciled"
+      ]
+    },
+    "patch_apply": {
+      "$filesystem": [
+        "guest_effect_finished"
+      ]
+    },
+    "scheduled_read": {
+      "$call": [
+        "builtin_run"
+      ]
+    },
+    "builtin_run": {
+      "$evaluate": [
+        "guest_tool_verified"
+      ]
+    },
+    "registered_run": {
+      "$evaluate": [
+        "guest_tool_deliver"
+      ]
+    },
+    "effect_run": {
+      "$filesystem": [
+        "guest_effect_finished"
+      ]
+    },
+    "guest_effect_reconciled": {
+      "$filesystem": [
+        "guest_effect_finished"
+      ]
+    }
+  },
+  "startup_recovery": [
+    {
+      "page": "recovery_page",
+      "apply": "effects_recover"
+    }
+  ]
 }

@@ -671,7 +671,7 @@ dependencies = [
 [[package]]
 name = "fluxr"
 version = "0.1.0"
-source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=5301c0974929ae3f3d5737b22591bdbd8a6e819b#5301c0974929ae3f3d5737b22591bdbd8a6e819b"
+source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=3c202331a013f0cc1bce5498cca37cfff18d1bd1#3c202331a013f0cc1bce5498cca37cfff18d1bd1"
 dependencies = [
  "fluxr-entry",
  "serde",
@@ -727,12 +727,12 @@ dependencies = [
 [[package]]
 name = "fluxr-entry"
 version = "0.1.0"
-source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=5301c0974929ae3f3d5737b22591bdbd8a6e819b#5301c0974929ae3f3d5737b22591bdbd8a6e819b"
+source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=3c202331a013f0cc1bce5498cca37cfff18d1bd1#3c202331a013f0cc1bce5498cca37cfff18d1bd1"
 
 [[package]]
 name = "fluxr-win32"
 version = "0.1.0"
-source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=5301c0974929ae3f3d5737b22591bdbd8a6e819b#5301c0974929ae3f3d5737b22591bdbd8a6e819b"
+source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=3c202331a013f0cc1bce5498cca37cfff18d1bd1#3c202331a013f0cc1bce5498cca37cfff18d1bd1"
 dependencies = [
  "anyhow",
  "serde",

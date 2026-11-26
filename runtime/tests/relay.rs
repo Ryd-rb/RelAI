@@ -157,9 +157,21 @@ fn a_chat_follow_up_uses_only_the_selected_exchange_and_preserves_the_new_prompt
             .unwrap()
     };
     let frame = render(&mut app);
-    let accept = frame["controls"]
-        .as_array()
-        .unwrap()
+    let controls = frame["controls"].as_array().unwrap();
+    for (role, text) in [("outgoing", "Colour?"), ("incoming", "Blue.")] {
+        let message = controls
+            .iter()
+            .find(|c| c["role"] == role && c["value"] == text)
+            .unwrap();
+        assert_eq!(message["kind"], "detail");
+        assert_ne!(message["area"], "composer");
+        assert_ne!(message["area"], "header");
+        assert_ne!(message["side"], true);
+    }
+    assert!(controls.iter().any(|c| c["id"] == frame["composer"]
+        && c["kind"] == "multiline"
+        && c["area"] == "composer"));
+    let accept = controls
         .iter()
         .find(|c| c["label"] == "Accept answer")
         .unwrap();

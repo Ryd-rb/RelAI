@@ -126,6 +126,136 @@ impl Desktop {
 }
 
 #[test]
+fn leaving_project_selection_restores_the_addressed_chat_draft_without_a_picker() {
+    let mut ui = Desktop::open();
+    let project = ui.view["project"].clone();
+    ui.invoke(
+        "submit",
+        json!({"key":"opening-question","text":"Choose.","attachments":[]}),
+    );
+    let seal = ui.app.invoke("poll", Value::Null).unwrap();
+    ui.app.invoke("seal", seal).unwrap();
+    let model = ui.app.invoke("poll", Value::Null).unwrap();
+    let response = json!({"version":1,"actions":[{"type":"ASK","summary":"Choose the style.","question":"Which style?","work":"Plan the interface","choices":["Buttons.","Links."]}],"next":"wait_for","dispositions":[{"start":0,"end":7,"attachment":null,"disposition":"Ask for the presentation."}]});
+    ui.app.invoke("receive",json!({"job":model["job"],"attempt":model["attempt"],"response":{"message":{"params":{"item":{"text":response.to_string()}}}}})).unwrap();
+    ui.render(true);
+    ui.click("Buttons.");
+    ui.type_message("Buttons. Keep this draft 🙂");
+    let nav = ui.state["nav"].clone();
+    let drafts = ui.state["drafts"].clone();
+    ui.click("Open project");
+    assert_eq!(ui.frame["layout"], "welcome");
+    assert_eq!(ui.state["openReturn"], nav);
+    let back = ui.control("Back", "button");
+    assert_eq!(back["role"], "quiet");
+    assert_eq!(
+        ui.frame["default"],
+        ui.control("Choose folder…", "button")["id"]
+    );
+    let returned = ui.event(back, json!({}));
+    assert!(returned.get("platform").is_none());
+    assert!(returned.get("request").is_none());
+    let focus = returned["focus"].clone();
+    ui.apply(returned);
+    assert_eq!(ui.state["nav"], nav);
+    assert_eq!(ui.view["project"], project);
+    assert_eq!(ui.state["drafts"], drafts);
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "Buttons. Keep this draft 🙂"
+    );
+    assert_eq!(focus, ui.control("Message", "multiline")["id"]);
+    ui.click("Open project");
+    let pick = ui.event(ui.control("Choose folder…", "button"), json!({}));
+    assert_eq!(pick["platform"], "folder");
+    let cancelled = ui.app.invoke("desktop_result",json!({"state":ui.state,"project":ui.view["project"],"after":pick["after"],"result":{"path":null}})).unwrap();
+    ui.apply(cancelled);
+    assert_eq!(ui.state["nav"], nav);
+    assert_eq!(ui.state["drafts"], drafts);
+    assert_eq!(ui.frame["layout"], "conversation");
+}
+
+#[test]
+fn project_selection_restores_its_previous_page_and_preserves_manual_path_recovery() {
+    let mut ui = Desktop::open();
+    let first = ui.view["project"].clone();
+    ui.type_message("Keep the first project draft.");
+    ui.click("Models");
+    ui.click("Edit assignment");
+    let nav = ui.state["nav"].clone();
+    let panes = ui.state["panes"].clone();
+    ui.click("Open project");
+    ui.click("Enter folder path");
+    let missing = ui.root.with_file_name("missing-project");
+    ui.change("Existing project folder", "input", json!({"value":missing}));
+    let manual = ui.event(ui.control("Open project", "button"), json!({}));
+    assert_eq!(manual["request"]["op"], "open_project");
+    assert!(
+        ui.app
+            .invoke("open_project", manual["request"]["input"].clone())
+            .is_err()
+    );
+    ui.state = manual["state"].clone();
+    ui.render(false);
+    assert_eq!(
+        ui.control("Existing project folder", "input")["value"],
+        missing.to_string_lossy().as_ref()
+    );
+    ui.click("Back");
+    assert_eq!(ui.state["nav"], nav);
+    assert_eq!(ui.state["panes"], panes);
+    ui.control("Model ID", "input");
+    ui.click("Open project");
+    let pick = ui.event(ui.control("Choose folder…", "button"), json!({}));
+    let cancelled = ui.app.invoke("desktop_result",json!({"state":ui.state,"project":ui.view["project"],"after":pick["after"],"result":{"path":null}})).unwrap();
+    assert!(cancelled.get("focus").is_none());
+    ui.apply(cancelled);
+    assert_eq!(ui.state["nav"], nav);
+    assert_eq!(ui.state["panes"], panes);
+    ui.control("Model ID", "input");
+    ui.click("Open project");
+    let picked = ui.root.with_file_name("second-project");
+    fs::create_dir(&picked).unwrap();
+    let pick = ui.event(ui.control("Choose folder…", "button"), json!({}));
+    let selected = ui.app.invoke("desktop_result",json!({"state":ui.state,"project":ui.view["project"],"after":pick["after"],"result":{"path":picked}})).unwrap();
+    ui.apply(selected);
+    assert_ne!(ui.view["project"], first);
+    assert_eq!(ui.frame["layout"], "conversation");
+    assert!(ui.state["openReturn"].is_null());
+    assert_eq!(ui.state["manualFolder"], false);
+    assert_eq!(ui.control("Message", "multiline")["value"], "");
+    ui.click("project");
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "Keep the first project draft."
+    );
+}
+
+#[test]
+fn cancelling_first_run_project_selection_keeps_welcome_and_the_manual_path() {
+    let mut ui = Desktop::empty();
+    assert!(!ui.controls().iter().any(|c| c["label"] == "Back"));
+    ui.click("Enter folder path");
+    ui.change("Existing project folder", "input", json!({"value":ui.root}));
+    let draft = ui.state["drafts"].clone();
+    let pick = ui.event(ui.control("Choose folder…", "button"), json!({}));
+    let cancelled = ui
+        .app
+        .invoke(
+            "desktop_result",
+            json!({"state":ui.state,"after":pick["after"],"result":{"path":null}}),
+        )
+        .unwrap();
+    assert!(cancelled.get("request").is_none());
+    ui.apply(cancelled);
+    assert_eq!(ui.frame["layout"], "welcome");
+    assert_eq!(ui.state["drafts"], draft);
+    assert!(!ui.controls().iter().any(|c| c["label"] == "Back"));
+    ui.click("Open project");
+    assert_eq!(ui.frame["layout"], "conversation");
+}
+
+#[test]
 fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
     let mut ui = Desktop::empty();
     assert_eq!(ui.frame["theme"], "dark");
@@ -708,6 +838,112 @@ fn changing_composer_skills_updates_the_visible_count_and_keeps_the_message() {
     let send = ui.event(ui.control("Send", "button"), json!({}));
     assert_eq!(send["request"]["input"]["skills"], json!(["notes"]));
     assert_eq!(send["request"]["input"]["text"], "Keep my draft");
+}
+
+#[test]
+fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
+    let mut ui = Desktop::open();
+    let question = "Which command?";
+    let change = "Include the port.";
+    let project = ui.view["project"].clone();
+    let reply = |ui: &mut Desktop, prompt: &str, answer: &str| {
+        let seal = ui.app.invoke("poll", Value::Null).unwrap();
+        ui.app.invoke("seal", seal).unwrap();
+        let job = ui.app.invoke("poll", Value::Null).unwrap();
+        let result = json!({"version":1,"actions":[{"type":"RESULT","summary":"Preview command.","findings":answer,"result_kind":"final","evidence":[],"outcome":null}],"next":"complete_when",
+            "dispositions":[{"start":0,"end":prompt.len(),"attachment":null,"disposition":"Answer the question."}]});
+        ui.app.invoke("receive",json!({"job":job["job"],"attempt":job["attempt"],"response":{"message":{"params":{"item":{"text":result.to_string()}}}}})).unwrap();
+        ui.render(true);
+        job["job"].clone()
+    };
+    ui.type_message(question);
+    ui.click("Send");
+    ui.type_message("Unrelated draft");
+    reply(&mut ui, question, "Use garden preview.");
+    let untargeted = ui.event(ui.control("Send", "button"), json!({}));
+    assert!(untargeted["request"]["input"]["steer"].is_null());
+    let revise = ui.control("Request changes", "button");
+    assert_eq!(revise["row"], ui.control("Accept answer", "button")["row"]);
+    let selected = ui.event(revise.clone(), json!({}));
+    assert_eq!(selected["focus"], ui.control("Message", "multiline")["id"]);
+    ui.apply(selected);
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "Unrelated draft"
+    );
+    assert_eq!(
+        ui.control("Message", "multiline")["placeholder"],
+        "Describe the change…"
+    );
+    ui.click("New topic");
+    let fresh = ui.event(ui.control("Send", "button"), json!({}));
+    assert!(fresh["request"]["input"]["revise"].is_null());
+    assert!(fresh["request"]["input"]["steer"].is_null());
+    ui.click("Request changes");
+    ui.type_message(change);
+    let send = ui.event(ui.control("Send", "button"), json!({}));
+    let submitted = send["request"]["input"].clone();
+    let original = revise["event"]["patch"]["revise"].clone();
+    assert_eq!(submitted["revise"], original);
+    assert_eq!(submitted["text"], change);
+    let other = ui.root.with_file_name("other");
+    fs::create_dir(&other).unwrap();
+    let mut foreign = submitted.clone();
+    foreign["project"] = ui
+        .app
+        .invoke("open_project", json!({"root":other}))
+        .unwrap()["id"]
+        .clone();
+    assert!(ui.app.invoke("submit", foreign).is_err());
+    ui.apply(send);
+    assert!(ui.app.invoke("submit", submitted.clone()).is_ok());
+    let mut late = submitted;
+    late["key"] = json!("late-change");
+    assert!(ui.app.invoke("submit", late).is_err());
+
+    let job = reply(&mut ui, change, "Use garden preview on port 4317.");
+    let path = ui
+        ._temp
+        .path()
+        .join("state/turns")
+        .join(job.as_str().unwrap())
+        .join("input.json");
+    let sealed: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+    assert_eq!(
+        sealed["delivery"]["previous_exchange"],
+        json!({"user_message":question,"answer":"Use garden preview.","answer_id":original})
+    );
+    ui.control("RelAI · Earlier answer", "detail");
+    let stale = ui.event(revise, json!({}));
+    ui.apply(stale);
+    ui.type_message("Keep me");
+    assert_eq!(ui.control("Send", "button")["enabled"], false);
+    assert!(
+        ui.app
+            .invoke(
+                "control",
+                json!({"project":project,"op":"accept","action":original})
+            )
+            .is_err()
+    );
+    ui.click("Request changes");
+    ui.type_message("Does it reload?");
+    let accepted =
+        ui.control("Accept answer", "button")["event"]["spec"]["fixed"]["action"].clone();
+    ui.click("Accept answer");
+    ui.control("RelAI · Accepted answer", "detail");
+    ui.control("Following up on “Which command?”", "label");
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "Does it reload?"
+    );
+    assert_eq!(
+        ui.control("Message", "multiline")["placeholder"],
+        "Ask a follow-up…"
+    );
+    let next = ui.event(ui.control("Send", "button"), json!({}));
+    assert_eq!(next["request"]["input"]["follow"], accepted);
+    assert!(next["request"]["input"]["revise"].is_null());
 }
 
 #[test]

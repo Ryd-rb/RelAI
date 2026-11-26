@@ -134,6 +134,63 @@ fn submission_recovery_retries_and_single_improvement() {
 }
 
 #[test]
+fn updating_a_request_while_reading_the_project_can_reach_acceptance() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("project");
+    fs::create_dir(&root).unwrap();
+    fs::write(root.join("notes.txt"), "Earlier context").unwrap();
+    let data = temp.path().join("state");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let project = app.invoke("open_project", json!({"root":root})).unwrap()["id"].clone();
+    let request = app
+        .invoke(
+            "submit",
+            json!({"project":project,"key":"initial","text":"Read notes."}),
+        )
+        .unwrap()["request"]
+        .clone();
+    let job = next(&mut app);
+    let read = json!({"type":"RUN_TOOL","tool":"fs.read","summary":"Read notes.","arguments_json":json!({"path":"notes.txt"}).to_string()});
+    let mut response = intake(json!([read]), "Read notes.".len());
+    response["next"] = json!("wait_for");
+    deliver(&mut app, &job, response).unwrap();
+    let read = app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(read["local"], "tool_run");
+    let receipt = app.invoke("tool_run", read["arguments"].clone()).unwrap();
+    app.invoke(
+        "submit",
+        json!({"project":project,"key":"update","text":"Say hello.","steer":request}),
+    )
+    .unwrap();
+    app.invoke(
+        "tool_done",
+        json!({"job":read["job"],"state":read["state"],"result":receipt}),
+    )
+    .unwrap();
+    let updated = next(&mut app);
+    deliver(
+        &mut app,
+        &updated,
+        intake(json!([result("final", "Hello.")]), "Say hello.".len()),
+    )
+    .unwrap();
+    let view = app.invoke("dashboard", json!({"project":project})).unwrap();
+    let transcript = view["components"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["type"] == "transcript")
+        .unwrap();
+    let answer = &transcript["destination"]["bind"]["revise"];
+    assert!(answer.is_string());
+    app.invoke(
+        "control",
+        json!({"project":project,"op":"accept","action":answer}),
+    )
+    .unwrap();
+}
+
+#[test]
 fn a_chat_follow_up_uses_only_the_selected_exchange_and_preserves_the_new_prompt() {
     let temp = tempfile::tempdir().unwrap();
     let folder = temp.path().join("first");

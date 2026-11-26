@@ -38,6 +38,10 @@ SELECT p.cursor, p.kind, p.request, p.state, CASE WHEN p.kind='Final result' THE
             THEN 'review' END
       WHEN (p.kind='Final result' OR (p.kind='RESULT' AND f.action=a.id)) AND p.state='completed' THEN 'follow'
       END AS interaction,
+    CASE WHEN p.kind='RESULT' AND p.payload->>'$.state'='awaiting_acceptance' THEN
+      CASE WHEN f.action=a.id AND p.state='completed' THEN 'accepted'
+           WHEN j.revision<p.revision THEN 'earlier' END
+    END AS answer_status,
     CASE WHEN p.kind='Submission' AND p.state='open' AND p.payload->>'$.submission'=(
       SELECT s.id FROM submissions s WHERE s.request=p.request ORDER BY s.rowid DESC LIMIT 1)
       THEN 1 ELSE 0 END AS current_prompt,

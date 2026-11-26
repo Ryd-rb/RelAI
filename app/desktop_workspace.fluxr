@@ -24,7 +24,7 @@ fn ui_header 3 state uint view uint pid uint uint do 4 name uint titleval uint p
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "page/title" call str 1 utf8 "heading" titleval call shape 2 call str 1 utf8 "{\"role\":\"title\",\"area\":\"header\"}" call arr 0
   ret 0u
 
-fn ui_open_form 3 state uint pid uint spec uint uint do 5 scope uint draft uint rowval uint pick uint discard uint 6
+fn ui_open_form 3 state uint pid uint spec uint uint do 5 scope uint draft uint rowval uint pick uint discard uint 7
   set scope call ui_form_key 2 pid spec
   set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
   set rowval call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions"
@@ -36,6 +36,9 @@ fn ui_open_form 3 state uint pid uint spec uint uint do 5 scope uint draft uint 
   2
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "choose" call str 1 utf8 "Choose folder…" pick call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"icon\":\"folder\",\"row\":\"$0\",\"width\":176}" call append 2 call arr 0 rowval
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "manual" call str 1 utf8 "Enter folder path" call shape 2 call str 1 utf8 "{\"action\":\"manual_folder\",\"focus\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "root" call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"$0\",\"width\":156}" call append 2 call arr 0 rowval
+  if not call same 2 call key 2 state call str 1 utf8 "openReturn" 0u 1
+    set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"Back\",\"role\":\"quiet\",\"width\":84,\"event\":{\"action\":\"open_back\"}}" call append 2 call arr 0 call cat 2 scope call str 1 utf8 "/back"
+  0
   ret scope
 
 fn ui_dock_button 2 state uint base uint uint do 2 labelval uint discard uint 4

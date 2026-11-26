@@ -1,13 +1,18 @@
 fluxr 1
 
+fn resolved_chat_target 3 pid uint mode uint fresh uint uint do 0 1
+  ret call nth 2 call query 2 call asset 1 call str 1 utf8 "chat_target.sql" @build append 1 6 call arr 0
+    pid call key 2 mode call str 1 utf8 "reply" call key 2 mode call str 1 utf8 "steer"
+    call key 2 mode call str 1 utf8 "follow" fresh call key 2 mode call str 1 utf8 "revise" 0
+
 fn chat_panel 3 arg uint pid uint components uint uint do 4 rowsval uint forms uint target uint mode uint 9
   set rowsval call query 2 call asset 1 call str 1 utf8 "chat_history.sql" call append 2 call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "older" call key 2 arg call str 1 utf8 "newer"
   set forms call decode 1 call str 1 utf8 "{\"type\":\"form\",\"label\":\"Send\",\"op\":\"submit\",\"fields\":[{\"name\":\"text\",\"label\":\"Message\",\"type\":\"textarea\"},{\"name\":\"attachments\",\"label\":\"Attach files\",\"type\":\"files\",\"op\":\"capture\"}],\"draft\":true,\"idempotent\":true}"
-  set mode call shape 2 call str 1 utf8 "{\"reply\":\"$0\",\"steer\":\"$1\",\"follow\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "reply" call key 2 arg call str 1 utf8 "steer" call key 2 arg call str 1 utf8 "follow"
-  set target call nth 2 call query 2 call asset 1 call str 1 utf8 "chat_target.sql" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "reply" call key 2 arg call str 1 utf8 "steer" call key 2 arg call str 1 utf8 "follow" call key 2 arg call str 1 utf8 "fresh" 0
+  set mode call shape 2 call str 1 @text r#"{"reply":"$0","steer":"$1","follow":"$2","revise":"$3"}"# @build append 1 4 call arr 0 call key 2 arg call str 1 utf8 "reply" call key 2 arg call str 1 utf8 "steer" call key 2 arg call str 1 utf8 "follow" call key 2 arg call str 1 utf8 "revise"
+  set target call resolved_chat_target 3 pid mode call key 2 arg call str 1 utf8 "fresh"
   if call same 2 target 0u 2
     set target call shape 2 call str 1 utf8 "{\"bind\":\"$0\"}" call append 2 call arr 0 mode
-    if or not call same 2 call key 2 arg call str 1 utf8 "reply" 0u or not call same 2 call key 2 arg call str 1 utf8 "steer" 0u not call same 2 call key 2 arg call str 1 utf8 "follow" 0u 1
+    if or not call same 2 call key 2 arg call str 1 utf8 "revise" 0u or not call same 2 call key 2 arg call str 1 utf8 "reply" 0u or not call same 2 call key 2 arg call str 1 utf8 "steer" 0u not call same 2 call key 2 arg call str 1 utf8 "follow" 0u 1
       set target call ui_merge 2 target call shape 2 call str 1 utf8 "{\"unavailable\":true,\"hint\":\"This message can no longer receive a reply. Start a new topic to send your draft.\"}" call arr 0
     0
   0
@@ -28,19 +33,19 @@ fn chat_destination 3 pid uint draft uint suggested uint uint do 3 frozen uint b
     ret suggested
   0
   set binding call key 2 frozen call str 1 utf8 "bind"
-  if and call same 2 call key 2 binding call str 1 utf8 "reply" 0u and call same 2 call key 2 binding call str 1 utf8 "steer" 0u call same 2 call key 2 binding call str 1 utf8 "follow" 0u 1
+  if and call same 2 call key 2 binding call str 1 utf8 "revise" 0u and call same 2 call key 2 binding call str 1 utf8 "reply" 0u and call same 2 call key 2 binding call str 1 utf8 "steer" 0u call same 2 call key 2 binding call str 1 utf8 "follow" 0u 1
     ret frozen
   0
   if call same 2 binding call key 2 suggested call str 1 utf8 "bind" 1
     ret suggested
   0
-  set checked call nth 2 call query 2 call asset 1 call str 1 utf8 "chat_target.sql" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid call key 2 binding call str 1 utf8 "reply" call key 2 binding call str 1 utf8 "steer" call key 2 binding call str 1 utf8 "follow" call decode 1 call str 1 utf8 "true" 0
+  set checked call resolved_chat_target 3 pid binding call decode 1 call str 1 utf8 "true"
   ret call ui_default 2 checked call ui_merge 2 frozen call shape 2 call str 1 utf8 "{\"unavailable\":true,\"hint\":\"This message can no longer receive a reply. Start a new topic to send your draft.\"}" call arr 0
 
 fn activity_panel 0 uint do 0  1
   ret call decode 1 call str 1 @text r#"{"type":"journal","section":"activity"}"#
 
-fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft uint uint do 19 groupval uint selected bool caption uint choices uint interaction uint speaker uint roleval uint body uint meta uint action uint reqid uint keyval uint progress uint jobsval uint item uint part uint term uint discard uint i int 24
+fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft uint uint do 19 groupval uint selected bool caption uint choices uint interaction uint speaker uint roleval uint body uint meta uint action uint reqid uint keyval uint progress uint jobsval uint item uint part uint term uint discard uint i int 27
   set interaction call key 2 row call str 1 utf8 "interaction"
   set reqid call key 2 row call str 1 utf8 "request"
   set action call key 2 row call str 1 utf8 "action"
@@ -48,6 +53,12 @@ fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft 
   set caption call decode 1 call str 1 utf8 "true"
   set speaker call str 1 utf8 "RelAI"
   set roleval call str 1 utf8 "incoming"
+  if call same 2 call key 2 row call str 1 utf8 "answer_status" call str 1 utf8 "accepted" 1
+    set speaker call str 1 utf8 "RelAI · Accepted answer"
+  0
+  if call same 2 call key 2 row call str 1 utf8 "answer_status" call str 1 utf8 "earlier" 1
+    set speaker call str 1 utf8 "RelAI · Earlier answer"
+  0
   if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Submission" 4
     set caption call decode 1 call str 1 utf8 "false"
     set speaker call str 1 utf8 "You"
@@ -97,7 +108,13 @@ fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft 
     if call same 2 interaction call str 1 utf8 "review" 1
       set meta call str 1 utf8 "Approve findings"
     0
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "accept" meta call shape 2 call str 1 utf8 "{\"action\":\"command\",\"spec\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Accept\",\"op\":\"control\",\"fixed\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"op\":\"accept\",\"action\":\"$0\"}" call append 2 call arr 0 action call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"width\":150}" call arr 0
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "accept" meta call shape 2 call str 1 utf8 "{\"action\":\"command\",\"spec\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"type\":\"button\",\"label\":\"Accept\",\"op\":\"control\",\"fixed\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"op\":\"accept\",\"action\":\"$0\"}" call append 2 call arr 0 action call shape 2 call str 1 @text r#"{"role":"primary","width":150,"row":"$0"}"# call append 2 call arr 0 base
+  0
+  if call same 2 interaction call str 1 utf8 "accept" 1
+    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{
+      "id":"$0","kind":"button","label":"Request changes","width":160,"row":"$1",
+      "event":{"action":"nav","patch":{"view":"relay","steer":"$2","revise":"$3","reply":null,"follow":null,"fresh":null}}
+    }"# @build append 1 4 call arr 0 call cat 2 base call str 1 utf8 "/revise" base reqid action
   0
   if and call same 2 interaction call str 1 utf8 "follow" not call same 2 action call key 2 call key 2 target call str 1 utf8 "bind" call str 1 utf8 "follow" 1
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "follow" call str 1 utf8 "Follow up" call shape 2 call str 1 utf8 "{\"action\":\"nav\",\"patch\":\"$0\"}" call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"view\":\"relay\",\"reply\":null,\"steer\":null,\"follow\":\"$0\",\"fresh\":null}" call append 2 call arr 0 action call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":105}" call arr 0

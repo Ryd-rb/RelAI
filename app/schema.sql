@@ -91,3 +91,11 @@ SELECT r.project, q.id, q.request, q.rowid AS sequence, q.body->>'$.question' AS
  WHERE q.state='open' AND r.state='open' AND NOT EXISTS (
     SELECT 1 FROM jobs j WHERE j.request=r.id AND j.revision=r.revision AND j.kind='intake'
       AND j.input->>'$.reply'=q.id AND j.state IN ('queued','sealing','sealed','running','waiting','held','uncertain'));
+
+CREATE VIEW IF NOT EXISTS pending_chat_answers AS
+SELECT r.project, r.id AS request, r.intent AS user_message,
+       a.id AS answer_id, a.payload->>'$.findings' AS answer
+  FROM requests r JOIN jobs j ON j.request=r.id AND j.project=r.project AND j.revision=r.revision
+  JOIN actions a ON a.job=j.id
+ WHERE r.state='open' AND a.kind='RESULT' AND a.state='awaiting_acceptance'
+   AND a.payload->>'$.result_kind'='final';

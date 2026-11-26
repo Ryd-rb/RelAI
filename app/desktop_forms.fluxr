@@ -46,8 +46,16 @@ fn ui_form 3 state uint pid uint spec uint uint do 20 scope uint fields uint dra
       0
       if and not call same 2 dest 0u call same 2 name call str 1 utf8 "text" 2
         set props call shape 2 call str 1 utf8 "{\"caption\":false,\"placeholder\":\"Message RelAI…\",\"lines\":2}" call arr 0
-        if and not call same 2 call key 2 call key 2 dest call str 1 utf8 "bind" call str 1 utf8 "reply" 0u not call same 2 call key 2 dest call str 1 utf8 "unavailable" call decode 1 call str 1 utf8 "true" 1
-          set props call put 3 props call str 1 utf8 "placeholder" call str 1 utf8 "Write your reply…"
+        if not call same 2 call key 2 dest call str 1 utf8 "unavailable" call decode 1 call str 1 utf8 "true" 3
+          if not call same 2 call key 2 call key 2 dest call str 1 utf8 "bind" call str 1 utf8 "revise" 0u 1
+            set props call put 3 props call str 1 utf8 "placeholder" call str 1 utf8 "Describe the change…"
+          0
+          if not call same 2 call key 2 call key 2 dest call str 1 utf8 "bind" call str 1 utf8 "follow" 0u 1
+            set props call put 3 props call str 1 utf8 "placeholder" call str 1 utf8 "Ask a follow-up…"
+          0
+          if not call same 2 call key 2 call key 2 dest call str 1 utf8 "bind" call str 1 utf8 "reply" 0u 1
+            set props call put 3 props call str 1 utf8 "placeholder" call str 1 utf8 "Write your reply…"
+          0
         0
       0
       if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 1

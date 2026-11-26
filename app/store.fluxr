@@ -83,7 +83,7 @@ pub capture 1 arg uint uint do 7 p uint info uint meta uint aid uint mime uint n
   set discard call query 2 call str 1 utf8 "INSERT INTO artifacts VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 aid p meta call key 2 arg call str 1 utf8 "base64"
   ret meta
 
-pub submit 1 arg uint uint do 18 previous uint p uint pid uint keyval uint finger uint prior uint rid uint sid uint prompt uint items uint files uint file uint body uint summary uint discard uint reply uint steer uint i int 34
+pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyval uint finger uint prior uint rid uint sid uint prompt uint items uint files uint file uint body uint summary uint discard uint reply uint steer uint i int 38
   set p call project 1 arg
   set pid call key 2 p call str 1 utf8 "id"
   set keyval call key 2 arg call str 1 utf8 "key"
@@ -107,20 +107,36 @@ pub submit 1 arg uint uint do 18 previous uint p uint pid uint keyval uint finge
     next i
   set reply call key 2 arg call str 1 utf8 "reply"
   set steer call key 2 arg call str 1 utf8 "steer"
+  set previous 0u
+  set revise call key 2 arg call str 1 utf8 "revise"
+  if not call same 2 revise 0u 1
+    set discard call require 2 and not call same 2 steer 0u and call same 2 reply 0u call same 2 call key 2 arg call str 1 utf8 "follow" 0u call str 1 utf8 "Choose one answer to revise"
+  0
   set rid call uid 0
   if not call same 2 reply 0u 2
     set rid call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT r.id FROM requests r JOIN questions q ON q.request=r.id AND q.revision=r.revision WHERE q.id=? AND r.project=? AND r.state='open' AND q.state='open' AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.request=r.id AND j.revision=r.revision AND j.kind='intake' AND j.input->>'$.reply'=q.id AND j.state IN ('queued','sealing','sealed','running','waiting','held','uncertain'))" call append 2 call append 2 call arr 0 reply pid 0 call str 1 utf8 "id"
     set discard call require 2 not call same 2 rid 0u call str 1 utf8 "Question unavailable"
   1
-    if not call same 2 steer 0u 4
-    set rid steer
-    set discard call query 2 call str 1 utf8 "UPDATE requests SET revision=revision+1,intent=? WHERE id=? AND project=? AND state='open'" call append 2 call append 2 call append 2 call arr 0 prompt rid pid
-    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Request unavailable"
-    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded' WHERE request=? AND state IN ('running','queued','sealed','held','uncertain')" call append 2 call arr 0 rid
+    if not call same 2 steer 0u 6
+      set rid steer
+      set previous call nth 2 call query 2 call str 1 @text r#"
+        SELECT user_message,answer,answer_id FROM pending_chat_answers
+         WHERE project=?1 AND request=?2 AND (answer_id=?3 OR (?3 IS NULL AND
+               (SELECT count(*) FROM pending_chat_answers WHERE project=?1 AND request=?2)=1))
+      "# @build append 1 3 call arr 0 pid rid revise 0
+      if not call same 2 revise 0u 1
+        set discard call require 2 not call same 2 previous 0u call str 1 utf8 "This answer is no longer available for revision"
+      0
+      set discard call query 2 call str 1 utf8 "UPDATE requests SET revision=revision+1,intent=? WHERE id=? AND project=? AND state='open'" call append 2 call append 2 call append 2 call arr 0 prompt rid pid
+      set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Request unavailable"
+      set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded' WHERE request=? AND state IN ('running','queued','sealing','sealed','waiting','held','uncertain')" call append 2 call arr 0 rid
   1
     set discard call query 2 call str 1 utf8 "INSERT INTO requests(id,project,intent) VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 rid pid prompt
   set sid call uid 0
   set body call shape 2 call str 1 utf8 "{\"submission\":\"$0\",\"request\":\"$1\",\"text\":\"$2\",\"attachments\":\"$3\",\"reply\":\"$4\",\"steer\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid rid prompt files reply steer
+  if not call same 2 previous 0u 1
+    set body call put 3 body call str 1 utf8 "previous_exchange" previous
+  0
   if not call same 2 call key 2 arg call str 1 utf8 "follow" 0u 4
     set discard call require 2 and call same 2 reply 0u call same 2 steer 0u call str 1 utf8 "A follow-up must have one conversation target"
     set previous call nth 2 call query 2 call str 1 utf8 "SELECT r.intent AS user_message,a.payload->>'$.findings' AS answer,f.action AS answer_id FROM finals f JOIN requests r ON r.id=f.request JOIN actions a ON a.id=f.action WHERE r.project=? AND r.state='completed' AND f.action=? AND (f.released=1 OR EXISTS(SELECT 1 FROM events e WHERE e.project=r.project AND e.kind='RESULT' AND e.payload->>'$.action'=f.action))" call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "follow" 0

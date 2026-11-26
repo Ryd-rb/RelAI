@@ -37,8 +37,8 @@ fn claim_tool 1 j uint uint do 4 args uint jid uint discard uint token uint 7
   if not call same 2 call key 2 call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" call str 1 utf8 "host_path" 0u 1 ret call shape 2 call str 1 utf8 "{\"local\":\"read_selected_file\",\"job\":\"$0\",\"arguments\":{\"job\":\"$0\"},\"then\":\"tool_done\",\"state\":\"$1\"}" call append 2 call append 2 call arr 0 jid token 0
   ret call shape 2 call str 1 utf8 "{\"local\":\"$0\",\"job\":\"$1\",\"arguments\":\"$2\",\"then\":\"tool_done\",\"state\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 args call str 1 utf8 "operation" jid call key 2 args call str 1 utf8 "arguments" token
 
-pub tool_done 1 arg uint uint do 7 j uint body uint receipt uint discard uint r uint assignment uint batch uint 16
-  set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\" FROM jobs j JOIN requests r ON r.id=j.request AND r.project=j.project AND r.revision=j.revision WHERE j.id=? AND j.state='executing' AND (r.state='open' OR (r.state='completed' AND j.role='workflow_improver'))" call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
+pub tool_done 1 arg uint uint do 7 j uint body uint receipt uint discard uint r uint assignment uint batch uint 17
+  set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,r.revision AS current_revision,j.input AS \"body:json\" FROM jobs j JOIN requests r ON r.id=j.request AND r.project=j.project WHERE j.id=? AND j.state='executing' AND (r.state='open' OR (r.state='completed' AND j.role='workflow_improver'))" call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
   if call same 2 j 0u 1
     ret 0u
   0
@@ -46,6 +46,10 @@ pub tool_done 1 arg uint uint do 7 j uint body uint receipt uint discard uint r 
     ret 0u
   0
   set body call key 2 j call str 1 utf8 "body"
+  if not call same 2 call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "current_revision" 2
+    set discard call query 2 call str 1 utf8 "UPDATE actions SET state='superseded' WHERE id=?" call append 2 call arr 0 call key 2 body call str 1 utf8 "action"
+    ret call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded',reason='Request updated during tool execution' WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id"
+  0
   if not call selected_source_ok 2 call key 2 j call str 1 utf8 "id" call key 2 call key 2 body call str 1 utf8 "arguments" call str 1 utf8 "arguments" 2
     set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason='Selected source access changed' WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id"
     ret 0u

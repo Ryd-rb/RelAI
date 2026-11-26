@@ -87,7 +87,8 @@ fn ui_nav 2 state uint patch uint uint do 3 navval uint scope uint discard uint 
     set state call put 3 state call str 1 utf8 "layers" 0u
     set state call put 3 state call str 1 utf8 "before" 0u
   0
-  if or call same 2 call key 2 patch call str 1 utf8 "fresh" call decode 1 call str 1 utf8 "true" or not call same 2 call key 2 patch call str 1 utf8 "reply" 0u or not call same 2 call key 2 patch call str 1 utf8 "follow" 0u not call same 2 call key 2 patch call str 1 utf8 "steer" 0u 3
+  if or call same 2 call key 2 patch call str 1 utf8 "fresh" call decode 1 call str 1 utf8 "true" or not call same 2 call key 2 patch call str 1 utf8 "reply" 0u or not call same 2 call key 2 patch call str 1 utf8 "follow" 0u not call same 2 call key 2 patch call str 1 utf8 "steer" 0u 4
+    set navval call put 3 navval call str 1 utf8 "revise" 0u
     set scope call ui_form_key 2 call key 2 patch call str 1 utf8 "project" call decode 1 call str 1 utf8 "{\"draft\":true}"
     set state call ui_draft_set 4 state scope call str 1 utf8 "$destination" 0u
     set state call ui_draft_set 4 state scope call str 1 utf8 "$key" 0u

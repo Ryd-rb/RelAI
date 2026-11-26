@@ -123,6 +123,18 @@ impl Desktop {
         input["project"] = self.view["project"].clone();
         self.app.invoke(export, input).unwrap()
     }
+    fn receive_intake(&mut self, prompt: &str, actions: Value, next: &str) -> Value {
+        let seal = self.app.invoke("poll", Value::Null).unwrap();
+        self.app.invoke("seal", seal).unwrap();
+        let job = self.app.invoke("poll", Value::Null).unwrap();
+        let response = json!({
+            "version":1, "actions":actions, "next":next,
+            "dispositions":[{"start":0,"end":prompt.len(),"attachment":null,"disposition":"Answer the question."}]
+        });
+        self.app.invoke("receive",json!({"job":job["job"],"attempt":job["attempt"],"response":{"message":{"params":{"item":{"text":response.to_string()}}}}})).unwrap();
+        self.render(true);
+        job["job"].clone()
+    }
 }
 
 #[test]
@@ -847,14 +859,7 @@ fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
     let change = "Include the port.";
     let project = ui.view["project"].clone();
     let reply = |ui: &mut Desktop, prompt: &str, answer: &str| {
-        let seal = ui.app.invoke("poll", Value::Null).unwrap();
-        ui.app.invoke("seal", seal).unwrap();
-        let job = ui.app.invoke("poll", Value::Null).unwrap();
-        let result = json!({"version":1,"actions":[{"type":"RESULT","summary":"Preview command.","findings":answer,"result_kind":"final","evidence":[],"outcome":null}],"next":"complete_when",
-            "dispositions":[{"start":0,"end":prompt.len(),"attachment":null,"disposition":"Answer the question."}]});
-        ui.app.invoke("receive",json!({"job":job["job"],"attempt":job["attempt"],"response":{"message":{"params":{"item":{"text":result.to_string()}}}}})).unwrap();
-        ui.render(true);
-        job["job"].clone()
+        ui.receive_intake(prompt,json!([{"type":"RESULT","summary":"Preview command.","findings":answer,"result_kind":"final","evidence":[],"outcome":null}]),"complete_when")
     };
     ui.type_message(question);
     ui.click("Send");
@@ -944,6 +949,89 @@ fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
     let next = ui.event(ui.control("Send", "button"), json!({}));
     assert_eq!(next["request"]["input"]["follow"], accepted);
     assert!(next["request"]["input"]["revise"].is_null());
+}
+
+#[test]
+fn a_newer_answer_keeps_the_draft_and_older_questions_can_be_reached_from_any_page() {
+    for count in [1, 2] {
+        let mut ui = Desktop::open();
+        ui.type_message("Choose a style.");
+        ui.click("Send");
+        let questions: Vec<_> = ["Which colour?", "Which font?"][..count].iter().map(|text|
+            json!({"type":"ASK","summary":"Choose a style.","work":"Style the page.","question":text,"choices":[]})
+        ).collect();
+        ui.receive_intake("Choose a style.", json!(questions), "wait_for");
+        if count == 2 {
+            ui.control("Question to answer", "select");
+        } else {
+            assert_eq!(
+                ui.control("Message", "multiline")["placeholder"],
+                "Write your reply…"
+            );
+        }
+
+        // Each intervening request and stop add two real transcript entries.
+        for i in 0..13 {
+            let sub = ui.invoke(
+                "submit",
+                json!({"key":format!("old-{i}"),"text":"Intervening topic."}),
+            );
+            ui.invoke("control", json!({"op":"stop","request":sub["request"]}));
+        }
+        ui.render(true);
+        ui.click("New topic");
+        ui.type_message("Check the build.");
+        ui.click("Send");
+        ui.receive_intake("Check the build.",json!([{"type":"RESULT","summary":"Build checked.","findings":"The build passes.","result_kind":"final","outcome":null,"evidence":[]}]),"complete_when");
+        ui.control("Earlier messages", "button");
+        assert!(!ui.controls().iter().any(|c| c["value"] == "Which colour?"));
+        let answer =
+            ui.control("Accept answer", "button")["event"]["spec"]["fixed"]["action"].clone();
+        ui.type_message("Keep this draft.");
+        let send_target = |ui: &mut Desktop| {
+            ui.event(ui.control("Send", "button"), json!({}))["request"]["input"].clone()
+        };
+        assert_eq!(send_target(&mut ui)["revise"], answer);
+        ui.click("Other questions");
+        let picker = ui.control("Question to answer", "select");
+        assert_eq!(picker["choices"].as_array().unwrap().len(), count + 1);
+        let old = picker["choices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["label"] == "Which colour?")
+            .unwrap()["value"]
+            .clone();
+        assert_eq!(send_target(&mut ui)["revise"], answer);
+        ui.click("Accept answer");
+        assert_eq!(send_target(&mut ui)["follow"], answer);
+        if !ui
+            .controls()
+            .iter()
+            .any(|c| c["kind"] == "select" && c["label"] == "Question to answer")
+        {
+            ui.click("Other questions");
+        }
+        ui.change("Question to answer", "select", json!({"value":old}));
+        assert_eq!(send_target(&mut ui)["reply"], old);
+        assert!(send_target(&mut ui)["follow"].is_null());
+        assert_eq!(
+            ui.control("Message", "multiline")["value"],
+            "Keep this draft."
+        );
+        ui.click("New topic");
+        let fresh = send_target(&mut ui);
+        assert!(
+            ["reply", "revise", "follow", "steer"]
+                .iter()
+                .all(|key| fresh[*key].is_null())
+        );
+        assert!(
+            !ui.controls()
+                .iter()
+                .any(|c| c["label"] == "Other questions")
+        );
+    }
 }
 
 #[test]

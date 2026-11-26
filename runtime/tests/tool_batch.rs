@@ -144,6 +144,70 @@ fn reads() -> Value {
 }
 
 #[test]
+#[cfg(windows)]
+fn checking_two_effects_returns_one_answer_that_can_be_accepted() {
+    let mut h = Harness::new();
+    let mut ids = Vec::new();
+    for name in ["first", "second"] {
+        let path = h.temp.path().join("project").join(name);
+        let proposal = h.app.invoke("effect_propose",json!({
+            "project":h.project,"operation":"fs.mkdir","path":path,"expected":{"kind":"absent"}
+        })).unwrap();
+        ids.push(proposal["effect"].clone());
+    }
+    let request = h.submit(json!({"text":"Check both proposals."}));
+    let source = h.provider();
+    let checks: Vec<_> = ids
+        .iter()
+        .map(|id| tool("effect.status", json!({"effect":id})))
+        .collect();
+    h.respond(&source, json!(checks), "wait_for");
+    for id in &ids {
+        let local = h.local();
+        let receipt = h.execute(&local);
+        assert_eq!(receipt["id"], *id);
+        assert_eq!(receipt["state"], "planned");
+        h.done(&local, &receipt);
+    }
+    assert_eq!(h.batch_count(&source), 1);
+    let resumed = h.provider();
+    let delivery = h.delivery(&resumed);
+    let receipts = delivery["tool_receipts"].as_array().unwrap();
+    assert_eq!(receipts.len(), ids.len());
+    for (entry, id) in receipts.iter().zip(ids) {
+        assert_eq!(entry["tool"], "effect.status");
+        assert_eq!(entry["receipt"]["id"], id);
+    }
+    h.respond(&resumed,json!([{"type":"RESULT","summary":"Checked both proposals.","findings":"Both proposals await approval.","result_kind":"final","evidence":[],"outcome":null}]),"complete_when");
+    let answer: String = h
+        .sql()
+        .query_row(
+            "SELECT id FROM actions WHERE state='awaiting_acceptance'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    h.app
+        .invoke(
+            "control",
+            json!({"project":h.project,"op":"accept","action":answer}),
+        )
+        .unwrap();
+    let state: String = h
+        .sql()
+        .query_row(
+            "SELECT state FROM requests WHERE id=?",
+            [request["request"].as_str().unwrap()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(state, "completed");
+    for name in ["first", "second"] {
+        assert!(!h.temp.path().join("project").join(name).exists());
+    }
+}
+
+#[test]
 fn sibling_reads_resume_once_with_all_receipts_and_sealed_reply_context() {
     let mut h = Harness::new();
     h.submit(json!({}));

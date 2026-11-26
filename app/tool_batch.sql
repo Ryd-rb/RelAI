@@ -13,7 +13,7 @@ WITH source AS (
         AND NOT EXISTS (
             SELECT 1 FROM json_each(s.receipt,'$.actions') a
             WHERE a.value->>'$.type'!='RUN_TOOL'
-                OR a.value->>'$.tool' NOT IN ('fs.list','fs.read','fs.search','tool.find')
+                OR a.value->>'$.tool' NOT IN ('fs.list','fs.read','fs.search','tool.find','effect.status')
                 OR CASE WHEN json_valid(a.value->>'$.arguments_json')
                     THEN json_extract(a.value->>'$.arguments_json','$.host_path') IS NOT NULL
                     ELSE 1 END)

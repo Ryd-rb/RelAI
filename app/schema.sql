@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS projects(id TEXT PRIMARY KEY,root TEXT NOT NULL UNIQUE,discriminator TEXT NOT NULL UNIQUE);
+CREATE TABLE IF NOT EXISTS desktop_selection(singleton INTEGER PRIMARY KEY CHECK(singleton=1),project TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE);
 CREATE TABLE IF NOT EXISTS events(cursor INTEGER PRIMARY KEY AUTOINCREMENT,project TEXT NOT NULL REFERENCES projects,kind TEXT NOT NULL,payload TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS project_cursor ON events(project,cursor);
 CREATE TABLE IF NOT EXISTS presets(scope TEXT NOT NULL,role TEXT NOT NULL,provider TEXT NOT NULL,model TEXT NOT NULL,effort TEXT NOT NULL,rev INTEGER NOT NULL,PRIMARY KEY(scope,role));
@@ -7,6 +8,8 @@ CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,project TEXT NOT NULL RE
 CREATE TABLE IF NOT EXISTS submissions(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,request TEXT NOT NULL REFERENCES requests,key TEXT NOT NULL,hash TEXT NOT NULL,content TEXT NOT NULL,UNIQUE(project,key));
 CREATE INDEX IF NOT EXISTS submissions_request ON submissions(request);
 CREATE INDEX IF NOT EXISTS chat_cursor ON events(project,cursor) WHERE kind IN ('Submission','ASK','RESULT','Final result','Request stopped');
+CREATE INDEX IF NOT EXISTS chat_request_cursor ON events(project,(payload->>'$.request'),cursor)
+  WHERE kind IN ('Submission','ASK','RESULT','Final result','Request stopped');
 CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY,content TEXT NOT NULL,digest TEXT NOT NULL,verified INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,request TEXT NOT NULL REFERENCES requests,revision INTEGER NOT NULL,session TEXT NOT NULL,role TEXT NOT NULL,kind TEXT NOT NULL,input TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'queued',seal TEXT,attempt TEXT,receipt TEXT,reason TEXT);
 CREATE INDEX IF NOT EXISTS queue ON jobs(state,role,session);
@@ -82,3 +85,9 @@ CREATE TABLE IF NOT EXISTS git_remotes(id TEXT PRIMARY KEY,project TEXT NOT NULL
 CREATE TABLE IF NOT EXISTS git_transfers(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,remote TEXT NOT NULL REFERENCES git_remotes,operation TEXT NOT NULL,expected TEXT,target TEXT,state TEXT NOT NULL,receipt TEXT);
 CREATE TABLE IF NOT EXISTS connectors(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,name TEXT NOT NULL,definition TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS network_effects(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,connector TEXT NOT NULL REFERENCES connectors,arguments TEXT NOT NULL,state TEXT NOT NULL,receipt TEXT);
+CREATE VIEW IF NOT EXISTS open_chat_questions AS
+SELECT r.project, q.id, q.request, q.rowid AS sequence, q.body->>'$.question' AS prompt
+  FROM questions q JOIN requests r ON r.id=q.request AND r.revision=q.revision
+ WHERE q.state='open' AND r.state='open' AND NOT EXISTS (
+    SELECT 1 FROM jobs j WHERE j.request=r.id AND j.revision=r.revision AND j.kind='intake'
+      AND j.input->>'$.reply'=q.id AND j.state IN ('queued','sealing','sealed','running','waiting','held','uncertain'));

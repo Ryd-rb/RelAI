@@ -72,9 +72,13 @@ fn ui_complete 2 state uint event uint uint do 12 scope uint name uint draft uin
   set state call ui_set_map 4 state call str 1 utf8 "drafts" scope draft
   ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\",\"selection\":{\"id\":\"$0\",\"start\":\"$1\",\"end\":\"$1\"}}" call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" name endval
 
-fn ui_nav 2 state uint patch uint uint do 2 navval uint scope uint 6
+fn ui_nav 2 state uint patch uint uint do 3 navval uint scope uint discard uint 6
   set navval call ui_default 2 call key 2 state call str 1 utf8 "nav" call obj 0
-  if and not call same 2 call key 2 patch call str 1 utf8 "project" 0u not call same 2 call key 2 patch call str 1 utf8 "project" call key 2 navval call str 1 utf8 "project" 3
+  if and not call same 2 call key 2 patch call str 1 utf8 "project" 0u not call same 2 call key 2 patch call str 1 utf8 "project" call key 2 navval call str 1 utf8 "project" 4
+    set discard call query 2 call str 1 @text r#"
+      INSERT INTO desktop_selection(singleton,project) SELECT 1,id FROM projects WHERE id=?
+      ON CONFLICT(singleton) DO UPDATE SET project=excluded.project WHERE project<>excluded.project
+    "# call append 2 call arr 0 call key 2 patch call str 1 utf8 "project"
     set navval call obj 0
     set state call put 3 state call str 1 utf8 "filter" 0u
     set state call put 3 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "false"

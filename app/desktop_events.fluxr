@@ -1,6 +1,6 @@
 fluxr 1
 
-pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval uint actionval uint scope uint name uint spec uint v uint stack uint keyval uint fixed uint before uint draft uint discard uint 39
+pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval uint actionval uint scope uint name uint spec uint v uint stack uint keyval uint fixed uint before uint draft uint discard uint 40
   set state call key 2 arg call str 1 utf8 "state"
   set pid call key 2 arg call str 1 utf8 "project"
   set event call key 2 arg call str 1 utf8 "event"
@@ -48,6 +48,13 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     set state call ui_draft_set 4 state scope call str 1 utf8 "version" call key 2 v call str 1 utf8 "version"
     set state call ui_set_map 4 state call str 1 utf8 "folds" call cat 2 call cat 2 pid call str 1 utf8 "/" call str 1 utf8 "tools/run-tools" call decode 1 call str 1 utf8 "true"
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "arguments"
+  0
+  if call same 2 actionval call str 1 utf8 "pick_question" 3
+    if eq 0 call size 1 v 1
+      ret call shape 2 call str 1 @text r#"{"state":"$0","refresh":"none"}"# call append 2 call arr 0 state
+    0
+    set state call ui_nav 2 state call shape 2 call str 1 @text r#"{"project":"$0","view":"relay","reply":"$1","steer":null,"follow":null,"fresh":null}"# @build append 1 2 call arr 0 pid v
+    ret call chat_focus 2 state pid
   0
   if call same 2 actionval call str 1 utf8 "project_tab" 2
     set state call ui_nav 2 state call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"view\":\"relay\"}" call append 2 call arr 0 v

@@ -794,6 +794,140 @@ fn a_question_arriving_while_typing_cannot_redirect_the_draft() {
 }
 
 #[test]
+fn a_draft_with_two_open_questions_waits_for_an_explicit_destination() {
+    let mut ui = Desktop::open();
+    let project = ui.view["project"].as_str().unwrap().to_owned();
+    let request = ui.invoke(
+        "submit",
+        json!({"key":"start","text":"Review this project","attachments":[]}),
+    );
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    for (id, question) in [("scope", "Which scope?"), ("build", "Which build?")] {
+        let ask = json!({"question":question,"choices":["Recommended","Custom"]});
+        db.execute("INSERT INTO questions(id,request,revision,session,role,body) VALUES(?,?,1,'session','planner',?)",
+            (id, request["request"].as_str().unwrap(), ask.to_string())).unwrap();
+        db.execute(
+            "INSERT INTO events(project,kind,payload) VALUES(?,'ASK',?)",
+            (
+                &project,
+                json!({"action":id,"request":request["request"],"payload":ask}).to_string(),
+            ),
+        )
+        .unwrap();
+    }
+    ui.render(true);
+    let picker = ui.control("Question to answer", "select");
+    let choices = picker["choices"].as_array().unwrap();
+    assert!(
+        choices
+            .iter()
+            .any(|q| q["value"] == "scope" && q["label"] == "Which scope?")
+    );
+    assert!(
+        choices
+            .iter()
+            .any(|q| q["value"] == "build" && q["label"] == "Which build?")
+    );
+    let question = ui
+        .controls()
+        .iter()
+        .find(|c| c["value"] == "Which build?")
+        .unwrap();
+    let section = &question["section"];
+    assert!(section.is_string());
+    assert!(ui.controls().iter().any(|c| &c["section"] == section
+        && c["label"] == "Recommended"
+        && c["event"]["action"] == "choose_reply"));
+    let options = ui
+        .controls()
+        .iter()
+        .position(|c| c["label"] == "Request options")
+        .unwrap();
+    assert!(
+        options
+            > ui.controls()
+                .iter()
+                .position(|c| c["id"] == question["id"])
+                .unwrap()
+    );
+
+    ui.type_message("The local build");
+    assert_eq!(ui.control("Send", "button")["enabled"], false);
+    assert!(
+        ui.event(ui.control("Send", "button"), json!({}))
+            .get("request")
+            .is_none()
+    );
+    ui.change("Question to answer", "select", json!({"value":"build"}));
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "The local build"
+    );
+    assert_eq!(
+        ui.control("Message", "multiline")["placeholder"],
+        "Write your reply…"
+    );
+    let selected = ui.control("RelAI · Replying to this question", "detail");
+    assert_eq!(selected["value"], "Which build?");
+    assert_eq!(
+        ui.controls()
+            .iter()
+            .filter(|c| c["label"] == "Reply")
+            .count(),
+        1
+    );
+    let routed = ui.event(ui.control("Send", "button"), json!({}));
+    assert_eq!(routed["request"]["input"]["reply"], "build");
+
+    ui.click("New topic");
+    let fresh = ui.event(ui.control("Send", "button"), json!({}));
+    assert_eq!(fresh["request"]["input"]["text"], "The local build");
+    assert!(fresh["request"]["input"]["reply"].is_null());
+}
+
+#[test]
+fn reopening_restores_the_selected_project_after_a_different_projects_last_message() {
+    let mut ui = Desktop::empty();
+    let first = ui
+        .app
+        .invoke("open_project", json!({"root":ui.root}))
+        .unwrap()["id"]
+        .clone();
+    let other = ui.root.with_file_name("another-project");
+    fs::create_dir(&other).unwrap();
+    let second = ui
+        .app
+        .invoke("open_project", json!({"root":other}))
+        .unwrap()["id"]
+        .clone();
+    ui.app
+        .invoke(
+            "submit",
+            json!({"project":second,"key":"last","text":"Discuss this project","attachments":[]}),
+        )
+        .unwrap();
+    ui.render(true);
+    assert_eq!(ui.view["project"], second);
+    ui.click("project");
+    assert_eq!(ui.view["project"], first);
+
+    let data = ui._temp.path().join("state");
+    drop(ui.app);
+    let mut reopened =
+        App::open(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"), &data).unwrap();
+    assert_eq!(
+        reopened.invoke("dashboard", Value::Null).unwrap()["project"],
+        first
+    );
+    assert_eq!(
+        reopened
+            .invoke("dashboard", json!({"project":second}))
+            .unwrap()["project"],
+        second
+    );
+}
+
+#[test]
 fn many_project_tabs_keep_each_draft_addressable() {
     let mut ui = Desktop::open();
     let first = ui.view["project"].clone();

@@ -29,9 +29,8 @@ SELECT p.cursor, p.kind, p.request, p.state, CASE WHEN p.kind='Final result' THE
         AND json_array_length(p.payload,'$.payload.choices') BETWEEN 1 AND 6
         AND NOT EXISTS (SELECT 1 FROM json_each(p.payload,'$.payload.choices') WHERE type!='text' OR length(trim(value))=0 OR length(value)>48)
         THEN p.payload->'$.payload.choices' ELSE '[]' END AS "quick_choices:json",
-    CASE WHEN p.kind='ASK' AND p.state='open' AND q.revision=p.revision AND q.state='open'
-        AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.request=p.request AND j.revision=p.revision
-          AND j.kind='intake' AND j.input->>'$.reply'=q.id AND j.state IN ('queued','sealing','sealed','running','waiting','held','uncertain')) THEN 'reply'
+    CASE WHEN p.kind='ASK' AND EXISTS (
+        SELECT 1 FROM open_chat_questions oq WHERE oq.project=?1 AND oq.id=q.id) THEN 'reply'
       WHEN p.kind='RESULT' AND p.state='open' AND j.revision=p.revision THEN
         CASE WHEN a.state='awaiting_acceptance' THEN 'accept'
           WHEN a.state='evidence' AND EXISTS (SELECT 1 FROM branches b WHERE b.report=a.id AND b.accepted IS NULL)
@@ -42,6 +41,9 @@ SELECT p.cursor, p.kind, p.request, p.state, CASE WHEN p.kind='Final result' THE
     CASE WHEN p.kind='Submission' AND p.state='open' AND p.payload->>'$.submission'=(
       SELECT s.id FROM submissions s WHERE s.request=p.request ORDER BY s.rowid DESC LIMIT 1)
       THEN 1 ELSE 0 END AS current_prompt,
+    CASE WHEN p.state='open' AND NOT EXISTS (
+      SELECT 1 FROM visible later WHERE later.payload->>'$.request'=p.request AND later.cursor>p.cursor
+    ) THEN 1 ELSE 0 END AS request_tail,
     (SELECT min(cursor) FROM page) AS oldest, (SELECT max(cursor) FROM page) AS newest,
     EXISTS (SELECT 1 FROM visible WHERE cursor<(SELECT min(cursor) FROM page)) AS earlier,
     EXISTS (SELECT 1 FROM visible WHERE cursor>(SELECT max(cursor) FROM page)) AS later

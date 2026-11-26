@@ -10,7 +10,11 @@ pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uin
   set projects call query 2 call str 1 utf8 "WITH names AS (SELECT rowid AS ord,id,root,coalesce(nullif((SELECT value FROM json_each('['||replace(json_quote(rtrim(replace(p.root,char(92),'/'),'/')), '/',char(34)||','||char(34))||']') ORDER BY key DESC LIMIT 1),''),root) AS leaf FROM projects AS p) SELECT id,root,CASE WHEN count(*) OVER (PARTITION BY lower(leaf))=1 THEN leaf ELSE root END AS short FROM names ORDER BY ord" call arr 0
   set pid call key 2 arg call str 1 utf8 "project"
   if call same 2 pid 0u 1
-    set pid call key 2 call nth 2 projects 0 call str 1 utf8 "id"
+    set pid call key 2 call nth 2 call query 2 call str 1 @text r#"
+      SELECT coalesce((SELECT project FROM desktop_selection WHERE singleton=1),
+                      (SELECT project FROM submissions ORDER BY rowid DESC LIMIT 1),
+                      (SELECT id FROM projects ORDER BY rowid LIMIT 1)) AS id
+    "# call arr 0 0 call str 1 utf8 "id"
   0
   set tabs call arr 0
   set i 0

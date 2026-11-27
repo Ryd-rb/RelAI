@@ -284,6 +284,39 @@ fn starter_prompts_focus_an_editable_draft_without_sending_or_overwriting() {
 }
 
 #[test]
+fn model_editor_keeps_separate_project_and_global_drafts() {
+    let mut ui = Desktop::open();
+    for (scope, provider, model, effort) in [
+        ("project", "codex", "project-model", "high"),
+        ("global", "qwen", "global-model", "low"),
+    ] {
+        ui.invoke("save_model", json!({
+            "role":"discriminator","scope":scope,"provider":provider,"model":model,"effort":effort
+        }));
+    }
+    ui.click("Models");
+    ui.click("Edit assignment");
+    assert_eq!(ui.control("Model ID", "input")["value"], "project-model");
+    ui.change("Model ID", "input", json!({"value":"project-draft"}));
+    ui.change("Apply to", "select", json!({"value":"global"}));
+    assert_eq!(ui.control("Apply to", "select")["value"], "global");
+    assert_eq!(ui.control("Provider", "select")["value"], "qwen");
+    assert_eq!(ui.control("Model ID", "input")["value"], "global-model");
+    assert_eq!(ui.control("Reasoning effort", "select")["value"], "low");
+    ui.change("Model ID", "input", json!({"value":"global-draft"}));
+    ui.change("Apply to", "select", json!({"value":"project"}));
+    assert_eq!(ui.control("Model ID", "input")["value"], "project-draft");
+    ui.change("Apply to", "select", json!({"value":"global"}));
+    assert_eq!(ui.control("Model ID", "input")["value"], "global-draft");
+    ui.click("Save preset");
+    ui.control("project-model", "heading");
+    ui.click("Edit assignment");
+    assert_eq!(ui.control("Model ID", "input")["value"], "global-draft");
+    ui.change("Apply to", "select", json!({"value":"project"}));
+    assert_eq!(ui.control("Model ID", "input")["value"], "project-draft");
+}
+
+#[test]
 fn leaving_project_selection_restores_the_addressed_chat_draft_without_a_picker() {
     let mut ui = Desktop::open();
     let project = ui.view["project"].clone();
@@ -1097,6 +1130,41 @@ fn activity_pages_are_stable_and_attention_tracks_an_open_question() {
 }
 
 #[test]
+fn activity_can_step_newer_without_losing_the_anchored_head() {
+    let mut ui = Desktop::open();
+    let project = ui.view["project"].as_str().unwrap().to_owned();
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    for index in 0..250 {
+        db.execute(
+            "INSERT INTO events(project,kind,payload) VALUES(?,'Recorded',?)",
+            (
+                &project,
+                json!({"text":format!("event {index}")}).to_string(),
+            ),
+        )
+        .unwrap();
+    }
+    ui.click("Activity");
+    let first = ui.control("Events", "list")["choices"].clone();
+    ui.click("Older activity");
+    let second = ui.control("Events", "list")["choices"].clone();
+    ui.click("Older activity");
+    db.execute(
+        "INSERT INTO events(project,kind,payload) VALUES(?,'Arrival','{}')",
+        [&project],
+    )
+    .unwrap();
+    ui.render(true);
+    ui.click("Newer activity");
+    assert_eq!(ui.control("Events", "list")["choices"], second);
+    ui.click("Newer activity");
+    assert_eq!(ui.control("Events", "list")["choices"], first);
+    assert!(ui.controls().iter().all(|c| c["label"] != "Newer activity"));
+    ui.click("Return to latest activity");
+    assert_ne!(ui.control("Events", "list")["choices"][0], first[0]);
+}
+
+#[test]
 fn completing_terms_right_to_left_submits_in_text_order() {
     let mut ui = Desktop::open();
     for name in ["Café", "Thé"] {
@@ -1546,6 +1614,53 @@ fn changes_forms_send_labeled_effect_and_completed_fetch_ids() {
     assert_eq!(request["request"]["input"]["transfer"], "completed-fetch");
     assert_eq!(request["request"]["input"]["path"], "skills/example");
     assert_eq!(request["request"]["input"]["op"], "install_git");
+}
+
+#[test]
+fn tool_search_discloses_truncation_and_lists_extended_contracts() {
+    let mut ui = Desktop::open();
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    let project = ui.view["project"].as_str().unwrap();
+    for n in 0..110 {
+        db.execute(
+            "INSERT INTO tools(version,project,name,source,export,contract,runtime) VALUES(?,?,?,'','run','integer.increment','fixture')",
+            (format!("tool-{n}"), project, format!("Example {n}")),
+        ).unwrap();
+    }
+    ui.click("Tools");
+    ui.control(
+        "Showing the first 128 matches. Narrow the search to find more.",
+        "label",
+    );
+    assert_eq!(
+        ui.control("Matching tools", "list")["choices"]
+            .as_array()
+            .unwrap()
+            .len(),
+        128
+    );
+    let broad = ui.invoke(
+        "tool_run",
+        json!({"tool":"tool.find","arguments":{"query":""}}),
+    );
+    assert_eq!(broad["value"][0]["has_more"], true);
+    ui.change("Search tools", "input", json!({"value":"code.references"}));
+    assert!(
+        ui.controls()
+            .iter()
+            .all(|c| !c["label"].as_str().unwrap_or("").contains("first 128"))
+    );
+    let list = ui.control("Matching tools", "list");
+    let choice = list["choices"][0]["value"].clone();
+    let pick = ui.event(list, json!({"value":choice}));
+    ui.apply(pick);
+    let contract = ui.control("Selected tool input contract", "detail");
+    assert!(
+        contract["value"]
+            .as_str()
+            .unwrap()
+            .contains("exact symbol name")
+    );
 }
 
 #[test]

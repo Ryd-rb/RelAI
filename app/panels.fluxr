@@ -6,7 +6,7 @@ fn dictionary_panel 1 pid uint uint do 3 choices uint dictionaries uint skills u
   set choices call nth 2 call query 2 call asset 1 call str 1 utf8 "workspace_management.sql" @build append 1 2 call arr 0 pid call query 2 call asset 1 call str 1 utf8 "project_labels.sql" call arr 0 0
   ret call shape 2 call asset 1 call str 1 utf8 "dictionary_workspace.json" @build append 1 5 call arr 0 dictionaries skills call key 2 choices call str 1 utf8 "available" call key 2 choices call str 1 utf8 "owned" call key 2 choices call str 1 utf8 "installed"
 
-fn model_panel 2 arg uint pid uint uint do 14 assignments uint row uint profile uint titleval uint i int rolesval uint choices uint current uint presetval uint sourceval uint formval uint overview uint fields uint discard uint 16
+fn model_panel 2 arg uint pid uint uint do 15 assignments uint row uint profile uint titleval uint i int rolesval uint choices uint current uint presetval uint sourceval uint formval uint overview uint fields uint discard uint scopeval uint 19
   set rolesval call resource 1 call str 1 utf8 "roles.json"
   set current call ui_default 2 call key 2 arg call str 1 utf8 "modelRole" call str 1 utf8 "discriminator"
   set discard call require 2 not call same 2 call key 2 rolesval current 0u call str 1 utf8 "Unknown model role"
@@ -38,18 +38,24 @@ fn model_panel 2 arg uint pid uint uint do 14 assignments uint row uint profile 
   "section": "active-model"
 }"# call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 choices current call key 2 presetval call str 1 utf8 "model" sourceval call key 2 call decode 1 call str 1 utf8 "{\"codex\":\"Codex\",\"anthropic\":\"Anthropic\",\"qwen\":\"Self-hosted Qwen\"}" call key 2 presetval call str 1 utf8 "provider" call key 2 presetval call str 1 utf8 "effort"
   set overview call put 3 overview call str 1 utf8 "assignments" assignments
-  set fields call shape 2 call str 1 utf8 "[{\"name\":\"provider\",\"label\":\"Provider\",\"type\":\"select\",\"initial\":\"$0\",\"choices\":[{\"value\":\"codex\",\"label\":\"Codex\"},{\"value\":\"anthropic\",\"label\":\"Anthropic\"},{\"value\":\"qwen\",\"label\":\"Self-hosted Qwen\"}]},{\"name\":\"model\",\"label\":\"Model ID\",\"type\":\"text\",\"required\":true,\"initial\":\"$1\"},{\"name\":\"effort\",\"label\":\"Reasoning effort\",\"type\":\"select\",\"initial\":\"$2\",\"choices\":[{\"value\":\"low\",\"label\":\"Low\"},{\"value\":\"medium\",\"label\":\"Medium\"},{\"value\":\"high\",\"label\":\"High\"}]},{\"name\":\"scope\",\"label\":\"Apply to\",\"type\":\"select\",\"choices\":[{\"value\":\"project\",\"label\":\"This project\"},{\"value\":\"global\",\"label\":\"All projects\"}]},{\"name\":\"operation\",\"label\":\"When saved\",\"type\":\"select\",\"choices\":[{\"value\":\"save\",\"label\":\"Use these settings\"},{\"value\":\"reset\",\"label\":\"Restore inherited settings\"}]}]" call append 2 call append 2 call append 2 call arr 0 call key 2 presetval call str 1 utf8 "provider" call key 2 presetval call str 1 utf8 "model" call key 2 presetval call str 1 utf8 "effort"
+  set scopeval call ui_default 2 call key 2 arg call str 1 utf8 "modelScope" call str 1 utf8 "project"
+  set discard call require 2 or call same 2 scopeval call str 1 utf8 "project" call same 2 scopeval call str 1 utf8 "global" call str 1 utf8 "Unknown model scope"
+  if call same 2 scopeval call str 1 utf8 "global" 1
+    set presetval call preset 2 call str 1 utf8 "global" current
+  0
+  set fields call shape 2 call str 1 utf8 "[{\"name\":\"provider\",\"label\":\"Provider\",\"type\":\"select\",\"initial\":\"$0\",\"choices\":[{\"value\":\"codex\",\"label\":\"Codex\"},{\"value\":\"anthropic\",\"label\":\"Anthropic\"},{\"value\":\"qwen\",\"label\":\"Self-hosted Qwen\"}]},{\"name\":\"model\",\"label\":\"Model ID\",\"type\":\"text\",\"required\":true,\"initial\":\"$1\"},{\"name\":\"effort\",\"label\":\"Reasoning effort\",\"type\":\"select\",\"initial\":\"$2\",\"choices\":[{\"value\":\"low\",\"label\":\"Low\"},{\"value\":\"medium\",\"label\":\"Medium\"},{\"value\":\"high\",\"label\":\"High\"}]},{\"name\":\"scope\",\"label\":\"Apply to\",\"type\":\"select\",\"initial\":\"$3\",\"event\":{\"action\":\"path\",\"patch\":{\"view\":\"models\",\"project\":\"$4\"},\"key\":\"modelScope\"},\"choices\":[{\"value\":\"project\",\"label\":\"This project\"},{\"value\":\"global\",\"label\":\"All projects\"}]},{\"name\":\"operation\",\"label\":\"When saved\",\"type\":\"select\",\"choices\":[{\"value\":\"save\",\"label\":\"Use these settings\"},{\"value\":\"reset\",\"label\":\"Restore inherited settings\"}]}]" @build append 1 5 call arr 0 call key 2 presetval call str 1 utf8 "provider" call key 2 presetval call str 1 utf8 "model" call key 2 presetval call str 1 utf8 "effort" scopeval pid
   set formval call shape 2 call str 1 @text r#"{
   "type": "form",
   "label": "Save preset",
   "op": "save_model",
   "fields": "$0",
   "fixed": {
-    "role": "$1"
+    "role": "$1",
+    "scope": "$2"
   },
   "pane": "Configuration",
   "section": "model-settings"
-}"# call append 2 call append 2 call arr 0 fields current
+}"# @build append 1 3 call arr 0 fields current scopeval
   ret call shape 2 call str 1 utf8 "{\"type\":\"group\",\"items\":\"$0\"}" call append 2 call arr 0 call append 2 call append 2 call arr 0 overview call ui_merge 2 formval call decode 1 call str 1 @text r#"{"text":"Saved settings apply to subsequently sealed turns. They do not change the model, provider or reasoning effort of a turn whose input is already sealed."}"#
 
 fn skill_composer 2 formval uint pid uint uint do 5 items uint names uint fieldval uint rowsval uint i int 9

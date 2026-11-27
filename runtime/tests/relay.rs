@@ -812,6 +812,14 @@ fn queued_external_read_rechecks_the_exact_human_source_selection() {
         .unwrap(),
         "held"
     );
+    assert_eq!(
+        db.query_row(
+            "SELECT count(*) FROM events e JOIN jobs j ON j.id=e.payload->>'$.job' AND j.project=e.project WHERE e.kind='Job held' AND e.payload->>'$.reason'='Selected source access changed' AND j.state='held'",
+            [],
+            |r| r.get::<_, i64>(0)
+        ).unwrap(),
+        2
+    );
 }
 #[test]
 fn a_direct_checked_tool_result_needs_no_followup_model_turn() {

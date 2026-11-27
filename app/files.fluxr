@@ -79,4 +79,4 @@ fn find_files 2 pid uint args uint uint do 7 sid uint pattern uint cursor uint l
 fn find_tools 2 pid uint args uint uint do 2 listval uint querytext uint 3
   set listval call tool_catalog 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid
   set querytext call key 2 args call str 1 utf8 "query"
-  ret call query 2 call str 1 utf8 "WITH items(item) AS (SELECT value FROM json_each(?1,'$.builtins') UNION ALL SELECT value FROM json_each(?1,'$.versions')) SELECT json(item) AS \"entry:json\" FROM items WHERE instr(lower(item),lower(coalesce(?2,'')))>0 LIMIT 128" call append 2 call append 2 call arr 0 listval querytext
+  ret call query 2 call str 1 utf8 "WITH items(item) AS (SELECT value FROM json_each(?1,'$.builtins') UNION ALL SELECT value FROM json_each(?1,'$.versions')) SELECT json(item) AS \"entry:json\", CASE WHEN count(*) OVER () > 128 THEN 'true' ELSE 'false' END AS \"has_more:json\" FROM items WHERE instr(lower(item),lower(coalesce(?2,'')))>0 LIMIT 128" call append 2 call append 2 call arr 0 listval querytext

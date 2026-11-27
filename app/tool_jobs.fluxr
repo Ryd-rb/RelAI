@@ -25,11 +25,16 @@ fn schedule_tool 3 j uint aid uint a uint uint do 6 kind uint op uint args uint 
   set discard call job 6 p call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call str 1 utf8 "tool" body
   ret 0u
 
+fn hold_selected_read 1 j uint uint do 2 reason uint discard uint 3
+  set reason call str 1 utf8 "Selected source access changed"
+  set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason=? WHERE id=?" @build append 1 2 call arr 0 reason call key 2 j call str 1 utf8 "id"
+  ret call audit 3 call key 2 j call str 1 utf8 "project" call str 1 utf8 "Job held" call shape 2 call str 1 @text r#"{"job":"$0","request":"$1","reason":"$2"}"# @build append 1 3 call arr 0 call key 2 j call str 1 utf8 "id" call key 2 j call str 1 utf8 "request" reason
+
 fn claim_tool 1 j uint uint do 4 args uint jid uint discard uint token uint 8
   set jid call key 2 j call str 1 utf8 "id"
   set args call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT input AS \"value:json\" FROM jobs WHERE id=?" call append 2 call arr 0 jid 0 call str 1 utf8 "value"
   if not call selected_source_ok 2 jid call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" 2
-    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason='Selected source access changed' WHERE id=?" call append 2 call arr 0 jid
+    set discard call hold_selected_read 1 j
     ret 0u
   0
   set token call uid 0
@@ -54,7 +59,7 @@ pub tool_done 1 arg uint uint do 7 j uint body uint receipt uint discard uint r 
     ret call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded',reason='Request updated during tool execution' WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id"
   0
   if not call selected_source_ok 2 call key 2 j call str 1 utf8 "id" call key 2 call key 2 body call str 1 utf8 "arguments" call str 1 utf8 "arguments" 2
-    set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='held',reason='Selected source access changed' WHERE id=?" call append 2 call arr 0 call key 2 j call str 1 utf8 "id"
+    set discard call hold_selected_read 1 j
     ret 0u
   0
   set r call key 2 j call str 1 utf8 "request"

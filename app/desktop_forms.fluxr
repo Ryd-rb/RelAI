@@ -50,7 +50,7 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
     set name call key 2 fieldval call str 1 utf8 "name"
     set base call cat 2 call cat 2 scope call str 1 utf8 "/" name
     set v call ui_field_value 2 fieldval draft
-    set event call shape 2 call str 1 utf8 "{\"action\":\"field\",\"scope\":\"$0\",\"name\":\"$1\",\"completion\":\"$2\",\"destination\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 scope name call key 2 spec call str 1 utf8 "completion" dest
+    set event call ui_default 2 call key 2 fieldval call str 1 utf8 "event" call shape 2 call str 1 utf8 "{\"action\":\"field\",\"scope\":\"$0\",\"name\":\"$1\",\"completion\":\"$2\",\"destination\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 scope name call key 2 spec call str 1 utf8 "completion" dest
     if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "tool_run" 1
       set event call put 3 event call str 1 utf8 "runner" call decode 1 call str 1 utf8 "true"
     0
@@ -155,8 +155,8 @@ fn ui_byte_size 1 bytes uint uint do 0 1
     SELECT CASE WHEN ?1 IS NULL THEN 'size unknown'
        WHEN ?1=1 THEN '1 byte'
        WHEN ?1<1024 THEN printf('%d bytes',?1)
-       WHEN ?1<1048576 THEN printf('%.1f KiB',?1/1024.0)
-       ELSE printf('%.1f MiB',?1/1048576.0) END AS size
+       WHEN ?1<1048576 THEN printf('%.1f KiB (%d bytes)',?1/1024.0,?1)
+       ELSE printf('%.1f MiB (%d bytes)',?1/1048576.0,?1) END AS size
   "# call append 2 call arr 0 bytes 0 call str 1 utf8 "size"
 
 fn ui_attachments 6 state uint scope uint name uint base uint items uint area uint uint do 5 keyval uint item uint labelval uint discard uint i int 5
@@ -178,7 +178,10 @@ fn ui_attachments 6 state uint scope uint name uint base uint items uint area ui
 fn desktop_find_tools 2 catalog uint args uint uint do 0 1
   ret call query 2 call asset 1 call str 1 utf8 "tool_search.sql" @build append 1 2 call arr 0 catalog call key 2 args call str 1 utf8 "query"
 
-fn ui_tool_matches 3 state uint scope uint items uint uint do 2 choices uint discard uint 4
+fn ui_tool_matches 3 state uint scope uint items uint uint do 2 choices uint discard uint 5
+  if call same 2 call key 2 call nth 2 items 0 call str 1 utf8 "has_more" call integer 1 1 1
+    set discard call ui_label 4 call cat 2 scope call str 1 utf8 "/more" call str 1 utf8 "label" call str 1 utf8 "Showing the first 128 matches. Narrow the search to find more." call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+  0
   if eq 0 call size 1 items 2
     set discard call ui_label 4 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "empty" call str 1 utf8 "label" call str 1 utf8 "No matching tools." call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
     ret 0u

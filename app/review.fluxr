@@ -33,10 +33,11 @@ fn review_conditions 2 body uint envelopeval uint uint do 7 known uint rowsval u
   set rowsval call key 2 body call str 1 utf8 "branches"
   set known call arr 0
   set i 0
-  while lt i call size 1 rowsval 4
+  while lt i call size 1 rowsval 5
     set b call nth 2 rowsval i
     set known call add_refs 2 known call key 2 b call str 1 utf8 "questions"
     set known call add_refs 2 known call key 2 b call str 1 utf8 "waits"
+    set known call add_refs 2 known call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json_group_array(value->>'$.job') AS "jobs:json" FROM json_each(?) WHERE value->>'$.job' IS NOT NULL"# call append 2 call arr 0 call key 2 b call str 1 utf8 "holds" 0 call str 1 utf8 "jobs"
     next i
   ret known
 

@@ -2,7 +2,8 @@ WITH page AS MATERIALIZED (
 SELECT e.cursor, e.kind, e.payload,
     strftime('%Y-%m-%d %H:%M:%S UTC',t.occurred,'unixepoch') AS occurred
 FROM events e LEFT JOIN event_times t ON t.cursor=e.cursor
-WHERE e.project=?1 AND (?3 IS NULL OR e.cursor<CAST(?3 AS INTEGER)) AND (
+WHERE e.project=?1 AND (?3 IS NULL OR e.cursor<CAST(?3 AS INTEGER))
+ AND (?4 IS NULL OR e.cursor<=CAST(?4 AS INTEGER)) AND (
  ?2='Timeline'
  OR (e.kind='ASK' AND EXISTS(SELECT 1 FROM open_chat_questions q WHERE q.project=e.project AND q.id=e.payload->>'$.action'))
  OR (EXISTS (SELECT 1 FROM pending_chat_answers p

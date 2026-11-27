@@ -13,14 +13,17 @@ fn workspace_children 3 state uint base uint rows uint uint do 4 item uint disca
     next i
   ret 0u
 
-fn workspace_proposals 3 state uint pid uint base uint uint do 3 rows uint item uint discard uint 8
-  set rows call query 2 call str 1 @text r#"SELECT p.id AS value,v.name||' · '||d.name||' · '||p.id AS label,p.proposed,p.base_revision,p.entry,p.source,p.project AS origin FROM proposals p JOIN proposal_terms v ON v.proposal=p.id JOIN dictionaries d ON d.id=v.dictionary WHERE d.owner=? AND d.archived=0 AND p.status='pending' ORDER BY p.rowid,p.id LIMIT 129"# call append 2 call arr 0 pid
-  if eq 0 call size 1 rows 1
+fn workspace_proposals 3 state uint pid uint base uint uint do 5 rows uint item uint discard uint countval uint offsetval uint 11
+  set countval call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT count(*) AS total FROM proposals p JOIN proposal_terms v ON v.proposal=p.id JOIN dictionaries d ON d.id=v.dictionary WHERE d.owner=? AND d.archived=0 AND p.status='pending'"# call append 2 call arr 0 pid 0 call str 1 utf8 "total"
+  if eq 0 call number 1 countval 1
     ret call ui_prose 2 base call str 1 utf8 "No pending proposals owned by this project."
   0
-  set rows call ui_page_items 5 state call cat 2 pid call str 1 utf8 "/proposals" rows call str 1 utf8 "Previous proposals" call str 1 utf8 "More proposals"
+  set offsetval call ui_pager 5 state call cat 2 pid call str 1 utf8 "/proposals" countval call str 1 utf8 "Previous proposals" call str 1 utf8 "More proposals"
+  set rows call query 2 call str 1 @text r#"SELECT p.id AS value,v.name||' · '||d.name||' · '||p.id AS label,p.proposed,CASE WHEN p.entry IS NULL THEN 'New term (no original wording)' WHEN e.id IS NULL THEN 'Original wording unavailable (revision '||coalesce(p.base_revision,'unknown')||')' ELSE 'Original wording (revision '||e.revision||'):'||char(10)||e.definition END AS original,'Recorded source: '||p.source||' · Origin project: '||p.project AS evidence FROM proposals p JOIN proposal_terms v ON v.proposal=p.id JOIN dictionaries d ON d.id=v.dictionary LEFT JOIN entries e ON e.id=p.entry AND e.revision=p.base_revision AND e.dictionary=v.dictionary WHERE d.owner=? AND d.archived=0 AND p.status='pending' ORDER BY p.rowid,p.id LIMIT 12 OFFSET ?"# @build append 1 2 call arr 0 pid offsetval
   set item call workspace_pick 2 rows call key 2 call key 2 call key 2 state call str 1 utf8 "workspaceSelection" pid call str 1 utf8 "proposal"
   set discard call workspace_list 6 pid base call str 1 utf8 "Pending proposals" rows item call str 1 utf8 "proposal"
+  set discard call ui_prose 2 call cat 2 base call str 1 utf8 "/original" call key 2 item call str 1 utf8 "original"
+  set discard call ui_prose 2 call cat 2 base call str 1 utf8 "/evidence" call key 2 item call str 1 utf8 "evidence"
   set discard call ui_prose 2 call cat 2 base call str 1 utf8 "/wording" call key 2 item call str 1 utf8 "proposed"
   set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Accept proposal","event":{"action":"command","spec":{"op":"review_definition","fixed":{"op":"accept","proposal":"$1"}}}}"# @build append 1 2 call arr 0 call cat 2 base call str 1 utf8 "/accept" call key 2 item call str 1 utf8 "value"
   ret call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Decline proposal","event":{"action":"command","spec":{"op":"review_definition","fixed":{"op":"decline","proposal":"$1"}}}}"# @build append 1 2 call arr 0 call cat 2 base call str 1 utf8 "/decline" call key 2 item call str 1 utf8 "value"

@@ -26,6 +26,6 @@ pub term_view 1 arg uint uint do 6 pid uint refval uint row uint parts uint owne
     set parts call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"text\":\"$0\"}" call append 2 call arr 0 call key 2 row call str 1 utf8 "definition"
   0
   set parts call permitted_parts 2 pid parts
-  set owner call nth 2 call query 2 call str 1 utf8 "SELECT id,name,owner FROM dictionaries WHERE id=?" call append 2 call arr 0 call key 2 row call str 1 utf8 "dictionary" 0
+  set owner call nth 2 call query 2 call str 1 utf8 "SELECT d.id,d.name,d.owner,p.root AS owner_root FROM dictionaries d LEFT JOIN projects p ON p.id=d.owner WHERE d.id=?" call append 2 call arr 0 call key 2 row call str 1 utf8 "dictionary" 0
   set names call query 2 call str 1 utf8 "SELECT p.id,p.root FROM dictionary_links l JOIN projects p ON p.id=l.project WHERE l.dictionary=? AND l.enabled=1 ORDER BY p.root" call append 2 call arr 0 call key 2 row call str 1 utf8 "dictionary"
-  ret call shape 2 call str 1 utf8 "{\"available\":true,\"entry\":\"$0\",\"parts\":\"$1\",\"dictionary\":\"$2\",\"enabled_projects\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 row parts owner names
+  ret call shape 2 call str 1 @text r#"{"available":true,"entry":"$0","parts":"$1","dictionary":"$2","enabled_projects":"$3","owner_root":"$4"}"# @build append 1 5 call arr 0 row parts owner names call key 2 owner call str 1 utf8 "owner_root"

@@ -650,6 +650,132 @@ fn unicode_completion_shifts_pinned_markers_and_explicit_definition_history() {
 }
 
 #[test]
+fn pending_proposal_pager_reaches_the_last_proposal_without_deciding_any() {
+    let mut ui = Desktop::open();
+    let source = ui.invoke(
+        "submit",
+        json!({"key":"many-proposals","text":"Draft dictionary evidence.","attachments":[]}),
+    );
+    let mut last = Value::Null;
+    for n in 1..=130 {
+        last = ui.invoke("tool_run", json!({"tool":"dictionary.propose","arguments":{"name":format!("Term {n}"),"definition":format!("Wording {n}"),"source":source["id"]}}))["value"].clone();
+    }
+    ui.click("Dictionary");
+    ui.click("Create or review definitions");
+    for _ in 0..10 {
+        ui.click("More proposals");
+    }
+    let page = ui.control("Pending proposals", "list");
+    let choices = page["choices"].as_array().unwrap();
+    assert_eq!(choices.len(), 10);
+    assert_eq!(choices.last().unwrap()["value"], last);
+    ui.change("Pending proposals", "list", json!({"value":last}));
+    ui.find(|control| control["value"] == "Wording 130");
+    ui.click("Previous proposals");
+    assert_eq!(
+        ui.control("Pending proposals", "list")["choices"]
+            .as_array()
+            .unwrap()
+            .len(),
+        12
+    );
+}
+
+#[test]
+fn identical_skill_reinstall_preserves_revision_and_removed_skill_stops_suggesting() {
+    let mut ui = Desktop::open();
+    let skill = ui._temp.path().join("sample-skill");
+    fs::create_dir(&skill).unwrap();
+    let markdown = skill.join("SKILL.md");
+    fs::write(
+        &markdown,
+        "---\nname: styleguide\ndescription: Writing style\n---\nUse short words.",
+    )
+    .unwrap();
+
+    let input = json!({"op":"install","path":skill});
+    let id = ui.invoke("skill", input.clone())["id"].clone();
+    let first = ui.invoke("suggest_terms", json!({"prefix":"styleguide"}));
+    assert_eq!(first.as_array().unwrap().len(), 1);
+
+    assert_eq!(ui.invoke("skill", input)["id"], id);
+    assert_eq!(
+        ui.invoke("suggest_terms", json!({"prefix":"styleguide"})),
+        first
+    );
+
+    ui.invoke("skill", json!({"op":"remove","id":id}));
+    assert_eq!(
+        ui.invoke("suggest_terms", json!({"prefix":"styleguide"})),
+        json!([])
+    );
+
+    fs::write(
+        markdown,
+        "---\nname: \"   \"\ndescription: Writing style\n---\nUse short words.",
+    )
+    .unwrap();
+    assert!(
+        ui.app
+            .invoke(
+                "skill",
+                json!({"project":ui.view["project"],"op":"install","path":skill})
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn revision_proposal_keeps_base_wording_and_reports_a_conflict() {
+    let mut ui = Desktop::open();
+    let source = ui.invoke(
+        "submit",
+        json!({"key":"revision-source","text":"Recorded evidence.","attachments":[]}),
+    );
+    let term = ui.invoke(
+        "dictionary",
+        json!({"op":"save","name":"Plan","kind":"knowledge","definition":"Original plan."}),
+    );
+    ui.invoke(
+        "tool_run",
+        json!({"tool":"dictionary.propose","arguments":{"entry":term["id"],"revision":term["revision"],"definition":"Proposed plan.","source":source["id"]}}),
+    );
+    ui.invoke(
+        "dictionary",
+        json!({"op":"save","id":term["id"],"revision":term["revision"],"name":"Plan","kind":"knowledge","definition":"Current plan."}),
+    );
+    ui.click("Dictionary");
+    ui.click("Create or review definitions");
+    ui.find(|c| {
+        c["value"]
+            .as_str()
+            .is_some_and(|v| v.contains("Original plan."))
+    });
+    ui.find(|c| c["value"] == "Proposed plan.");
+    ui.find(|c| {
+        c["value"]
+            .as_str()
+            .is_some_and(|v| v.contains(source["id"].as_str().unwrap()))
+    });
+    ui.click("Accept proposal");
+    assert!(
+        ui.state["status"]
+            .as_str()
+            .unwrap()
+            .contains("Proposal conflict")
+    );
+    assert_eq!(
+        ui.invoke("review_definition", json!({"op":"list"}))[0]["status"],
+        "conflict"
+    );
+
+    let refval = ui.invoke("suggest_terms", json!({"prefix":"Plan"}))[0].clone();
+    let view = ui.invoke("term_view", json!({"ref":refval}));
+    assert_eq!(view["entry"]["definition"], "Current plan.");
+    assert!(view["owner_root"].as_str().unwrap().ends_with("project"));
+}
+
+#[test]
 fn dictionary_proposal_review_shows_wording_and_decides_the_selected_proposal() {
     let mut ui = Desktop::open();
     let source = ui.invoke(

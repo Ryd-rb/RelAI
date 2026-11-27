@@ -7,12 +7,13 @@ pub connector 1 arg uint uint do 7 pid uint op uint cid uint def uint method uin
   if call same 2 op call str 1 utf8 "list" 1
     ret call query 2 call str 1 utf8 "SELECT id,name,active,definition AS \"definition:json\" FROM connectors WHERE project=? ORDER BY name" call append 2 call arr 0 pid
   0
-  if call same 2 op call str 1 utf8 "register" 8
+  if call same 2 op call str 1 utf8 "register" 9
     set def call key 2 arg call str 1 utf8 "definition"
     set method call key 2 def call str 1 utf8 "method"
     set discard call require 2 or call same 2 method call str 1 utf8 "GET" call same 2 method call str 1 utf8 "POST" call str 1 utf8 "Connector method must be GET or POST"
     set discard call require 2 and lt 0 call size 1 call key 2 def call str 1 utf8 "name" lt 0 call size 1 call key 2 def call str 1 utf8 "url" call str 1 utf8 "Missing connector name or URL"
     set discard call require 2 not call same 2 call key 2 def call str 1 utf8 "schema" 0u call str 1 utf8 "A fixed argument schema is required"
+    set discard host validate_connector uint 1 uint def
     set cid call uid 0
     set discard call query 2 call str 1 utf8 "INSERT INTO connectors VALUES(?,?,?,?,1)" call append 2 call append 2 call append 2 call append 2 call arr 0 cid pid call key 2 def call str 1 utf8 "name" def
     ret call shape 2 call str 1 utf8 "{\"id\":\"$0\"}" call append 2 call arr 0 cid
@@ -28,7 +29,7 @@ pub connector 1 arg uint uint do 7 pid uint op uint cid uint def uint method uin
   set discard call query 2 call str 1 utf8 "INSERT INTO network_effects VALUES(?,?,?,?,'authorized',NULL)" call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid cid call encode 1 call key 2 arg call str 1 utf8 "arguments"
   ret call shape 2 call str 1 utf8 "{\"operation\":\"$0\"}" call append 2 call arr 0 sid
 
-fn net_prepare 3 pid uint toolname uint args uint uint do 7 cid uint def uint requestval uint sid uint state uint effect uint discard uint 11
+fn net_prepare 3 pid uint toolname uint args uint uint do 7 cid uint def uint requestval uint sid uint state uint effect uint discard uint 12
   set cid call key 2 args call str 1 utf8 "connector"
   set def call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT definition AS \"d:json\" FROM connectors WHERE id=? AND project=? AND active=1" call append 2 call append 2 call arr 0 cid pid 0 call str 1 utf8 "d"
   set discard call require 2 not call same 2 def 0u call str 1 utf8 "Connector unavailable"
@@ -41,6 +42,7 @@ fn net_prepare 3 pid uint toolname uint args uint uint do 7 cid uint def uint re
     set discard call require 2 and call same 2 call key 2 def call str 1 utf8 "method" call str 1 utf8 "GET" call same 2 call key 2 def call str 1 utf8 "tool" toolname call str 1 utf8 "Use the named read connector for this capability"
   0
   set sid call key 2 args call str 1 utf8 "operation"
+  set effect 0u
   if call same 2 call key 2 def call str 1 utf8 "method" call str 1 utf8 "POST" 4
     set effect call nth 2 call query 2 call str 1 utf8 "SELECT state,arguments AS \"bound:json\" FROM network_effects WHERE id=? AND project=? AND connector=?" call append 2 call append 2 call append 2 call arr 0 sid pid cid 0
     set discard call require 2 call same 2 call key 2 effect call str 1 utf8 "bound" requestval call str 1 utf8 "Write needs authorization for these exact arguments"
@@ -49,10 +51,10 @@ fn net_prepare 3 pid uint toolname uint args uint uint do 7 cid uint def uint re
   2
     set sid call uid 0
     set discard call query 2 call str 1 utf8 "INSERT INTO network_effects VALUES(?,?,?,?,'sending',NULL)" call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid cid call encode 1 requestval
-  set state call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"operation\":\"$1\",\"connector\":\"$2\",\"tool\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 pid sid cid toolname
+  set state call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"operation\":\"$1\",\"connector\":\"$2\",\"tool\":\"$3\",\"prior\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid sid cid toolname call key 2 effect call str 1 utf8 "state"
   ret call shape 2 call str 1 utf8 "{\"$http\":{\"definition\":\"$0\",\"arguments\":\"$1\",\"operation\":\"$2\"},\"resume\":\"guest_net_done\",\"state\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 def requestval sid state
 
-pub guest_net_done 1 arg uint uint do 10 state uint resultval uint pid uint sid uint aid uint meta uint info uint receipt uint kind uint discard uint 12
+pub guest_net_done 1 arg uint uint do 10 state uint resultval uint pid uint sid uint aid uint meta uint info uint receipt uint kind uint discard uint 13
   set state call key 2 arg call str 1 utf8 "state"
   set pid call key 2 state call str 1 utf8 "project"
   set sid call key 2 state call str 1 utf8 "operation"
@@ -61,6 +63,20 @@ pub guest_net_done 1 arg uint uint do 10 state uint resultval uint pid uint sid 
     set receipt call shape 2 call str 1 utf8 "{\"invocation\":\"$0\",\"state\":\"revoked\",\"reason\":\"Connector revoked before delivery\"}" call append 2 call arr 0 sid
     set discard call query 2 call str 1 utf8 "UPDATE network_effects SET state='revoked_after_send',receipt=? WHERE id=? AND project=? AND state='sending'" call append 2 call append 2 call append 2 call arr 0 receipt sid pid
     set discard call audit 3 pid call str 1 utf8 "Connector revoked before delivery" receipt
+    ret receipt
+  0
+  if not call same 2 call key 2 arg call str 1 utf8 "failure" 0u 8
+    set kind call key 2 arg call str 1 utf8 "failure"
+    set receipt call shape 2 call str 1 utf8 "{\"invocation\":\"$0\",\"state\":\"$1\",\"error\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid kind call key 2 arg call str 1 utf8 "error"
+    if call same 2 kind call str 1 utf8 "http_error" 1
+      set receipt call put 3 receipt call str 1 utf8 "status" call key 2 arg call str 1 utf8 "status"
+    0
+    if and call same 2 kind call str 1 utf8 "not_sent" not call same 2 call key 2 state call str 1 utf8 "prior" 0u 1
+      set kind call key 2 state call str 1 utf8 "prior"
+    0
+    set discard call query 2 call str 1 utf8 "UPDATE network_effects SET state=?,receipt=? WHERE id=? AND project=? AND state='sending'" call append 2 call append 2 call append 2 call append 2 call arr 0 kind receipt sid pid
+    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Receipt already recorded"
+    set discard call audit 3 pid call str 1 utf8 "Connector receipt" receipt
     ret receipt
   0
   set kind call str 1 utf8 "completed"

@@ -716,6 +716,10 @@ impl Bindings<'_> {
                     format!("{a}/{b}")
                 })
             }
+            "validate_connector" => {
+                network::validate_definition(get(0)?)?;
+                Value::Null
+            }
             "validate" => {
                 validate(get(0)?, get(1)?)?;
                 Value::Null

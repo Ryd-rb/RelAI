@@ -30,6 +30,11 @@ async fn named_connector_captures_bytes_and_consumes_an_exact_write_grant_once()
     let fixture = Router::new()
         .route("/read", get(|| async { "from fixture" }))
         .route(
+            "/denied",
+            get(|| async { (axum::http::StatusCode::NOT_FOUND, "private response") })
+                .post(|| async { (axum::http::StatusCode::CONFLICT, "private response") }),
+        )
+        .route(
             "/write",
             post(move |headers: HeaderMap, Json(body): Json<Value>| {
                 let counter = counter.clone();
@@ -49,6 +54,7 @@ async fn named_connector_captures_bytes_and_consumes_an_exact_write_grant_once()
             .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"))
             .arg(temp.path().join("state"))
             .arg("--headless")
+            .env_remove("RELAI_CONNECTOR_OFFLINE_FIXTURE_TOKEN")
             .stdout(Stdio::piped())
             .spawn()
             .unwrap(),
@@ -223,5 +229,94 @@ async fn named_connector_captures_bytes_and_consumes_an_exact_write_grant_once()
             .status()
             .is_client_error()
     );
+    for bad in [
+        json!({"url":"http://example.invalid/read"}),
+        json!({"url":"https://user@example.invalid/read"}),
+        json!({"url":"https://example.invalid/read#fragment"}),
+        json!({"idempotency_header":"Authorization"}),
+    ] {
+        let mut def = definition("GET", "read", json!({}));
+        def.as_object_mut()
+            .unwrap()
+            .extend(bad.as_object().unwrap().clone());
+        assert!(register(def).await.unwrap().status().is_client_error());
+    }
+    let get = register(definition("GET", "denied", json!({})))
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json::<Value>()
+        .await
+        .unwrap();
+    let failure = run("web.fetch", &get["id"], json!({}), &Value::Null)
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json::<Value>()
+        .await
+        .unwrap();
+    assert_eq!(failure["state"], "http_error");
+    assert_eq!(failure["status"], 404);
+    assert!(failure.get("artifact").is_none() && failure.get("response").is_none());
+    assert!(!failure.to_string().contains("private response"));
+
+    for (missing_credential, expected) in [(true, "not_sent"), (false, "uncertain")] {
+        let mut def = definition("POST", "denied", json!({}));
+        if missing_credential {
+            def["credential"] = json!("RELAI_CONNECTOR_OFFLINE_FIXTURE_TOKEN");
+        } else {
+            def.as_object_mut().unwrap().remove("idempotency_header");
+        }
+        let connector = register(def)
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json::<Value>()
+            .await
+            .unwrap();
+        let id = &connector["id"];
+        let grant = api(
+            "connector",
+            json!({"op":"authorize","project":p,"id":id,"arguments":{}}),
+        )
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap()
+        .json::<Value>()
+        .await
+        .unwrap();
+        let operation = &grant["operation"];
+        let first = run("connector.call", id, json!({}), operation)
+            .await
+            .unwrap()
+            .error_for_status()
+            .unwrap()
+            .json::<Value>()
+            .await
+            .unwrap();
+        assert_eq!(first["state"], expected);
+        assert_eq!(&first["invocation"], operation);
+        assert!(first.get("artifact").is_none() && first.get("response").is_none());
+        assert!(!first.to_string().contains("private response"));
+        let retry = run("connector.call", id, json!({}), operation)
+            .await
+            .unwrap();
+        if missing_credential {
+            let retry = retry
+                .error_for_status()
+                .unwrap()
+                .json::<Value>()
+                .await
+                .unwrap();
+            assert_eq!(retry["state"], "not_sent");
+            assert_eq!(&retry["invocation"], operation);
+        } else {
+            assert!(retry.status().is_client_error());
+        }
+    }
     fixture.abort();
 }

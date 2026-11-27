@@ -78,11 +78,8 @@ async fn invoke(app: Arc<Mutex<App>>, name: &str, input: Value) -> Result<Value>
         return app.lock().unwrap().invoke("guest_transfer_done", receipt);
     }
     if let Some(plan) = v.get("$http") {
-        let result = fluxr_app_host::network::exchange(plan).await;
-        let receipt = match result {
-            Ok(result) => json!({"state":v["state"],"result":result}),
-            Err(e) => json!({"state":v["state"],"error":format!("{e:#}")}),
-        };
+        let mut receipt = fluxr_app_host::network::exchange(plan).await;
+        receipt["state"] = v["state"].clone();
         return app.lock().unwrap().invoke("guest_net_done", receipt);
     }
     Ok(v)

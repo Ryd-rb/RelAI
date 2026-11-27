@@ -743,7 +743,6 @@ source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=6fe5f1ce7cf77f672208b
 [[package]]
 name = "fluxr-win32"
 version = "0.1.0"
-source = "git+https://github.com/Ryd-rb/FluxR-lang.git?rev=6fe5f1ce7cf77f672208b7e45e3e970eae3db0a7#6fe5f1ce7cf77f672208b7e45e3e970eae3db0a7"
 dependencies = [
  "anyhow",
  "serde",

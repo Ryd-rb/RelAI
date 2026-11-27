@@ -1,3 +1,4 @@
 [workspace]
 members = ["runtime"]
+exclude = ["vendor/fluxr-win32"]
 resolver = "3"

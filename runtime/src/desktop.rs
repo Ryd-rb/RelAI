@@ -459,10 +459,8 @@ mod tests {
         desktop.process(json!({"id":submit,"type":"click","serial":5}))?;
         let transcript = desktop.frame["controls"].as_array().unwrap();
         assert!(
-            transcript
-                .iter()
-                .any(|c| c["role"] == "outgoing"
-                    && c["value"] == "🙂\nhello.\n\nAttached · manual.md")
+            transcript.iter().any(|c| c["role"] == "outgoing"
+                && c["value"] == "🙂\nhello.\n\nAttached files\nmanual.md")
         );
         assert!(!desktop.frame.to_string().contains("Remove manual.md"));
 

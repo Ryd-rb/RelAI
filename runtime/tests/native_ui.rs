@@ -138,6 +138,43 @@ impl Desktop {
 }
 
 #[test]
+fn starter_prompts_focus_an_editable_draft_without_sending_or_overwriting() {
+    let mut ui = Desktop::open();
+    ui.control("Start a conversation", "heading");
+    ui.control("Relay · project", "heading");
+    ui.control("Enter to send · Shift+Enter for a new line", "label");
+    let starter = ui.control("Find how to run it", "button");
+    assert_eq!(starter["enabled"], true);
+    ui.type_message(" \n ");
+    assert_eq!(ui.control("Find how to run it", "button")["enabled"], false);
+    let stale = ui.event(starter.clone(), json!({}));
+    assert_eq!(stale["refresh"], "none");
+    assert_eq!(stale["state"], ui.state);
+    ui.type_message("");
+    let effect = ui.event(starter.clone(), json!({}));
+    assert_eq!(effect["focus"], ui.frame["composer"]);
+    assert!(effect.get("request").is_none());
+    ui.apply(effect);
+    let message = ui.control("Message", "multiline");
+    assert_eq!(
+        message["value"],
+        "How do I run this project locally? Include any prerequisites."
+    );
+    assert_eq!(ui.control("Send", "button")["enabled"], true);
+    assert_eq!(ui.control("Find how to run it", "button")["enabled"], false);
+
+    ui.type_message("My own draft");
+    let stale = ui.event(starter.clone(), json!({}));
+    assert_eq!(stale["refresh"], "none");
+    assert_eq!(stale["state"], ui.state);
+    ui.click("Send");
+    assert_eq!(ui.control("You", "detail")["value"], "My own draft");
+    let stale = ui.event(starter, json!({}));
+    assert_eq!(stale["refresh"], "none");
+    assert_eq!(stale["state"], ui.state);
+}
+
+#[test]
 fn leaving_project_selection_restores_the_addressed_chat_draft_without_a_picker() {
     let mut ui = Desktop::open();
     let project = ui.view["project"].clone();
@@ -303,13 +340,13 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
         ui.control("Attach files", "button")["row"]
     );
     assert_eq!(ui.control("Send", "button")["role"], "primary");
-    assert_eq!(ui.control("project", "heading")["area"], "header");
+    assert_eq!(ui.control("Relay · project", "heading")["area"], "header");
     let composer = ui.control("Message", "multiline");
     assert_eq!(composer["caption"], false);
     assert_eq!(composer["lines"], 2);
     assert_eq!(composer["placeholder"], "Message project…");
     assert!(
-        !ui.control("project", "heading")["side"]
+        !ui.control("Relay · project", "heading")["side"]
             .as_bool()
             .unwrap_or(false)
     );
@@ -431,6 +468,8 @@ fn unicode_completion_shifts_pinned_markers_and_explicit_definition_history() {
     ui.apply(submit);
     assert!(ui.state["definition"].is_null());
     ui.type_message("Unsent Relay draft");
+    assert!(ui.controls().iter().all(|c| c["event"]["action"] != "term"));
+    ui.click("Definitions (1)");
     let definition =
         ui.find(|c| c["event"]["action"] == "term" && c["event"]["ref"]["id"] == cafe["id"]);
     let response = ui.event(definition.clone(), json!({}));
@@ -589,14 +628,54 @@ fn workspace_search_and_selected_activity_survive_navigation_and_refresh() {
     record("New event");
     ui.render(true);
     assert_eq!(ui.control("Events", "list")["value"], saved);
-    assert!(
-        ui.control("Event details", "detail")["value"]
-            .as_str()
-            .unwrap()
-            .contains("Worker failed")
+    assert_eq!(
+        ui.find(|c| c["id"] == "activity/summary")["value"],
+        "Worker failed"
+    );
+    assert!(ui.controls().iter().all(|c| c["id"] != "activity/details"));
+    ui.click("Event record");
+    assert_eq!(
+        ui.control("Event details", "detail")["value"],
+        json!({"text":"Worker failed"}).to_string()
     );
     ui.click("Needs attention");
     ui.find(|c| c["id"] == "activity/empty");
+}
+
+#[test]
+fn activity_names_project_reads_and_keeps_the_record_available() {
+    let mut ui = Desktop::open();
+    fs::write(ui.root.join("notes.txt"), "Check the project").unwrap();
+    ui.invoke(
+        "tool_run",
+        json!({"tool":"fs.read","arguments":{"path":"notes.txt"}}),
+    );
+    ui.click("Activity");
+    let events = ui.control("Events", "list");
+    let read = events["choices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|choice| {
+            choice["label"]
+                .as_str()
+                .is_some_and(|label| label.contains("Tool receipt · fs.read · notes.txt"))
+        })
+        .expect("Read is identifiable directly in the event list");
+    ui.change("Events", "list", json!({"value":read["value"]}));
+    ui.control("fs.read · notes.txt", "label");
+    assert!(
+        ui.find(|c| c["id"] == "activity/time")["value"]
+            .as_str()
+            .is_some_and(|time| time.ends_with(" UTC"))
+    );
+    assert!(ui.controls().iter().all(|c| c["id"] != "activity/details"));
+    ui.click("Event record");
+    assert!(
+        ui.control("Event details", "detail")["value"]
+            .as_str()
+            .is_some_and(|record| record.contains("output_digest"))
+    );
 }
 
 #[test]
@@ -1086,7 +1165,7 @@ fn chat_pages_keep_durable_messages_visible_across_internal_traffic() {
     let page = transcript(&ui);
     assert_eq!(page.len(), 24);
     assert_eq!(page[0]["value"], "Message 5");
-    assert_eq!(page[0]["caption"], false);
+    assert_eq!(page[0]["caption"], true);
     assert_eq!(page[0]["label"], "You");
     assert_eq!(page[23]["value"], "Message 28");
     assert!(!ui.frame.to_string().contains("Internal trace"));
@@ -1135,7 +1214,13 @@ fn send_readiness_tracks_content_and_dismissing_an_error_keeps_the_draft() {
     assert_eq!(send(&ui)["enabled"], true);
     ui.state["status"] = json!("Could not read a file.");
     ui.render(false);
-    ui.click("Dismiss message");
+    assert_eq!(
+        ui.control("Could not read a file.", "label")["row"],
+        ui.control("Dismiss message", "button")["row"]
+    );
+    let dismiss = ui.event(ui.control("Dismiss message", "button"), json!({}));
+    assert_eq!(dismiss["focus"], ui.frame["composer"]);
+    ui.apply(dismiss);
     assert!(ui.state["status"].is_null());
     assert_eq!(
         ui.control("Message", "multiline")["value"],
@@ -1176,6 +1261,45 @@ fn send_readiness_tracks_content_and_dismissing_an_error_keeps_the_draft() {
 }
 
 #[test]
+fn file_only_messages_retain_the_author_size_and_exact_attachment_receipt() {
+    let mut ui = Desktop::open();
+    let attach = ui.control("Attach files", "button");
+    let effect = ui.event(attach, json!({}));
+    let capture = ui.invoke(
+        "capture",
+        json!({"name":"notes.txt","mime":"text/plain","base64":"YQ=="}),
+    );
+    let receipt = ui
+        .app
+        .invoke(
+            "desktop_result",
+            json!({
+                "state":ui.state,"project":ui.view["project"],"after":effect["after"],
+                "result":capture
+            }),
+        )
+        .unwrap();
+    ui.apply(receipt);
+    ui.control("Remove notes.txt · 1 byte", "button");
+    assert_eq!(ui.control("Send", "button")["enabled"], true);
+    ui.click("Send");
+    assert_eq!(
+        ui.control("You", "detail")["value"],
+        "Attached files\nnotes.txt"
+    );
+    ui.click("Attachment details");
+    ui.control("notes.txt · 1 byte", "label");
+    ui.click("Attachment receipts");
+    let record = ui.control("Immutable sent attachment receipts", "detail");
+    assert!(
+        record["value"]
+            .as_str()
+            .unwrap()
+            .contains(capture["digest"].as_str().unwrap())
+    );
+}
+
+#[test]
 fn changing_composer_skills_updates_the_visible_count_and_keeps_the_message() {
     let mut ui = Desktop::open();
     let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
@@ -1208,19 +1332,24 @@ fn long_answer_preview_preserves_the_exact_answer_and_its_accept_action() {
     ui.type_message(prompt);
     ui.click("Send");
     ui.receive_intake(prompt, json!([{"type":"RESULT","summary":"Explanation","findings":answer,"result_kind":"final","evidence":[],"outcome":null}]),"complete_when");
-    assert!(ui.controls().iter().any(|c| {
-        c["role"] == "incoming"
-            && c["value"]
-                .as_str()
-                .is_some_and(|s| s.contains("Line 1") && !s.contains("Line 50"))
-    }));
-    ui.click("Full answer");
+    let preview = ui.control("RelAI · Answer ready for review", "detail");
+    assert_eq!(
+        preview["value"],
+        format!("{}…", answer.lines().take(8).collect::<Vec<_>>().join("\n"))
+    );
+    let expand = ui.control("Show full answer", "button");
+    assert_eq!(expand["expanded"], false);
+    ui.click("Show full answer");
+    let collapse = ui.control("Show less", "button");
+    assert_eq!(collapse["id"], expand["id"]);
+    assert_eq!(collapse["expanded"], true);
     assert!(
         ui.controls()
             .iter()
             .any(|c| c["role"] == "incoming" && c["value"] == answer)
     );
-    ui.click("Full answer");
+    ui.control("Request changes", "button");
+    ui.click("Show less");
     ui.click("Accept answer");
     assert!(
         ui.controls()

@@ -1,6 +1,6 @@
 fluxr 1
 
-fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fields uint draft uint area uint dest uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint picker uint props uint styleval uint discard uint i int j int 22
+fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fields uint draft uint area uint dest uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint picker uint props uint styleval uint discard uint i int j int 23
   set scope call ui_form_key 2 pid spec
   set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
   set area call obj 0
@@ -10,7 +10,7 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
     set dest call chat_destination 3 pid draft call key 2 spec call str 1 utf8 "destination"
     set spec call put 3 spec call str 1 utf8 "destination" dest
     if and not call same 2 call key 2 dest call str 1 utf8 "hint" 0u not call same 2 call key 2 dest call str 1 utf8 "choose_question" call decode 1 call str 1 utf8 "true" 1
-      set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "target" call str 1 utf8 "label" call key 2 dest call str 1 utf8 "hint" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+      set discard call ui_label 4 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "target" call str 1 utf8 "label" call key 2 dest call str 1 utf8 "hint" call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
     0
     if call same 2 call key 2 dest call str 1 utf8 "choose_question" call decode 1 call str 1 utf8 "true" 1
       set discard call chat_question_picker 2 scope pid
@@ -39,9 +39,9 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
   set picker 0u
   if and not call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" not call same 2 call key 2 spec call str 1 utf8 "presentation" call str 1 utf8 "search" 1
     if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 1
-      set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "heading" call str 1 utf8 "heading" call str 1 utf8 "Edit preset" call obj 0
+      set discard call ui_label 4 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "heading" call str 1 utf8 "heading" call str 1 utf8 "Edit preset" call ui_merge 2 area call obj 0
     1
-      set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "heading" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call obj 0
+      set discard call ui_label 4 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "heading" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call ui_merge 2 area call obj 0
   0
   set i 0
   while lt i call size 1 fields 10
@@ -88,23 +88,23 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
       0
       if and call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" call same 2 kind call str 1 utf8 "multi" 2
         set event call put 3 event call str 1 utf8 "refresh" call str 1 utf8 "view"
-        set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "toggle" call cat 2 call cat 2 call str 1 utf8 "Skills (" call encode 1 call integer 1 call size 1 v call str 1 utf8 ")" call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 base call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":90,\"row\":\"$0\",\"expanded\":\"$1\"}" call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions" call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "false"
+        set discard call ui_button 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "toggle" call cat 2 call cat 2 call str 1 utf8 "Skills (" call encode 1 call integer 1 call size 1 v call str 1 utf8 ")" call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 base call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":90,\"row\":\"$0\",\"expanded\":\"$1\"}" call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions" call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "false"
       0
       if or not and call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" call same 2 kind call str 1 utf8 "multi" call same 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "true" 1
         set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"label\":\"$1\",\"kind\":\"$2\",\"value\":\"$3\",\"choices\":\"$4\",\"event\":\"$5\",\"lines\":3}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 base call key 2 fieldval call str 1 utf8 "label" widget v call ui_choices 1 call key 2 fieldval call str 1 utf8 "choices" event props
       0
       if call same 2 kind call str 1 utf8 "folder" 1
-        set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "browse" call str 1 utf8 "Browse for folder" call shape 2 call str 1 utf8 "{\"action\":\"folder\",\"scope\":\"$0\",\"name\":\"$1\"}" call append 2 call append 2 call arr 0 scope name call obj 0
+        set discard call ui_button 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "browse" call str 1 utf8 "Browse for folder" call shape 2 call str 1 utf8 "{\"action\":\"folder\",\"scope\":\"$0\",\"name\":\"$1\"}" call append 2 call append 2 call arr 0 scope name call ui_merge 2 area call obj 0
       0
       if call same 2 call key 2 call key 2 spec call str 1 utf8 "completion" call str 1 utf8 "field" name 4
         set matches call key 2 draft call str 1 utf8 "$suggestions"
         if lt 0 call size 1 matches 1
-          set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "description" call str 1 utf8 "label" call key 2 call nth 2 matches 0 call str 1 utf8 "description" call obj 0
+          set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "description" call str 1 utf8 "label" call key 2 call nth 2 matches 0 call str 1 utf8 "description" call ui_merge 2 area call obj 0
         0
         set j 0
         while lt j call size 1 matches 3
           set item call nth 2 matches j
-          set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call cat 2 call cat 2 call cat 2 call cat 2 call key 2 item call str 1 utf8 "name" call str 1 utf8 " · " call key 2 item call str 1 utf8 "kind" call str 1 utf8 " · " call key 2 item call str 1 utf8 "dictionary_name" call shape 2 call str 1 utf8 "{\"action\":\"complete\",\"scope\":\"$0\",\"name\":\"$1\",\"hit\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name item call obj 0
+          set discard call ui_button 4 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call cat 2 call cat 2 call cat 2 call cat 2 call key 2 item call str 1 utf8 "name" call str 1 utf8 " · " call key 2 item call str 1 utf8 "kind" call str 1 utf8 " · " call key 2 item call str 1 utf8 "dictionary_name" call shape 2 call str 1 utf8 "{\"action\":\"complete\",\"scope\":\"$0\",\"name\":\"$1\",\"hit\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name item call ui_merge 2 area call obj 0
           next j
       0
     next i
@@ -114,8 +114,11 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
     set discard call ui_tool_matches 3 state scope matches
     ret scope
   0
+  if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 1
+    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"label","role":"muted","area":"composer","label":"Enter to send · Shift+Enter for a new line"}"# call append 2 call arr 0 call cat 2 scope call str 1 utf8 "/shortcuts"
+  0
   if or not call same 2 call key 2 dest call str 1 utf8 "hint" 0u not call same 2 call key 2 call key 2 dest call str 1 utf8 "bind" call str 1 utf8 "follow" 0u 1
-    set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "fresh" call str 1 utf8 "New topic" call decode 1 call str 1 utf8 "{\"action\":\"nav\",\"patch\":{\"view\":\"relay\",\"reply\":null,\"steer\":null,\"follow\":null,\"fresh\":true,\"older\":null,\"newer\":null}}" call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":100,\"row\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions"
+    set discard call ui_button 4 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "fresh" call str 1 utf8 "New topic" call decode 1 call str 1 utf8 "{\"action\":\"nav\",\"patch\":{\"view\":\"relay\",\"reply\":null,\"steer\":null,\"follow\":null,\"fresh\":true,\"older\":null,\"newer\":null}}" call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":100,\"row\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "actions"
   0
   if not call same 2 picker 0u 1
     set discard call ui_emit 1 call ui_merge 2 area picker
@@ -133,24 +136,42 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
   if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 1
     set styleval call shape 2 call str 1 utf8 "{\"role\":\"primary\",\"width\":148}" call arr 0
   0
-  set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit" call key 2 spec call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"submit\",\"scope\":\"$0\",\"spec\":\"$1\"}" call append 2 call append 2 call arr 0 scope spec styleval
+  set discard call ui_button 4 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "submit" call key 2 spec call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"submit\",\"scope\":\"$0\",\"spec\":\"$1\"}" call append 2 call append 2 call arr 0 scope spec call ui_merge 2 area styleval
   if not call same 2 call key 2 call key 2 state call str 1 utf8 "outputs" scope 0u 1
     set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "output" call str 1 utf8 "detail" call ui_show 1 call key 2 call key 2 state call str 1 utf8 "outputs" scope call obj 0
   0
   ret scope
 
-fn ui_attachments 6 state uint scope uint name uint base uint items uint area uint uint do 4 keyval uint item uint discard uint i int 5
+fn composer_status 1 message uint uint do 2 kind uint discard uint 4
+  set kind call str 1 utf8 "label"
+  if lt 180 call size 1 message 1
+    set kind call str 1 utf8 "detail"
+  0
+  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"status","kind":"$0","role":"body","area":"composer","row":"status/actions","label":"$1","value":"$1","caption":false,"lines":2}"# @build append 1 2 call arr 0 kind message
+  ret call ui_emit 1 call decode 1 call str 1 @text r#"{"id":"status/dismiss","kind":"button","label":"Dismiss message","role":"quiet","area":"composer","row":"status/actions","width":148,"event":{"action":"dismiss_status"}}"#
+
+fn ui_byte_size 1 bytes uint uint do 0 1
+  ret call key 2 call nth 2 call query 2 call str 1 @text r#"
+    SELECT CASE WHEN ?1 IS NULL THEN 'size unknown'
+       WHEN ?1=1 THEN '1 byte'
+       WHEN ?1<1024 THEN printf('%d bytes',?1)
+       WHEN ?1<1048576 THEN printf('%.1f KiB',?1/1024.0)
+       ELSE printf('%.1f MiB',?1/1048576.0) END AS size
+  "# call append 2 call arr 0 bytes 0 call str 1 utf8 "size"
+
+fn ui_attachments 6 state uint scope uint name uint base uint items uint area uint uint do 5 keyval uint item uint labelval uint discard uint i int 5
   set keyval call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "list"
   if lt 2 call size 1 items 2
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 keyval call cat 2 call encode 1 call integer 1 call size 1 items call str 1 utf8 " attached files" call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 keyval call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"icon\":\"attachment\",\"width\":185,\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "false"
+    set discard call ui_button 4 keyval call cat 2 call encode 1 call integer 1 call size 1 items call str 1 utf8 " attached files" call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 keyval call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"icon\":\"attachment\",\"width\":185,\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "false"
     if not call same 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "true" 1
       ret 0u
     0
   0
   set i 0
-  while lt i call size 1 items 3
+  while lt i call size 1 items 4
     set item call nth 2 items i
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT 'Remove '||?1||' · '||CASE WHEN ?2 IS NULL THEN 'size unknown' ELSE printf('%d bytes',?2) END AS label" @build append 1 2 call arr 0 call key 2 item call str 1 utf8 "name" call key 2 item call str 1 utf8 "byte_length" 0 call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"remove\",\"scope\":\"$0\",\"name\":\"$1\",\"id\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 item call str 1 utf8 "id" call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 keyval call str 1 utf8 "/" call encode 1 call integer 1 div i 2
+    set labelval call cat 2 call cat 2 call cat 2 call str 1 utf8 "Remove " call key 2 item call str 1 utf8 "name" call str 1 utf8 " · " call ui_byte_size 1 call key 2 item call str 1 utf8 "byte_length"
+    set discard call ui_emit 1 call ui_merge 2 area call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"$1","role":"quiet","row":"$2","event":{"action":"remove","scope":"$3","name":"$4","id":"$5"}}"# @build append 1 6 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" labelval call cat 2 call cat 2 keyval call str 1 utf8 "/" call encode 1 call integer 1 div i 2 scope name call key 2 item call str 1 utf8 "id"
     next i
   ret 0u
 
@@ -159,7 +180,7 @@ fn desktop_find_tools 2 catalog uint args uint uint do 0 1
 
 fn ui_tool_matches 3 state uint scope uint items uint uint do 2 choices uint discard uint 4
   if eq 0 call size 1 items 2
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "empty" call str 1 utf8 "label" call str 1 utf8 "No matching tools." call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    set discard call ui_label 4 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "empty" call str 1 utf8 "label" call str 1 utf8 "No matching tools." call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
     ret 0u
   0
   set choices call query 2 call asset 1 call str 1 utf8 "tool_choices.sql" call append 2 call arr 0 items

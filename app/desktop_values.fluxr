@@ -5,6 +5,13 @@ fn ui_collect 0 uint ret host ui_collect uint 0
 fn ui_merge 2 a uint b uint uint ret host merge_records uint 2 uint a uint b
 fn ui_show 1 a uint uint ret host display_value uint 1 uint a
 fn edit_span 3 old uint body uint caret uint uint ret host edit_span uint 3 uint old uint body uint caret
+
+fn ui_label 4 idval uint kind uint labelval uint props uint uint do 0 1
+  ret call ui_emit 1 call ui_merge 2 call shape 2 call str 1 @text r#"{"id":"$0","kind":"$1","label":"$2","value":"$2"}"# @build append 1 3 call arr 0 idval kind labelval props
+
+fn ui_button 4 idval uint labelval uint event uint props uint uint do 0 1
+  ret call ui_emit 1 call ui_merge 2 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"$1","event":"$2"}"# @build append 1 3 call arr 0 idval labelval event props
+
 fn ui_default 2 v uint fallback uint uint do 0  2
   if call same 2 v 0u 1
     ret fallback

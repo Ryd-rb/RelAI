@@ -34,7 +34,7 @@ fn workspace_list 6 pid uint base uint titleval uint rows uint item uint keyval 
   set choices call query 2 call str 1 @text r#"SELECT value->>'$.label' AS label,value->>'$.value' AS value FROM json_each(?) ORDER BY CAST(key AS INTEGER)"# call append 2 call arr 0 rows
   ret call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"list","label":"$1","choices":"$2","value":"$3","lines":6,"event":{"action":"workspace_select","scope":"$4","name":"$5"}}"# @build append 1 6 call arr 0 base titleval choices call key 2 item call str 1 utf8 "value" pid keyval
 
-fn activity_journal 4 state uint pid uint base uint pane uint uint do 7 rows uint item uint keyval uint message uint discard uint pagekey uint before uint 12
+fn activity_journal 4 state uint pid uint base uint pane uint uint do 7 rows uint item uint keyval uint message uint discard uint pagekey uint before uint 11
   set pagekey call cat 2 call cat 2 call str 1 utf8 "activity/" pane call str 1 utf8 "/before"
   set before call key 2 call key 2 call key 2 state call str 1 utf8 "workspaceSelection" pid pagekey
   set rows call query 2 call asset 1 call str 1 utf8 "workspace_activity.sql" @build append 1 3 call arr 0 pid pane before
@@ -55,7 +55,23 @@ fn activity_journal 4 state uint pid uint base uint pane uint uint do 7 rows uin
   set item call workspace_pick 2 rows call key 2 call key 2 call key 2 state call str 1 utf8 "workspaceSelection" pid keyval
   set discard call workspace_list 6 pid call cat 2 base call str 1 utf8 "/events" call str 1 utf8 "Events" rows item keyval
   set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/event","kind":"heading","label":"$0","value":"$0"}"# call append 2 call arr 0 call key 2 item call str 1 utf8 "kind"
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/details","kind":"detail","label":"Event details","lines":6,"value":"$0"}"# call append 2 call arr 0 call ui_show 1 call key 2 item call str 1 utf8 "record"
+  ret call activity_details 3 state base item
+
+fn activity_details 3 state uint base uint item uint uint do 4 keyval uint expanded uint message uint discard uint 9
+  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/time","kind":"label","role":"caption","label":"$0","value":"$0"}"# call append 2 call arr 0 call key 2 item call str 1 utf8 "time_label"
+  if not call same 2 call key 2 item call str 1 utf8 "tool_label" 0u 1
+    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/tool","kind":"label","role":"muted","label":"$0","value":"$0"}"# call append 2 call arr 0 call key 2 item call str 1 utf8 "tool_label"
+  0
+  set message call key 2 item call str 1 utf8 "summary"
+  if not call same 2 message 0u 1
+    set discard call ui_prose 2 call str 1 utf8 "activity/summary" message
+  0
+  set keyval call cat 2 call cat 2 base call str 1 utf8 "/record/" call key 2 item call str 1 utf8 "value"
+  set expanded call key 2 call key 2 state call str 1 utf8 "folds" keyval
+  set discard call chat_fold 4 keyval call str 1 utf8 "Event record" expanded call obj 0
+  if call same 2 expanded call decode 1 call str 1 utf8 "true" 1
+    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/details","kind":"detail","label":"Event details","lines":6,"value":"$0"}"# call append 2 call arr 0 call key 2 item call str 1 utf8 "record"
+  0
   ret 0u
 
 fn workspace_lexicon 3 state uint pid uint base uint uint do 5 values uint queryval uint rows uint item uint discard uint 10

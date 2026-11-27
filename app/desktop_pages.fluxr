@@ -11,10 +11,10 @@ fn ui_pager 5 state uint name uint countval uint newer uint older uint uint do 4
   0
   set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"label","role":"caption","label":"$1"}"# @build append 1 2 call arr 0 call cat 2 name call str 1 utf8 "/position" call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT CASE WHEN ?1=0 THEN '0 results' ELSE printf('Results %d–%d of %d',?2*12+1,min(?1,(?2+1)*12),?1) END AS label"# @build append 1 2 call arr 0 countval call integer 1 p 0 call str 1 utf8 "label"
   if lt 0 p 1
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 name call str 1 utf8 "/" call str 1 utf8 "previous" newer call shape 2 call str 1 utf8 "{\"action\":\"page\",\"key\":\"$0\",\"page\":\"$1\"}" call append 2 call append 2 call arr 0 name call integer 1 sub p 1 call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 name
+    set discard call ui_button 4 call cat 2 call cat 2 name call str 1 utf8 "/" call str 1 utf8 "previous" newer call shape 2 call str 1 utf8 "{\"action\":\"page\",\"key\":\"$0\",\"page\":\"$1\"}" call append 2 call append 2 call arr 0 name call integer 1 sub p 1 call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 name
   0
   if lt mul add p 1 12 n 1
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 name call str 1 utf8 "/" call str 1 utf8 "next" older call shape 2 call str 1 utf8 "{\"action\":\"page\",\"key\":\"$0\",\"page\":\"$1\"}" call append 2 call append 2 call arr 0 name call integer 1 add p 1 call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 name
+    set discard call ui_button 4 call cat 2 call cat 2 name call str 1 utf8 "/" call str 1 utf8 "next" older call shape 2 call str 1 utf8 "{\"action\":\"page\",\"key\":\"$0\",\"page\":\"$1\"}" call append 2 call append 2 call arr 0 name call integer 1 add p 1 call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 name
   0
   ret call integer 1 mul p 12
 

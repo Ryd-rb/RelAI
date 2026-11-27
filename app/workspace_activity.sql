@@ -1,10 +1,6 @@
-WITH page AS (
-SELECT e.cursor, e.kind,
-    json_set(e.payload,'$.occurred_utc',strftime('%Y-%m-%d %H:%M:%S UTC',t.occurred,'unixepoch')) AS record,
-    coalesce(strftime('%Y-%m-%d %H:%M:%S UTC',t.occurred,'unixepoch'),'Time unknown') || ' · ' || e.kind ||
-    coalesce('   ·   ' || nullif(substr(replace(replace(coalesce(nullif(e.payload->>'$.error',''),e.payload->>'$.text',
-      e.payload->>'$.payload.question',e.payload->>'$.summary',e.payload->>'$.reason',
-      e.payload->>'$.payload.findings',''),char(10),' '),char(13),' '),1,110),''),'') AS label
+WITH page AS MATERIALIZED (
+SELECT e.cursor, e.kind, e.payload,
+    strftime('%Y-%m-%d %H:%M:%S UTC',t.occurred,'unixepoch') AS occurred
 FROM events e LEFT JOIN event_times t ON t.cursor=e.cursor
 WHERE e.project=?1 AND (?3 IS NULL OR e.cursor<CAST(?3 AS INTEGER)) AND (
  ?2='Timeline'
@@ -27,7 +23,42 @@ WHERE e.project=?1 AND (?3 IS NULL OR e.cursor<CAST(?3 AS INTEGER)) AND (
  OR (e.kind='Action held' AND EXISTS(SELECT 1 FROM actions a JOIN jobs j ON j.id=a.job JOIN requests r ON r.id=j.request AND r.revision=j.revision AND r.state='open' WHERE j.project=e.project AND a.id=e.payload->>'$.action' AND a.state='held'))
 )
 ORDER BY e.cursor DESC LIMIT 101
+), tools AS (
+    SELECT *,
+        CASE kind WHEN 'RUN_TOOL' THEN payload->>'$.payload.tool'
+             WHEN 'Tool receipt' THEN payload->>'$.tool'
+             WHEN 'Tool outcome' THEN payload->>'$.receipt.tool' END AS tool,
+        CASE kind WHEN 'RUN_TOOL' THEN
+            CASE WHEN json_valid(payload->>'$.payload.arguments_json')
+                 THEN payload->>'$.payload.arguments_json' END
+             WHEN 'Tool receipt' THEN payload->'$.arguments'
+             WHEN 'Tool outcome' THEN payload->'$.receipt.arguments' END AS tool_args
+    FROM page
+), display AS (
+    SELECT *,
+        CASE kind WHEN 'RUN_TOOL' THEN 'Tool requested' WHEN 'ASK' THEN 'Question'
+             WHEN 'RESULT' THEN 'Result ready' ELSE kind END AS title,
+        coalesce(nullif(payload->>'$.error',''),nullif(payload->>'$.receipt.error',''),
+            nullif(payload->>'$.reason',''),nullif(payload->>'$.text',''),
+            nullif(payload->>'$.payload.question',''),nullif(payload->>'$.summary',''),
+            nullif(payload->>'$.payload.summary',''),nullif(payload->>'$.payload.findings',''),
+            nullif(payload->>'$.result.summary',''),
+            CASE kind WHEN 'Project opened' THEN payload->>'$.root'
+                 WHEN 'Attempt started' THEN
+                    (payload->>'$.preset.model')||' · '||(payload->>'$.preset.effort')||' reasoning'
+            END) AS message,
+        CASE WHEN tool IN ('fs.read','fs.list','fs.find','fs.search','fs.stat','fs.count','fs.digest')
+            AND tool_args->>'$.host_path' IS NULL
+            THEN nullif(tool_args->>'$.path','') END AS path
+    FROM tools
+), details AS (
+    SELECT *,tool||coalesce(' · '||path,'') AS tool_label,coalesce(occurred,'Time unknown') AS time_label
+    FROM display
 )
-SELECT CAST(cursor AS TEXT) AS value,kind,record AS "record:json",label,
+SELECT CAST(cursor AS TEXT) AS value,title AS kind,time_label,tool_label,
+       CASE WHEN length(message)>1500 THEN substr(message,1,1500)||'…' ELSE message END AS summary,
+       payload AS record,
+       time_label||' · '||title||coalesce(' · '||tool_label,'')||
+           coalesce(' · '||nullif(substr(replace(replace(message,char(10),' '),char(13),' '),1,110),''),'') AS label,
        (SELECT count(*)>100 FROM page) AS has_older
-FROM page ORDER BY cursor DESC LIMIT 100
+FROM details ORDER BY cursor DESC LIMIT 100

@@ -31,7 +31,7 @@ fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint d
         set extra call put 3 extra call str 1 utf8 "role" call str 1 utf8 "selected"
       0
     0
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call hash 1 call encode 1 event labelval event extra
+    set discard call ui_button 4 call cat 2 call cat 2 base call str 1 utf8 "/" call hash 1 call encode 1 event labelval event extra
     ret 0u
   0
   if call same 2 kind call str 1 utf8 "form" 2
@@ -46,14 +46,14 @@ fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint d
       ret 0u
     0
     set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"models/roles","kind":"list","label":"Role assignments","lines":8,"choices":"$0","value":"$1","event":{"action":"path","patch":{"view":"models","project":"$2"},"key":"modelRole"}}"# @build append 1 3 call arr 0 call key 2 spec call str 1 utf8 "assignments" call key 2 spec call str 1 utf8 "value" pid
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "models/active" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "model" call obj 0
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "models/source" call str 1 utf8 "label" call cat 2 call cat 2 call cat 2 call cat 2 call key 2 spec call str 1 utf8 "provider" call str 1 utf8 "  ·  " call key 2 spec call str 1 utf8 "effort" call str 1 utf8 " reasoning  ·  " call key 2 spec call str 1 utf8 "source" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    set discard call ui_label 4 call str 1 utf8 "models/active" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "model" call obj 0
+    set discard call ui_label 4 call str 1 utf8 "models/source" call str 1 utf8 "label" call cat 2 call cat 2 call cat 2 call cat 2 call key 2 spec call str 1 utf8 "provider" call str 1 utf8 "  ·  " call key 2 spec call str 1 utf8 "effort" call str 1 utf8 " reasoning  ·  " call key 2 spec call str 1 utf8 "source" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
     set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"models/edit","kind":"button","label":"Edit assignment","role":"quiet","width":152,"event":{"action":"pane","page":"$0","pane":"Configuration","focus":"$1"}}"# @build append 1 2 call arr 0 call cat 2 pid call str 1 utf8 "/models" call cat 2 call ui_form_key 2 pid call shape 2 call str 1 @text r#"{"op":"save_model","label":"Save preset","fixed":{"role":"$0"}}"# call append 2 call arr 0 call key 2 spec call str 1 utf8 "value" call str 1 utf8 "/provider"
     ret 0u
   0
   if call same 2 kind call str 1 utf8 "empty" 3
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "title" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call obj 0
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "description" call str 1 utf8 "label" call key 2 spec call str 1 utf8 "text" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
+    set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "title" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call obj 0
+    set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "description" call str 1 utf8 "label" call key 2 spec call str 1 utf8 "text" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
     ret 0u
   0
   if call same 2 kind call str 1 utf8 "snapshot_children" 1
@@ -75,10 +75,10 @@ fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint d
     if call same 2 call key 2 spec call str 1 utf8 "dockable" call decode 1 call str 1 utf8 "true" 3
       if call same 2 pid 0u 1
         if lt 1 call number 1 call key 2 spec call str 1 utf8 "itemCount" 1
-          set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "group" call str 1 utf8 "label" call str 1 utf8 "Recent projects" call shape 2 call str 1 utf8 "{\"role\":\"caption\"}" call arr 0
+          set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "group" call str 1 utf8 "label" call str 1 utf8 "Recent projects" call shape 2 call str 1 utf8 "{\"role\":\"caption\"}" call arr 0
         0
       1
-        set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "group" call str 1 utf8 "label" call str 1 utf8 "Projects" call shape 2 call str 1 utf8 "{\"role\":\"caption\",\"side\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true"
+        set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "group" call str 1 utf8 "label" call str 1 utf8 "Projects" call shape 2 call str 1 utf8 "{\"role\":\"caption\",\"side\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true"
       set tabs call key 2 spec call str 1 utf8 "tabs"
       if lt 0 call size 1 tabs 3
         set props call shape 2 call str 1 utf8 "{\"role\":\"nav\",\"side\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 state call str 1 utf8 "left" call decode 1 call str 1 utf8 "true"
@@ -88,24 +88,24 @@ fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint d
         set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"projects/switch\",\"kind\":\"select\",\"label\":\"Active project\",\"choices\":\"$0\",\"value\":\"$1\",\"event\":{\"action\":\"project_tab\"}}" call append 2 call append 2 call arr 0 tabs pid props
       0
     1
-      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "group" call str 1 utf8 "label" labelval call shape 2 call str 1 utf8 "{\"role\":\"caption\",\"side\":true}" call arr 0
+      set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "group" call str 1 utf8 "label" labelval call shape 2 call str 1 utf8 "{\"role\":\"caption\",\"side\":true}" call arr 0
     ret 0u
   0
   if call same 2 kind call str 1 utf8 "fold" 3
     if not call same 2 call key 2 spec call str 1 utf8 "foldKey" 0u 1
       set base call cat 2 call cat 2 call cat 2 call cat 2 pid call str 1 utf8 "/" call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay" call str 1 utf8 "/" call key 2 spec call str 1 utf8 "foldKey"
     0
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 base labelval call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 base call shape 2 call str 1 utf8 "{\"role\":\"nav\",\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "false"
+    set discard call ui_button 4 base labelval call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 base call shape 2 call str 1 utf8 "{\"role\":\"nav\",\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "false"
     ret 0u
   0
   if call same 2 kind call str 1 utf8 "feed" 1
     set labelval call str 1 utf8 "Recent events"
   0
   if call same 2 kind call str 1 utf8 "card" 1
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "label" call str 1 utf8 "label" labelval call shape 2 call str 1 utf8 "{\"role\":\"caption\"}" call arr 0
+    set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "label" call str 1 utf8 "label" labelval call shape 2 call str 1 utf8 "{\"role\":\"caption\"}" call arr 0
   1
     if not call same 2 labelval 0u 1
-      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "label" call str 1 utf8 "heading" labelval call obj 0
+      set discard call ui_label 4 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "label" call str 1 utf8 "heading" labelval call obj 0
     0
   if call same 2 kind call str 1 utf8 "feed" 1
     set discard call ui_pager 5 state call str 1 utf8 "history" call key 2 spec call str 1 utf8 "itemCount" call str 1 utf8 "Newer events" call str 1 utf8 "Earlier events"
@@ -127,14 +127,14 @@ fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint d
   0
   if not call same 2 call key 2 spec call str 1 utf8 "details" 0u 3
     set detail call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "details"
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 detail call str 1 utf8 "Details" call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 detail call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":96,\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" detail call decode 1 call str 1 utf8 "false"
+    set discard call ui_button 4 detail call str 1 utf8 "Details" call shape 2 call str 1 utf8 "{\"action\":\"fold\",\"key\":\"$0\"}" call append 2 call arr 0 detail call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"width\":96,\"expanded\":\"$0\"}" call append 2 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" detail call decode 1 call str 1 utf8 "false"
     if call same 2 call key 2 call key 2 state call str 1 utf8 "folds" detail call decode 1 call str 1 utf8 "true" 1
       set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 detail call str 1 utf8 "/" call str 1 utf8 "body" call str 1 utf8 "detail" call ui_show 1 call key 2 spec call str 1 utf8 "details" call obj 0
     0
   0
   ret 0u
 
-pub desktop_frame 1 arg uint uint do 21 chunks uint section uint pane uint state uint view uint pid uint prefix uint rows uint r uint spec uint base uint extra uint defaultval uint dropval uint scope uint layoutval uint composer uint conversation uint followval uint discard uint i int 23
+pub desktop_frame 1 arg uint uint do 21 chunks uint section uint pane uint state uint view uint pid uint prefix uint rows uint r uint spec uint base uint extra uint defaultval uint dropval uint scope uint layoutval uint composer uint conversation uint followval uint discard uint i int 24
   set chunks call arr 0
   set section 0u
   set pane 0u
@@ -148,6 +148,7 @@ pub desktop_frame 1 arg uint uint do 21 chunks uint section uint pane uint state
   set view call key 2 arg call str 1 utf8 "view"
   set state call put 3 state call str 1 utf8 "toolCatalog" call key 2 view call str 1 utf8 "toolCatalog"
   set state call put 3 state call str 1 utf8 "projectName" call key 2 view call str 1 utf8 "name"
+  set state call put 3 state call str 1 utf8 "projectPath" call ui_display_path 1 call key 2 view call str 1 utf8 "subtitle"
   set pid call key 2 view call str 1 utf8 "project"
   set prefix call cat 2 call cat 2 call ui_default 2 pid call str 1 utf8 "welcome" call str 1 utf8 "/" call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay"
   if call same 2 pid 0u 1
@@ -158,9 +159,8 @@ pub desktop_frame 1 arg uint uint do 21 chunks uint section uint pane uint state
     set pane call workspace_tabs 3 state prefix call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay"
   0
   if lt 0 call size 1 call key 2 state call str 1 utf8 "status" 1
-    if and not call same 2 pid 0u and call same 2 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay" call str 1 utf8 "relay" call same 2 call key 2 state call str 1 utf8 "definition" 0u 2
-      set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call str 1 utf8 "status" call str 1 utf8 "detail" call key 2 state call str 1 utf8 "status" call shape 2 call str 1 utf8 "{\"role\":\"body\",\"area\":\"composer\",\"lines\":2}" call arr 0
-      set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"status/dismiss\",\"kind\":\"button\",\"label\":\"Dismiss message\",\"role\":\"quiet\",\"area\":\"composer\",\"width\":142,\"event\":{\"action\":\"dismiss_status\"}}" call arr 0
+    if and not call same 2 pid 0u and call same 2 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay" call str 1 utf8 "relay" call same 2 call key 2 state call str 1 utf8 "definition" 0u 1
+      set discard call composer_status 1 call key 2 state call str 1 utf8 "status"
     2
       set discard call ui_prose 2 call str 1 utf8 "status" call key 2 state call str 1 utf8 "status"
       set discard call ui_emit 1 call decode 1 call str 1 @text r#"{"id":"status/dismiss","kind":"button","label":"Dismiss message","role":"quiet","event":{"action":"dismiss_status"}}"#

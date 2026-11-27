@@ -21,7 +21,7 @@ fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint 
   set draft call put 3 draft name v
   if not call same 2 readiness 0u 4
     set previous call chat_ready 2 call key 2 draft call str 1 utf8 "text" call key 2 draft call str 1 utf8 "attachments"
-    if not call same 2 readiness previous 1
+    if or not call same 2 readiness previous or and eq 0 call size 1 old lt 0 call size 1 v and lt 0 call size 1 old eq 0 call size 1 v 1
       set changed call decode 1 call str 1 utf8 "true"
     0
     if call same 2 previous call decode 1 call str 1 utf8 "true" 1

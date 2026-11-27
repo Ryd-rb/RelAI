@@ -7,6 +7,73 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[test]
+fn retained_snapshot_paging_preserves_first_visit_comparison() {
+    let mut ui = Desktop::open();
+    let project = ui.view["project"].clone();
+    fs::write(ui.root.join("note.txt"), "captured").unwrap();
+    let mut ids = Vec::new();
+    for _ in 0..66 {
+        let capture = ui
+            .app
+            .invoke("capture_graph", json!({"project":project}))
+            .unwrap();
+        ids.push(capture["snapshot"].clone());
+    }
+    ui.state = json!({"nav":{"project":project,"view":"graph","selected":"note.txt"},"panes":{},"before":null});
+    ui.render(true);
+    let files = ui.control("Snapshot", "select");
+    let choices = files["choices"].as_array().unwrap();
+    assert_eq!(choices.len(), 64);
+    assert!(!choices.iter().any(|choice| choice["value"] == ids[0]));
+    ui.click("Relationships");
+    assert!(ui.state["nav"]["snapshot"].is_null());
+    ui.change("Compare with snapshot", "select", json!({"value":ids[2]}));
+    assert_eq!(ui.state["nav"]["snapshot"], ids[65]);
+    assert_eq!(ui.state["nav"]["comparisonSnapshot"], ids[2]);
+    ui.click("Older snapshots");
+    assert_eq!(ui.state["nav"]["selected"], "note.txt");
+    let comparison = ui.control("Compare with snapshot", "select");
+    assert_eq!(comparison["value"], ids[2]);
+    let choices = comparison["choices"].as_array().unwrap();
+    assert!(
+        choices
+            .iter()
+            .any(|choice| choice["value"] == ids[0] && choice["label"] == "Snapshot 1")
+    );
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["label"] == "Older snapshots")
+    );
+    ui.click("Files");
+    assert_eq!(
+        ui.control("Snapshot", "select")["choices"]
+            .as_array()
+            .unwrap()
+            .len(),
+        4
+    );
+    ui.click("Newer snapshots");
+    assert_eq!(
+        ui.control("Snapshot", "select")["choices"]
+            .as_array()
+            .unwrap()
+            .len(),
+        64
+    );
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["label"] == "Newer snapshots")
+    );
+    ui.click("Older snapshots");
+    ui.click("Capture snapshot");
+    assert!(ui.state["nav"]["snapshotCursor"].is_null());
+    assert!(ui.state["nav"]["snapshotDirection"].is_null());
+    assert!(ui.state["nav"]["comparisonSnapshot"].is_null());
+}
+
 struct Desktop {
     _temp: tempfile::TempDir,
     root: PathBuf,

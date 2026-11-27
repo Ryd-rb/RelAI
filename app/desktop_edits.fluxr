@@ -100,9 +100,10 @@ fn ui_nav 2 state uint patch uint uint do 3 navval uint scope uint discard uint 
   if and call same 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 "graph" not call same 2 call key 2 patch call str 1 utf8 "snapshot" call key 2 navval call str 1 utf8 "snapshot" 1
     set state call ui_set_map 4 state call str 1 utf8 "pages" call str 1 utf8 "changes" call integer 1 0
   0
-  if or not call same 2 call key 2 patch call str 1 utf8 "snapshot" call key 2 navval call str 1 utf8 "snapshot" not call same 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 "graph" 2
+  if or not call same 2 call key 2 patch call str 1 utf8 "snapshot" call key 2 navval call str 1 utf8 "snapshot" not call same 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 "graph" 3
     set state call put 3 state call str 1 utf8 "layers" 0u
     set state call put 3 state call str 1 utf8 "before" 0u
+    set navval call put 3 navval call str 1 utf8 "comparisonSnapshot" 0u
   0
   if or call same 2 call key 2 patch call str 1 utf8 "fresh" call decode 1 call str 1 utf8 "true" or not call same 2 call key 2 patch call str 1 utf8 "reply" 0u or not call same 2 call key 2 patch call str 1 utf8 "follow" 0u not call same 2 call key 2 patch call str 1 utf8 "steer" 0u 4
     set navval call put 3 navval call str 1 utf8 "revise" 0u

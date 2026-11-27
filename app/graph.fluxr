@@ -54,18 +54,32 @@ pub capture_graph 1 arg uint uint do 5 p uint pid uint sid uint nodes uint disca
   set discard call query 2 call str 1 utf8 "INSERT INTO graph_cursors SELECT ?,coalesce(max(cursor),0) FROM events WHERE project=?" call append 2 call append 2 call arr 0 sid pid
   ret call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\"}" call append 2 call arr 0 sid
 
-fn graph_view 2 arg uint pid uint uint do 8 sid uint rowsval uint components uint node uint body uint a uint discard uint versions uint 11
+fn graph_snapshot_pager 4 components uint versions uint sid uint pane uint uint do 3 row uint older uint newer uint 6
+  set row call nth 2 versions 0
+  set older call key 2 row call str 1 utf8 "older"
+  set newer call key 2 row call str 1 utf8 "newer"
+  if not call same 2 older 0u 1
+    set components call append 2 components call shape 2 call str 1 @text r#"{"type":"button","label":"Older snapshots","navigate":{"view":"graph","snapshot":"$0","snapshotCursor":"$1","snapshotDirection":"older"},"pane":"$2","section":"snapshot-paging"}"# @build append 1 3 call arr 0 sid older pane
+  0
+  if not call same 2 newer 0u 1
+    set components call append 2 components call shape 2 call str 1 @text r#"{"type":"button","label":"Newer snapshots","navigate":{"view":"graph","snapshot":"$0","snapshotCursor":"$1","snapshotDirection":"newer"},"pane":"$2","section":"snapshot-paging"}"# @build append 1 3 call arr 0 sid newer pane
+  0
+  ret components
+
+fn graph_view 2 arg uint pid uint uint do 8 sid uint rowsval uint components uint node uint body uint a uint discard uint versions uint 13
   set sid call key 2 arg call str 1 @text r#"snapshot"#
   if call same 2 sid 0u 1
     set sid call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT id FROM snapshots WHERE project=? ORDER BY rowid DESC LIMIT 1"# @build append 1 1 call arr 0 pid 0 call str 1 @text r#"id"#
   0
-  set components call append 2 call arr 0 call shape 2 call str 1 @text r#"{"type":"button","label":"Capture snapshot","op":"capture_graph","selectResult":{"snapshot":"snapshot"},"after":{"view":"graph"},"section":"snapshot"}"# call arr 0
+  set components call append 2 call arr 0 call shape 2 call str 1 @text r#"{"type":"button","label":"Capture snapshot","op":"capture_graph","selectResult":{"snapshot":"snapshot"},"after":{"view":"graph","snapshotCursor":null,"snapshotDirection":null},"section":"snapshot"}"# call arr 0
   if call same 2 sid 0u 1
     ret call append 2 call append 2 call arr 0 call shape 2 call str 1 @text r#"{"type":"empty","label":"Explore a retained source snapshot","text":"Capture the current project to browse files, inspect source links and compare versions without changing your working files.","section":"snapshot"}"# call arr 0 call nth 2 components 0
   0
   set rowsval call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT manifest AS "nodes:json" FROM snapshots WHERE id=? AND project=?"# @build append 1 2 call arr 0 sid pid 0 call str 1 @text r#"nodes"#
   set discard call require 2 not call same 2 rowsval 0u call str 1 @text r#"Snapshot unavailable"#
-  set versions call query 2 call asset 1 call str 1 utf8 "graph_snapshots.sql" @build append 1 2 call arr 0 pid sid
+  set versions call query 2 call asset 1 call str 1 utf8 "graph_snapshots.sql" @build append 1 5 call arr 0 pid sid call key 2 arg call str 1 utf8 "comparisonSnapshot" call key 2 arg call str 1 utf8 "snapshotCursor" call key 2 arg call str 1 utf8 "snapshotDirection"
+  set components call graph_snapshot_pager 4 components versions sid call str 1 utf8 "Files"
+  set components call graph_snapshot_pager 4 components versions sid call str 1 utf8 "Relationships"
   set components call append 2 components call shape 2 call str 1 @text r#"{"type":"tree","nodes":"$0","navigate":{"view":"graph","snapshot":"$1"},"versions":"$2","pathField":"selected","pane":"Files","section":"source-tree"}"# @build append 1 3 call arr 0 rowsval sid versions
   set components call append 2 components call shape 2 call str 1 @text r#"{"type":"graph_layers","op":"graph_layers","snapshot":"$0","versions":"$1","pane":"Relationships","section":"relationships"}"# @build append 1 2 call arr 0 sid versions
   if call same 2 call key 2 arg call str 1 @text r#"selected"# 0u 1

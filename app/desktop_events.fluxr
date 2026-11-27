@@ -186,11 +186,12 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
   if or call same 2 actionval call str 1 utf8 "compare" call same 2 actionval call str 1 utf8 "inspect" 4
-    if call same 2 actionval call str 1 utf8 "compare" 2
+    if call same 2 actionval call str 1 utf8 "compare" 3
       if not call same 2 call ui_default 2 call key 2 state call str 1 utf8 "before" call str 1 utf8 "" call ui_default 2 v call str 1 utf8 "" 1
         set state call ui_set_map 4 state call str 1 utf8 "pages" call str 1 utf8 "changes" call integer 1 0
       0
       set state call put 3 state call str 1 utf8 "before" v
+      set state call put 3 state call str 1 utf8 "nav" call ui_merge 2 call ui_default 2 call key 2 state call str 1 utf8 "nav" call obj 0 call shape 2 call str 1 @text r#"{"snapshot":"$0","comparisonSnapshot":"$1"}"# @build append 1 2 call arr 0 call key 2 event call str 1 utf8 "snapshot" v
     0
     set before call key 2 state call str 1 utf8 "before"
     if call same 2 before call str 1 utf8 "" 1

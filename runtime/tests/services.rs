@@ -321,6 +321,16 @@ fn file_ranges_find_cursor_host_reads_and_monitor_cancellation() {
     assert!(next["cursor"].is_null());
     let range=f.tool("fs.read",json!({"path":"a.md","snapshot":page["snapshot"],"range":{"unit":"lines","start":1,"end":2}})).unwrap();
     assert_eq!(range["text"], "second\n");
+    assert_eq!(
+        f.tool("fs.read", json!({"path":"a.md"})).unwrap()["text"],
+        "é\nsecond\n"
+    );
+    for range in [json!([]), json!({"unit":42}), json!("bytes")] {
+        assert!(
+            f.tool("fs.read", json!({"path":"a.md","range":range}))
+                .is_err()
+        );
+    }
     let bytes = f
         .tool(
             "fs.read",

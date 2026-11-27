@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Data = (Join-Path $env:LOCALAPPDATA 'RelAI'),
+    [ValidateRange(0,65535)]
     [int]$Port = 0,
     [ValidateSet('relay','activity','graph','tools','models','dictionary','open')]
     [string]$View,
@@ -9,6 +10,9 @@ param(
     [switch]$CheckProvider
 )
 $ErrorActionPreference = 'Stop'
+if ($CheckProvider -and ($Headless -or $PSBoundParameters.ContainsKey('Port'))) {
+    throw '-CheckProvider cannot be combined with -Headless or an explicit -Port.'
+}
 if ($View -and ($Headless -or $CheckProvider -or $PSBoundParameters.ContainsKey('Port'))) {
     throw '-View selects a native window. Use it with the desktop launcher.'
 }
@@ -23,6 +27,8 @@ cargo build --release --locked --manifest-path $manifest
 if ($LASTEXITCODE -ne 0) { throw 'FluxR host build failed.' }
 $service = $null
 $sessionDir = $null
+$originalCodexUrl = [Environment]::GetEnvironmentVariable('RELAI_CODEX_URL', 'Process')
+$originalCodexTokenFile = [Environment]::GetEnvironmentVariable('RELAI_CODEX_TOKEN_FILE', 'Process')
 try {
     if (!$ExternalProvider) {
         $codex = (Get-Command codex -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
@@ -53,6 +59,10 @@ try {
     else { & $exe (Join-Path $root 'app') $Data }
     if ($LASTEXITCODE -ne 0) { throw 'RelAI exited with an error.' }
 } finally {
+    if (!$ExternalProvider) {
+        $env:RELAI_CODEX_URL = $originalCodexUrl
+        $env:RELAI_CODEX_TOKEN_FILE = $originalCodexTokenFile
+    }
     if ($service -and !$service.HasExited) { $service.Kill(); $service.WaitForExit() }
     if ($sessionDir) {
         $tokenPath = Join-Path $sessionDir 'socket.token'

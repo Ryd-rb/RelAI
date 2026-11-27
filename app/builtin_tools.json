@@ -23,11 +23,12 @@
   },
   {
     "id": "fs.read",
-    "description": "Fresh bounded UTF-8 text",
+    "description": "Read bounded project file bytes, with optional byte or UTF-8 line ranges",
     "input": {
-      "path": "relative path"
+      "path": "relative path",
+      "range": "optional {unit: bytes|lines, start, end}; defaults to bytes and the whole file; bounds are zero-based, start inclusive and end exclusive"
     },
-    "output": "text",
+    "output": "Selected bytes in base64, encoding (utf-8 or binary), text when valid UTF-8 (otherwise null), selected range, full-file byte size and SHA-256 digest",
     "route": "portable",
     "effects": [],
     "reuse": "disabled",

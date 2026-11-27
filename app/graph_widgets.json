@@ -70,7 +70,7 @@
     "kind": "input",
     "label": "Filter paths",
     "caption": false,
-    "placeholder": "Filter by path or file nameâ€¦",
+    "placeholder": "Filter by path or file name…",
     "value": "$0",
     "event": {
       "action": "filter"
@@ -144,7 +144,7 @@
     "kind": "input",
     "label": "Filter relationships",
     "caption": false,
-    "placeholder": "Filter source, target or symbolâ€¦",
+    "placeholder": "Filter source, target or symbol…",
     "value": "$0",
     "event": {
       "action": "filter",

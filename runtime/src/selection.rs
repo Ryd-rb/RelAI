@@ -66,7 +66,13 @@ pub(super) fn regex_spans(body: &str, pattern: &str) -> Result<Value> {
 
 pub(super) fn range(encoded: &str, spec: &Value) -> Result<Value> {
     let data = STANDARD.decode(encoded)?;
-    let unit = spec["unit"].as_str().unwrap_or("bytes");
+    if !spec.is_null() {
+        ensure!(spec.is_object(), "Expected an object for the range");
+    }
+    let unit = match spec.get("unit") {
+        None => "bytes",
+        Some(value) => value.as_str().context("Expected a string range unit")?,
+    };
     let index = |key: &str, default: usize| -> Result<usize> {
         match spec.get(key) {
             None => Ok(default),

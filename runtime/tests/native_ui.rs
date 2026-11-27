@@ -976,6 +976,86 @@ fn graph_browses_snapshot_children_and_restores_project_zoom() {
 }
 
 #[test]
+fn graph_filters_show_correct_placeholders_and_fold_unicode_paths_and_edges() {
+    let mut ui = Desktop::open();
+    fs::write(ui.root.join("lib.rs"), "mod étage;\n").unwrap();
+    fs::write(ui.root.join("étage.rs"), "pub fn étage() {}\n").unwrap();
+    ui.click("Project graph");
+    ui.click("Capture snapshot");
+    assert_eq!(
+        ui.control("Filter paths", "input")["placeholder"],
+        "Filter by path or file name…"
+    );
+    ui.change("Filter paths", "input", json!({"value":"ÉTAGE"}));
+    assert_eq!(
+        ui.control("Project paths", "list")["choices"][0]["value"],
+        "étage.rs"
+    );
+    ui.click("Relationships");
+    ui.click("Inspect source relationships");
+    assert_eq!(
+        ui.control("Filter relationships", "input")["placeholder"],
+        "Filter source, target or symbol…"
+    );
+    ui.change("Filter relationships", "input", json!({"value":"ÉTAGE"}));
+    ui.find(|c| c["label"] == "Open target" && c["event"]["patch"]["selected"] == "étage.rs");
+}
+
+#[test]
+fn directory_only_snapshots_stop_at_the_entry_limit() {
+    let mut ui = Desktop::open();
+    for index in 0..2_001 {
+        fs::create_dir(ui.root.join(format!("directory-{index:04}"))).unwrap();
+    }
+    let project = ui.view["project"].clone();
+    let error = ui
+        .app
+        .invoke("capture_graph", json!({"project":project}))
+        .unwrap_err();
+    assert!(format!("{error:#}").contains("2000 entries"), "{error:#}");
+    ui.click("Project graph");
+    ui.control("Explore a retained source snapshot", "heading");
+}
+
+#[test]
+fn tool_library_search_matches_unicode_case() {
+    let mut ui = Desktop::open();
+    ui.invoke(
+        "tool_propose",
+        json!({"name":"Étage","source":"fluxr 1\npub run 1 x int int ret add x 1","export":"run","capability":"integer.increment"}),
+    );
+    ui.click("Tools");
+    ui.change("Search tools", "input", json!({"value":"étage"}));
+    let tools = ui.control("Matching tools", "list");
+    assert!(
+        tools["choices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entry| { entry["label"].as_str().unwrap().starts_with("Étage ") })
+    );
+}
+
+#[test]
+fn unknown_model_preset_operation_does_not_replace_the_assignment() {
+    let mut ui = Desktop::open();
+    ui.invoke(
+        "save_model",
+        json!({"role":"discriminator","provider":"codex","model":"original","effort":"low"}),
+    );
+    let invalid = ui.app.invoke(
+        "save_model",
+        json!({
+            "project":ui.view["project"],"role":"discriminator",
+            "provider":"codex","model":"replacement","effort":"low","operation":"sav"
+        }),
+    );
+    assert!(invalid.is_err());
+    ui.click("Models");
+    ui.control("original", "heading");
+}
+
+#[test]
 fn graph_filter_pause_zoom_comparison_and_old_snapshot_read_retained_content() {
     let mut ui = Desktop::open();
     fs::write(ui.root.join("note.md"), "Original café.").unwrap();
@@ -1308,6 +1388,13 @@ fn chat_pages_keep_durable_messages_visible_across_internal_traffic() {
 fn send_readiness_tracks_content_and_dismissing_an_error_keeps_the_draft() {
     let mut ui = Desktop::open();
     let send = |ui: &Desktop| ui.control("Send", "button");
+    let invalid = ui.app.invoke(
+        "submit",
+        json!({
+            "project":ui.view["project"],"key":"blank-api","text":" \t\u{a0}","attachments":[]
+        }),
+    );
+    assert!(invalid.is_err());
     for blank in ["", " \r\n\t", "\u{a0}\u{3000}"] {
         ui.type_message(blank);
         assert_eq!(send(&ui)["enabled"], false);

@@ -97,7 +97,7 @@ pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyva
   set prompt call key 2 arg call str 1 utf8 "text"
   set items call key 2 arg call str 1 utf8 "attachments"
   set discard call require 2 and le call size 1 items 8 le call size 1 prompt 262144 call str 1 utf8 "Submission exceeds limits"
-  set discard call require 2 lt 0 add call size 1 prompt call size 1 items call str 1 utf8 "Enter a message or attach a file"
+  set discard call require 2 or lt 0 call size 1 items call nonblank 1 prompt call str 1 utf8 "Enter a message or attach a file"
   set files call arr 0
   set i 0
   while lt i call size 1 items 4
@@ -173,7 +173,7 @@ pub save_model 1 arg uint uint do 7 p uint role uint scope uint provider uint mo
   set role call key 2 arg call str 1 utf8 "role"
   set discard call require 2 not call same 2 call key 2 call resource 1 call str 1 utf8 "roles.json" role 0u call str 1 utf8 "Unknown role"
   set scope p
-  set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"object\",\"properties\":{\"scope\":{\"enum\":[\"project\",\"global\"]}}}" arg
+  set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"object\",\"properties\":{\"scope\":{\"enum\":[\"project\",\"global\"]},\"operation\":{\"enum\":[\"save\",\"reset\"]}}}" arg
   if call same 2 call key 2 arg call str 1 utf8 "scope" call str 1 utf8 "global" 1
     set scope call str 1 utf8 "global"
   0

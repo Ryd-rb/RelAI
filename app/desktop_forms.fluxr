@@ -1,6 +1,6 @@
 fluxr 1
 
-fn ui_form 3 state uint pid uint spec uint uint do 20 scope uint fields uint draft uint area uint dest uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint picker uint props uint styleval uint discard uint i int j int 19
+fn ui_form 3 state uint pid uint spec uint uint do 20 scope uint fields uint draft uint area uint dest uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint picker uint props uint styleval uint discard uint i int j int 20
   set scope call ui_form_key 2 pid spec
   set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
   set area call obj 0
@@ -23,6 +23,14 @@ fn ui_form 3 state uint pid uint spec uint uint do 20 scope uint fields uint dra
       0
     0
   0
+  if and call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "tool_run" not call same 2 call key 2 spec call str 1 utf8 "presentation" call str 1 utf8 "search" 4
+    set matches call key 2 state call str 1 utf8 "toolCatalog"
+    set item call nth 2 call query 2 call str 1 @text r#"WITH entries(item) AS (SELECT value FROM json_each(?1,'$.builtins') UNION ALL SELECT value FROM json_each(?1,'$.versions')) SELECT json(item) AS "entry:json" FROM entries WHERE coalesce(item->>'$.id',item->>'$.name')=?2 AND (item->>'$.version') IS CASE WHEN item->>'$.id' IS NOT NULL THEN nullif(?3,'') ELSE coalesce(nullif(?3,''),(SELECT value->>'$.version' FROM json_each(?1,'$.defaults') WHERE value->>'$.name'=?2 LIMIT 1)) END AND (item->>'$.id' IS NULL OR nullif(?3,'') IS NULL) LIMIT 1"# @build append 1 3 call arr 0 matches call key 2 draft call str 1 utf8 "tool" call key 2 draft call str 1 utf8 "version" 0
+    set item call key 2 item call str 1 utf8 "entry"
+    if not call same 2 item 0u 1
+      set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"detail","label":"Selected tool input contract","lines":5,"value":"$1"}"# @build append 1 2 call arr 0 call cat 2 scope call str 1 utf8 "/input-contract" call ui_show 1 call ui_default 2 call key 2 item call str 1 utf8 "input" call ui_default 2 call key 2 item call str 1 utf8 "contract" call str 1 utf8 "No input contract is published for this tool."
+    0
+  0
   set fields call key 2 spec call str 1 utf8 "fields"
   set picker 0u
   if and not call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" not call same 2 call key 2 spec call str 1 utf8 "presentation" call str 1 utf8 "search" 1
@@ -32,13 +40,16 @@ fn ui_form 3 state uint pid uint spec uint uint do 20 scope uint fields uint dra
       set discard call ui_emit 1 call ui_merge 2 area call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "heading" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call obj 0
   0
   set i 0
-  while lt i call size 1 fields 9
+  while lt i call size 1 fields 10
     set fieldval call nth 2 fields i
     set kind call key 2 fieldval call str 1 utf8 "type"
     set name call key 2 fieldval call str 1 utf8 "name"
     set base call cat 2 call cat 2 scope call str 1 utf8 "/" name
     set v call ui_field_value 2 fieldval draft
     set event call shape 2 call str 1 utf8 "{\"action\":\"field\",\"scope\":\"$0\",\"name\":\"$1\",\"completion\":\"$2\",\"destination\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 scope name call key 2 spec call str 1 utf8 "completion" dest
+    if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "tool_run" 1
+      set event call put 3 event call str 1 utf8 "runner" call decode 1 call str 1 utf8 "true"
+    0
     if call same 2 call key 2 spec call str 1 utf8 "presentation" call str 1 utf8 "search" 1
       set event call put 3 event call str 1 utf8 "refresh" call str 1 utf8 "view"
     0
@@ -92,7 +103,7 @@ fn ui_form 3 state uint pid uint spec uint uint do 20 scope uint fields uint dra
     next i
   set styleval call obj 0
   if call same 2 call key 2 spec call str 1 utf8 "presentation" call str 1 utf8 "search" 3
-    set matches call find_tools 2 pid call shape 2 call str 1 @text r#"{"query":"$0"}"# call append 2 call arr 0 call key 2 draft call str 1 utf8 "query"
+    set matches call desktop_find_tools 2 call key 2 state call str 1 utf8 "toolCatalog" call shape 2 call str 1 @text r#"{"query":"$0"}"# call append 2 call arr 0 call key 2 draft call str 1 utf8 "query"
     set discard call ui_tool_matches 3 state scope matches
     ret scope
   0
@@ -133,12 +144,15 @@ fn ui_attachments 6 state uint scope uint name uint base uint items uint area ui
     next i
   ret 0u
 
+fn desktop_find_tools 2 catalog uint args uint uint do 0 1
+  ret call query 2 call str 1 @text r#"WITH items(item) AS (SELECT value FROM json_each(?1,'$.builtins') UNION ALL SELECT value FROM json_each(?1,'$.versions')) SELECT json(item) AS "entry:json" FROM items WHERE instr(lower(coalesce(item->>'$.id',item->>'$.name','')),lower(coalesce(?2,'')))>0 OR instr(lower(coalesce(item->>'$.description',item->>'$.contract','')),lower(coalesce(?2,'')))>0 LIMIT 128"# @build append 1 2 call arr 0 catalog call key 2 args call str 1 utf8 "query"
+
 fn ui_tool_matches 3 state uint scope uint items uint uint do 2 choices uint discard uint 4
   if eq 0 call size 1 items 2
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "empty" call str 1 utf8 "label" call str 1 utf8 "No matching tools." call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
     ret 0u
   0
-  set choices call query 2 call str 1 utf8 "SELECT coalesce(value->>'$.entry.id',value->>'$.entry.name')||'   ·   '||coalesce(value->>'$.entry.description',value->>'$.entry.contract','') AS label, json_object('tool',coalesce(value->>'$.entry.id',value->>'$.entry.name'),'version',value->>'$.entry.version') AS value FROM json_each(?)" call append 2 call arr 0 items
+  set choices call query 2 call str 1 utf8 "SELECT coalesce(value->>'$.entry.id',value->>'$.entry.name')||CASE WHEN value->>'$.entry.version' IS NULL THEN '' ELSE '   ·   version '||(value->>'$.entry.version') END||'   ·   '||coalesce(value->>'$.entry.description',value->>'$.entry.contract','') AS label, json_object('tool',coalesce(value->>'$.entry.id',value->>'$.entry.name'),'version',value->>'$.entry.version') AS value FROM json_each(?)" call append 2 call arr 0 items
   set discard call ui_emit 1 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"list\",\"label\":\"Matching tools\",\"lines\":5,\"choices\":\"$1\",\"value\":\"$2\",\"event\":{\"action\":\"tool_choice\",\"scope\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" call str 1 utf8 "matches" choices call key 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call str 1 utf8 "$tool" scope
   ret 0u
 

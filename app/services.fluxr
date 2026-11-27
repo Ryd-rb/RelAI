@@ -1,7 +1,7 @@
 fluxr 1
 
 fn extra_catalog 0  uint do 0  1
-  ret call query 2 call str 1 utf8 "SELECT key AS id,value AS description,'portable' AS route FROM json_each(?) ORDER BY key" call append 2 call arr 0 call asset 1 call str 1 utf8 "services.json"
+  ret call query 2 call str 1 utf8 "SELECT key AS id,value AS description,'portable' AS route FROM json_each(?1) WHERE key NOT IN (SELECT value->>'$.id' FROM json_each(?2)) ORDER BY key" call append 2 call append 2 call arr 0 call asset 1 call str 1 utf8 "services.json" call asset 1 call str 1 utf8 "builtin_tools.json"
 
 fn extra_known 1 toolname uint bool do 0  1
   ret not call same 2 call key 2 call resource 1 call str 1 utf8 "services.json" toolname 0u

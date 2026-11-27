@@ -3,7 +3,7 @@ fluxr 1
 fn ui_shift_markers 4 markers uint start uint oldend uint newend uint uint do 0  1
   ret call query 2 call str 1 utf8 "SELECT CASE WHEN value->>'$.end'<=?2 THEN value->>'$.start' ELSE value->>'$.start'+?4-?3 END AS start,CASE WHEN value->>'$.end'<=?2 THEN value->>'$.end' ELSE value->>'$.end'+?4-?3 END AS end,value->'$.ref' AS \"ref:json\" FROM json_each(?1) WHERE value->>'$.end'<=?2 OR value->>'$.start'>=?3 ORDER BY start" call append 2 call append 2 call append 2 call append 2 call arr 0 markers start oldend newend
 
-fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint name uint draft uint v uint old uint span uint hits uint previous uint caret uint readiness uint changed uint 23
+fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint name uint draft uint v uint old uint span uint hits uint previous uint caret uint readiness uint changed uint 24
   set scope call key 2 event call str 1 utf8 "scope"
   set name call key 2 event call str 1 utf8 "name"
   set draft call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
@@ -13,6 +13,10 @@ fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint 
     set readiness call chat_ready 2 call key 2 draft call str 1 utf8 "text" call key 2 draft call str 1 utf8 "attachments"
   0
   set v call key 2 inputval call str 1 utf8 "value"
+  if and call same 2 call key 2 event call str 1 utf8 "runner" call decode 1 call str 1 utf8 "true" or call same 2 name call str 1 utf8 "tool" call same 2 name call str 1 utf8 "version" 2
+    set state call ui_tool_switch 3 state scope call put 3 call shape 2 call str 1 @text r#"{"tool":"$0","version":"$1"}"# @build append 1 2 call arr 0 call key 2 draft call str 1 utf8 "tool" call key 2 draft call str 1 utf8 "version" name v
+    ret call shape 2 call str 1 @text r#"{"state":"$0","refresh":"view"}"# call append 2 call arr 0 state
+  0
   set old call ui_default 2 call key 2 draft name call str 1 utf8 ""
   set draft call put 3 draft name v
   if not call same 2 readiness 0u 4

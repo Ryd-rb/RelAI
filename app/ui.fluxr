@@ -135,11 +135,12 @@ pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uin
   "section": "term-edit"
 }"# call arr 0
   1
-    if call same 2 viewname call str 1 utf8 "tools" 1
+    if call same 2 viewname call str 1 utf8 "tools" 2
+    set p call put 3 p call str 1 utf8 "toolCatalog" call tool_catalog 1 call shape 2 call str 1 @text r#"{"project":"$0"}"# call append 2 call arr 0 pid
     set components call append 2 components call operations_panel 1 pid
   1
     if call same 2 viewname call str 1 utf8 "activity" 1
       set components call append 2 components call activity_panel 0
     1
       set components call chat_panel 3 arg pid components
-  ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"$0\",\"project\":\"$1\",\"components\":\"$2\",\"name\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 p call str 1 utf8 "root" pid components projectname
+  ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"$0\",\"project\":\"$1\",\"components\":\"$2\",\"name\":\"$3\",\"toolCatalog\":\"$4\"}" @build append 1 5 call arr 0 call key 2 p call str 1 utf8 "root" pid components projectname call key 2 p call str 1 utf8 "toolCatalog"

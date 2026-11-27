@@ -128,7 +128,7 @@ fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint d
   0
   ret 0u
 
-pub desktop_frame 1 arg uint uint do 21 chunks uint section uint pane uint state uint view uint pid uint prefix uint rows uint r uint spec uint base uint extra uint defaultval uint dropval uint scope uint layoutval uint composer uint conversation uint followval uint discard uint i int 21
+pub desktop_frame 1 arg uint uint do 21 chunks uint section uint pane uint state uint view uint pid uint prefix uint rows uint r uint spec uint base uint extra uint defaultval uint dropval uint scope uint layoutval uint composer uint conversation uint followval uint discard uint i int 22
   set chunks call arr 0
   set section 0u
   set pane 0u
@@ -140,6 +140,7 @@ pub desktop_frame 1 arg uint uint do 21 chunks uint section uint pane uint state
   set layoutval call str 1 utf8 "workspace"
   set state call key 2 arg call str 1 utf8 "state"
   set view call key 2 arg call str 1 utf8 "view"
+  set state call put 3 state call str 1 utf8 "toolCatalog" call key 2 view call str 1 utf8 "toolCatalog"
   set pid call key 2 view call str 1 utf8 "project"
   set prefix call cat 2 call cat 2 call ui_default 2 pid call str 1 utf8 "welcome" call str 1 utf8 "/" call ui_default 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "relay"
   if call same 2 pid 0u 1

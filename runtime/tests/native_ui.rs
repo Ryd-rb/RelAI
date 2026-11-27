@@ -747,6 +747,92 @@ fn tools_fold_preserves_typed_json_and_dispatches_exact_data() {
 }
 
 #[test]
+fn tool_library_keeps_arguments_and_output_with_the_selected_tool() {
+    let mut ui = Desktop::open();
+    fs::write(ui.root.join("garden.txt"), "Tulip receipt").unwrap();
+    ui.click("Tools");
+    let select = |ui: &mut Desktop, name: &str| {
+        ui.change("Search tools", "input", json!({"value":name}));
+        let list = ui.control("Matching tools", "list");
+        let choices = list["choices"].as_array().unwrap();
+        let choice = choices
+            .iter()
+            .find(|choice| {
+                choice["label"].as_str().unwrap().split_whitespace().next() == Some(name)
+            })
+            .unwrap();
+        let event = ui.event(list.clone(), json!({"value":choice["value"]}));
+        ui.apply(event);
+    };
+    select(&mut ui, "fs.read");
+    let input = r#"{"path":"garden.txt"}"#;
+    ui.change("Arguments", "multiline", json!({"value":input}));
+    ui.click("Run tool");
+    assert!(
+        ui.controls()
+            .iter()
+            .any(|c| c["id"].as_str().unwrap().ends_with("/output"))
+    );
+    select(&mut ui, "project.info");
+    assert_ne!(ui.control("Arguments", "multiline")["value"], input);
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["id"].as_str().unwrap().ends_with("/output"))
+    );
+    select(&mut ui, "fs.read");
+    assert_eq!(ui.control("Arguments", "multiline")["value"], input);
+    assert!(ui.controls().iter().any(|c| {
+        c["kind"] == "detail"
+            && c["value"]
+                .as_str()
+                .is_some_and(|text| text.contains("relative path"))
+    }));
+    ui.change("Search tools", "input", json!({"value":"tool.find"}));
+    assert_eq!(
+        ui.control("Matching tools", "list")["choices"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    ui.change("Search tools", "input", json!({"value":"portable"}));
+    ui.control("No matching tools.", "label");
+    let all = ui.invoke(
+        "tool_run",
+        json!({"tool":"tool.find","arguments":{"query":"portable"}}),
+    );
+    assert!(!all["value"].as_array().unwrap().is_empty());
+    let versions: Vec<Value> = [2, 3]
+        .map(|n| {
+            ui.invoke(
+                "tool_propose",
+                json!({
+                    "name":"increment", "export":"run", "capability":"integer.increment",
+                    "source":format!("fluxr 1\npub run 1 x int int ret {n}")
+                }),
+            )["version"]
+                .clone()
+        })
+        .into();
+    ui.render(true);
+    ui.change("Search tools", "input", json!({"value":"increment"}));
+    let matching = ui.control("Matching tools", "list");
+    for version in versions {
+        assert!(
+            matching["choices"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|choice| choice["label"]
+                    .as_str()
+                    .unwrap()
+                    .contains(version.as_str().unwrap()))
+        );
+    }
+}
+
+#[test]
 fn chat_pages_keep_durable_messages_visible_across_internal_traffic() {
     let mut ui = Desktop::open();
     let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();

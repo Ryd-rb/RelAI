@@ -41,6 +41,29 @@ fn ui_draft_set 4 state uint scope uint name uint v uint uint do 1 bag uint 2
   set bag call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
   ret call ui_set_map 4 state call str 1 utf8 "drafts" scope call put 3 bag name v
 
+fn ui_tool_switch 3 state uint scope uint selection uint uint do 5 draft uint saved uint keyval uint oldkey uint version uint 12
+  set draft call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
+  set version call key 2 selection call str 1 utf8 "version"
+  if call same 2 version call str 1 utf8 "" 1
+    set version 0u
+  0
+  set selection call put 3 selection call str 1 utf8 "version" version
+  set oldkey call encode 1 @build append 1 3 call arr 0 scope call key 2 draft call str 1 utf8 "tool" call key 2 draft call str 1 utf8 "version"
+  set keyval call encode 1 @build append 1 3 call arr 0 scope call key 2 selection call str 1 utf8 "tool" version
+  if call same 2 oldkey keyval 1
+    ret state
+  0
+  if and not call same 2 call key 2 draft call str 1 utf8 "arguments" 0u not call same 2 call key 2 draft call str 1 utf8 "arguments" call str 1 utf8 "" 1
+    set state call ui_set_map 4 state call str 1 utf8 "toolDrafts" oldkey draft
+  1
+    if not call same 2 call key 2 call key 2 state call str 1 utf8 "toolDrafts" oldkey 0u 1
+      set state call ui_set_map 4 state call str 1 utf8 "toolDrafts" oldkey 0u
+    0
+  set saved call ui_default 2 call key 2 call key 2 state call str 1 utf8 "toolDrafts" keyval call obj 0
+  set state call ui_set_map 4 state call str 1 utf8 "drafts" scope call ui_merge 2 saved selection
+  set state call ui_set_map 4 state call str 1 utf8 "outputs" scope 0u
+  ret state
+
 fn ui_form_key 2 pid uint spec uint uint do 0  2
   if call same 2 call key 2 spec call str 1 utf8 "draft" call decode 1 call str 1 utf8 "true" 1
     ret call hash 1 call encode 1 call append 2 call append 2 call arr 0 pid call str 1 utf8 "relay-composer"

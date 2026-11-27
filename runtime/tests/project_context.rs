@@ -290,6 +290,54 @@ fn semantic_find_returns_dictionary_ranked_passages_at_exact_retained_byte_offse
 }
 
 #[test]
+fn semantic_search_reports_incremental_coverage_and_recovers_dense_unicode_tails() {
+    let (temp, mut app) = fixture();
+    let root = temp.path().join("semantic");
+    let project = open(&mut app, &root);
+    for i in 0..128 {
+        fs::write(
+            root.join(format!("noise-{i:03}.txt")),
+            format!("retained noise {i}"),
+        )
+        .unwrap();
+    }
+    let mut body = "å\n".repeat(2200);
+    body.push_str("unique Étage");
+    // Choose a digest ordered after the 128 noise fixtures, exercising a real second batch.
+    use sha2::{Digest, Sha256};
+    let last_noise = (0..128)
+        .map(|i| Sha256::digest(format!("retained noise {i}")))
+        .max()
+        .unwrap();
+    let body = (0..100_000)
+        .map(|i| format!("{body} {i}"))
+        .find(|value| Sha256::digest(value) > last_noise)
+        .expect("fixture digest after the first batch");
+    fs::write(root.join("Étage.txt"), &body).unwrap();
+    let snapshot = app
+        .invoke("capture_graph", json!({"project":project}))
+        .unwrap()["snapshot"]
+        .clone();
+    let search = |app: &mut App| {
+        app.invoke("tool_run", json!({"project":project,"tool":"project.semantic_find","arguments":{"query":"étage","snapshot":snapshot}})).unwrap()["value"].clone()
+    };
+    let first = search(&mut app);
+    assert_eq!(first["coverage"]["partial"], true);
+    assert_eq!(first["coverage"]["remaining"], 1);
+    assert_eq!(first["passages"], json!([]));
+    assert_eq!(first["paths"][0]["path"], "Étage.txt");
+    let second = search(&mut app);
+    assert_eq!(second["coverage"]["partial"], false);
+    assert_eq!(second["coverage"]["remaining"], 0);
+    let match_row = &second["passages"][0];
+    assert_eq!(match_row["path"], "Étage.txt");
+    let start = match_row["start"].as_u64().unwrap() as usize;
+    let end = match_row["end"].as_u64().unwrap() as usize;
+    assert_eq!(&body[start..end], match_row["body"].as_str().unwrap());
+    assert!(body[start..end].contains("Étage"));
+}
+
+#[test]
 fn linked_definitions_use_exact_versions_and_do_not_confer_third_dictionary_access() {
     let (t, mut app) = fixture();
     let viewer = open(&mut app, &t.path().join("viewer"));

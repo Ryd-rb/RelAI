@@ -33,13 +33,14 @@ fn git_diff 2 pid uint args uint uint do 6 root uint before uint after uint oid 
   set after call key 2 call extra_run 3 pid call str 1 utf8 "git.snapshot" call shape 2 call str 1 utf8 "{\"object\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "new" call str 1 utf8 "snapshot"
   ret call extra_run 3 pid call str 1 utf8 "snapshot.diff" call shape 2 call str 1 utf8 "{\"before\":\"$0\",\"after\":\"$1\"}" call append 2 call append 2 call arr 0 before after
 
-fn semantic_find 2 pid uint args uint uint do 4 snapshot uint terms uint querytext uint discard uint 6
+fn semantic_find 2 pid uint args uint uint do 4 snapshot uint terms uint querytext uint discard uint 7
   set snapshot call key 2 args call str 1 utf8 "snapshot"
   set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid snapshot 0 0u call str 1 utf8 "Unknown snapshot"
   set querytext call key 2 args call str 1 utf8 "query"
   set discard call require 2 and call nonblank 1 querytext le call size 1 querytext 256 call str 1 utf8 "Invalid search query"
   set terms call matches 2 querytext call vocab 1 pid
-  ret call put 3 call shape 2 call str 1 utf8 "{\"concepts\":\"$0\",\"paths\":\"$1\"}" call append 2 call append 2 call arr 0 terms call query 2 call str 1 utf8 "WITH names(name) AS (SELECT json_extract(value,'$.ref.name') FROM json_each(?1) UNION SELECT ?2) SELECT path,digest,count(*) AS rank FROM inventory JOIN names ON instr(lower(path),lower(name))>0 WHERE snapshot=?3 GROUP BY path,digest ORDER BY rank DESC,path LIMIT 64" call append 2 call append 2 call append 2 call arr 0 terms querytext snapshot call str 1 utf8 "passages" call ranked_passages 4 pid snapshot terms querytext
+  set discard call index_passages 2 pid snapshot
+  ret call put 3 call put 3 call put 3 call shape 2 call str 1 utf8 "{\"concepts\":\"$0\",\"paths\":\"$1\"}" call append 2 call append 2 call arr 0 terms call query 2 call str 1 utf8 "WITH names(name) AS (SELECT json_extract(value,'$.ref.name') FROM json_each(?1) UNION SELECT ?2) SELECT path,digest,count(*) AS rank FROM inventory JOIN names ON instr(unicode_fold(path),unicode_fold(name))>0 WHERE snapshot=?3 GROUP BY path,digest ORDER BY rank DESC,path LIMIT 64" call append 2 call append 2 call append 2 call arr 0 terms querytext snapshot call str 1 utf8 "passages" call ranked_passages 4 pid snapshot terms querytext call str 1 utf8 "coverage" call passage_coverage 2 pid snapshot call str 1 utf8 "match_scope" call str 1 utf8 "Content matches use Unicode-folded substrings within one retained passage of up to 512 characters. A phrase may be split across passages."
 
 fn data_query 2 pid uint args uint uint do 3 idval uint discard uint cursor uint 4
   set idval call key 2 args call str 1 utf8 "template"

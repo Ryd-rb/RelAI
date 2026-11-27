@@ -2,18 +2,12 @@
 
 ## Project graph
 
-5. [ ] **Older snapshots become unreachable from the selectors.** Capture 65 snapshots and select the latest. Snapshot 1 is absent from the browse and comparison choices; expect a way to reach it without already knowing its ID. Source: `app/graph_snapshots.sql` (latest 64 plus the current selection), `app/graph.fluxr` (shared choices).
-8. [ ] **Rust path overrides are missing from the relationship graph.** Put `#[path = "actual.rs"] mod child;` in `src/lib.rs` and capture both `src/actual.rs` and an unused `src/child.rs`. The analyzer classifies attributed external declarations as `module`, not `external_module`, so the graph skips this declaration. Expect a link to the retained `src/actual.rs` and no link to the unused `src/child.rs`. Source: `runtime/src/syntax.rs` (`visit_item`), `app/graph_module_relationships.sql` (selects only `external_module`).
-9. [ ] **Custom Rust crate roots are treated as nested modules.** Set `[lib] path = "src/entry.rs"` in Cargo.toml, declare `mod child;` in `src/entry.rs`, and put the child in `src/child.rs`. Inspect the snapshot. The relationship lookup searches under `src/entry/` and misses the child; expect a link to `src/child.rs`. Source: `app/graph_module_relationships.sql` (`module_directories` recognizes only `main.rs`, `lib.rs` and `mod.rs`).
 
 ## Dictionary, Skills, Models, and Tools
 
 
 ## Providers, delivery, and launcher
 
-22. [ ] **Retry delivery stays available after the attempt limit.** Once a job has three attempts, the retry control can requeue the same job, but the scheduler holds it again without sending. Expect an exhausted state with no retry button for that job. Source: `app/chat.fluxr` (`chat_delivery_options`), `app/receive.fluxr` (`control`), `app/queue.fluxr` (`poll`).
-23. [ ] **A fresh attempt does not recover an exhausted request.** At the 64-call request limit, Start a fresh attempt creates a replacement job on the same request, so the request-wide count still blocks it. The count also spans request revisions. Expect the UI to explain the limit and offer a path that can actually run. Source: `app/chat.fluxr` (`chat_delivery_options`), `app/receive.fluxr` (`control`), `app/queue.fluxr` (`poll`).
-24. [ ] **Ambiguous delivery warnings are inconsistent before and after restart.** A transport error can leave a held job with an uncertain attempt. `hold` uses a missing `body_received` value in its SQL condition, and the chat warns of possible duplicate delivery for uncertain attempts. However, a seal-time failure has no attempt at all and is shown as a model response failure. Expect the status to distinguish preparation failure from an uncertain send. Source: `runtime/src/main.rs` (`work`), `app/queue.fluxr` (`hold`), `app/chat_progress.sql`.
 
 ## Attachments, file ranges, and Tools
 
@@ -37,10 +31,6 @@
 
 ## Connectors
 
-57. [ ] **Connector registration accepts invalid destinations.** Register a GET connector with a nonempty malformed URL and a valid argument schema. It is listed as active; the URL is parsed only at execution. Expect registration to validate the destination. Source: `app/connectors.fluxr` (`connector`), `runtime/src/network.rs` (`exchange`).
-58. [ ] **Unsupported idempotency header names are accepted at registration.** Register a connector with an unsupported header name. Registration succeeds, but execution rejects it before sending; expect the two supported header names to be enforced at registration. Source: `app/connectors.fluxr` (`connector`), `runtime/src/network.rs` (`exchange`).
-59. [ ] **A missing connector credential is reported as an uncertain send.** Use a connector with a valid credential reference whose environment variable is unset. The host fails before calling `send`, but the completion handler records `uncertain`; expect a configuration failure that clearly says no request was sent. Source: `runtime/src/network.rs` (`exchange`), `runtime/src/main.rs` (`invoke`), `app/connectors.fluxr` (`guest_net_done`).
-60. [ ] **A definite GET error loses its HTTP outcome classification.** Have an approved test connector return HTTP 404. The status survives in error text, but the operation is marked `uncertain`; expect a received HTTP error to be distinct from a lost response. Source: `runtime/src/network.rs` (`exchange`), `app/connectors.fluxr` (`guest_net_done`).
 
 ## Semantic search
 

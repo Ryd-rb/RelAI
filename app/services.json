@@ -38,7 +38,7 @@
   "code.references": {"description": "Read source-bound language analysis", "input": {"path": "required project-relative file path", "language": "source language, e.g. rust or fluxr", "symbol": "exact symbol name to match", "snapshot": "optional retained snapshot ID"}},
   "code.diagnostics": {"description": "Read source-bound language analysis", "input": {"path": "required project-relative file path", "language": "source language, e.g. rust or fluxr", "snapshot": "optional retained snapshot ID"}},
   "git.diff": "Compare two exact Git commits",
-  "project.semantic_find": "Rank retained text passages and paths by project terms",
+  "project.semantic_find": "Rank retained text passages and paths using Unicode-folded substring matching. Content matches stay within one passage of up to 512 characters. Phrases may be split across passages. Coverage reports eligible, processed and remaining sources.",
   "data.read_query": "Run scoped templates: recent_events {template, after?: nonnegative integer cursor, default 0}; request_jobs {template, request: required request ID}. Returns at most 100 rows.",
   "schedule.create": {"description": "Authorize a UTC schedule", "input": {"due": "required nonnegative UTC Unix timestamp in seconds", "period": "required interval in seconds; 0 for one shot", "action": "required object with an allowlisted repeatable project read in tool and its inputs in arguments; omit version for built-ins"}},
   "schedule.cancel": {"description": "Cancel the specified schedule revision", "input": {"id": "required active schedule ID", "revision": "required current numeric revision"}},

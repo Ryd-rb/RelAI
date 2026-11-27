@@ -225,7 +225,13 @@ fn chat_patch_requires_review_and_an_exact_grant_before_changing_files() {
             .unwrap()
             .contains("-wrong\n+correct\n")
     );
-    ui.control("guide.md · New file", "detail");
+    let files = ui.control("File to review", "select");
+    assert_eq!(files["value"], "README.md");
+    assert_eq!(files["choices"].as_array().unwrap().len(), 2);
+    ui.change("File to review", "select", json!({"value":"guide.md"}));
+    let new_file = ui.control("guide.md · New file", "detail");
+    assert!(new_file["value"].as_str().unwrap().contains("+Guide"));
+    assert!(ui.controls().iter().all(|c| c["label"] != "README.md"));
     ui.type_message("Draft to preserve");
     ui.click("Approve and apply patch");
     ui.control("Patch applied", "heading");

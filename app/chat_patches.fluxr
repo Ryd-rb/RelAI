@@ -41,10 +41,11 @@ pub chat_patch_apply 1 arg uint uint do 5 pid uint eid uint patchval uint auth u
   set auth call effect_authorize 1 call put 3 call put 3 arg call str 1 utf8 "project" pid call str 1 utf8 "destructive" call decode 1 call str 1 utf8 "true"
   ret call effect_apply 1 call put 3 auth call str 1 utf8 "project" pid
 
-fn chat_patch_card 3 state uint pid uint effectval uint uint do 5 controls uint keyval uint expanded uint discard uint i int 6
+fn chat_patch_card 3 state uint pid uint effectval uint uint do 6 controls uint keyval uint expanded uint selected uint discard uint i int 7
   set keyval call cat 2 call str 1 utf8 "chat/patch/" effectval
   set expanded call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" keyval call decode 1 call str 1 utf8 "false"
-  set controls call query 2 call asset 1 call str 1 utf8 "chat_patch_controls.sql" @build append 1 4 call arr 0 pid effectval keyval expanded
+  set selected call key 2 call key 2 call key 2 state call str 1 utf8 "workspaceSelection" keyval call str 1 utf8 "file"
+  set controls call query 2 call asset 1 call str 1 utf8 "chat_patch_controls.sql" @build append 1 5 call arr 0 pid effectval keyval expanded selected
   set i 0
   while lt i call size 1 controls 2
     set discard call ui_emit 1 call key 2 call nth 2 controls i call str 1 utf8 "control"

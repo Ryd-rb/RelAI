@@ -7,6 +7,13 @@ WITH review AS (
     JOIN file_effects e ON e.id=c.effect AND e.project=?1
     JOIN requests r ON r.id=c.request AND r.project=e.project
     WHERE c.effect=?2
+), file_choices AS (
+    SELECT CAST(f.key AS INTEGER) AS position,f.value->>'$.path' AS path,
+        (f.value->>'$.path')||CASE WHEN f.value->>'$.created'=1 THEN ' · New file' ELSE '' END AS label,
+        f.value->>'$.diff' AS diff
+    FROM review,json_each(review.files) f WHERE ?4
+), displayed AS (
+    SELECT * FROM file_choices ORDER BY path IS NOT ?5,position LIMIT 1
 ), controls AS (
     SELECT 0 AS sort,json_object('id',?3||'/title','kind','heading','section',?3,
         'label',CASE
@@ -34,12 +41,18 @@ WITH review AS (
         'event',json_object('action','fold','key',?3))
     FROM review
     UNION ALL
-    SELECT 4+CAST(f.key AS INTEGER),json_object('id',?3||'/file/'||f.key,'kind','detail',
-        'section',?3,'label',(f.value->>'$.path')||CASE WHEN f.value->>'$.created'=1 THEN ' · New file' ELSE '' END,
-        'value',f.value->>'$.diff','lines',9)
-    FROM review,json_each(review.files) f WHERE ?4
+    SELECT 4,json_object('id',?3||'/files','kind','select','section',?3,
+        'label','File to review','value',path,
+        'choices',json((SELECT json_group_array(json_object('value',path,'label',label) ORDER BY position)
+                        FROM file_choices)),
+        'event',json_object('action','workspace_select','scope',?3,'name','file'))
+    FROM displayed WHERE (SELECT count(*) FROM file_choices)>1
     UNION ALL
-    SELECT 21,json_object('id',?3||'/approve','kind','button','role','primary','section',?3,
+    SELECT 5,json_object('id',?3||'/file/'||position,'kind','detail',
+        'section',?3,'label',label,'value',diff,'lines',9)
+    FROM displayed
+    UNION ALL
+    SELECT 6,json_object('id',?3||'/approve','kind','button','role','primary','section',?3,
         'label','Approve and apply patch','width',225,
         'event',json_object('action','command','spec',json_object(
             'type','button','label','Approve and apply patch','op','chat_patch_apply',

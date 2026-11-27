@@ -51,9 +51,13 @@ SELECT
                THEN CASE state WHEN 'queued' THEN 'Preparing to inspect the project…' ELSE 'Inspecting the project…' END
              WHEN tool IN ('fs.search','project.semantic_find','code.symbols','code.definition','code.references','code.diagnostics')
                THEN CASE state WHEN 'queued' THEN 'Preparing to search the project…' ELSE 'Searching the project…' END
-             WHEN tool IN ('web.fetch','web.search','repo.issue_read','repo.pr_read','resource.read','connector.call')
+             WHEN tool='connector.write'
+               THEN CASE state WHEN 'queued' THEN 'Preparing to send the connector request…' ELSE 'Sending the connector request…' END
+             WHEN tool='git.push'
+               THEN CASE state WHEN 'queued' THEN 'Preparing the Git push…' ELSE 'Checking and pushing the remote branch…' END
+             WHEN tool IN ('web.fetch','web.search','repo.issue_read','repo.pr_read','resource.read','connector.call','git.remote_refs','git.push_status')
                THEN CASE state WHEN 'queued' THEN 'Preparing an online lookup…' ELSE 'Looking up online information…' END
-             WHEN tool IN ('project.lookup','plan.get','task.list','task.get','session.list','session.get','job.status','job.receipt','job.trace','dictionary.find','dictionary.get','dictionary.expand','skill.find','skill.read','tool.find','tool.inspect','workflow.find','data.read_query','resource.find')
+             WHEN tool IN ('project.lookup','plan.get','task.list','task.get','session.list','session.get','job.status','job.receipt','job.trace','dictionary.find','dictionary.get','dictionary.expand','skill.find','skill.read','tool.find','tool.inspect','workflow.find','data.read_query','resource.find','connector.find','git.remote_list')
                THEN CASE state WHEN 'queued' THEN 'Preparing a project lookup…' ELSE 'Looking up project information…' END
              WHEN tool IN ('verify.format','verify.lint','verify.build','verify.test','verify.benchmark')
                THEN CASE state WHEN 'queued' THEN 'Preparing project checks…' ELSE 'Checking the project…' END

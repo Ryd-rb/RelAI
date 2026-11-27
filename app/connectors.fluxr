@@ -29,7 +29,50 @@ pub connector 1 arg uint uint do 7 pid uint op uint cid uint def uint method uin
   set discard call query 2 call str 1 utf8 "INSERT INTO network_effects VALUES(?,?,?,?,'authorized',NULL)" call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid cid call encode 1 call key 2 arg call str 1 utf8 "arguments"
   ret call shape 2 call str 1 utf8 "{\"operation\":\"$0\"}" call append 2 call arr 0 sid
 
-fn net_prepare 3 pid uint toolname uint args uint uint do 7 cid uint def uint requestval uint sid uint state uint effect uint discard uint 12
+fn net_dispatch 7 pid uint cid uint toolname uint def uint requestval uint sid uint prior uint uint do 1 state uint 2
+  set state call shape 2 call str 1 @text r#"{"project":"$0","operation":"$1","connector":"$2","tool":"$3","prior":"$4"}"# @build append 1 5 call arr 0 pid sid cid toolname prior
+  ret call shape 2 call str 1 @text r#"{"$http":{"definition":"$0","arguments":"$1","operation":"$2"},"resume":"guest_net_done","state":"$3"}"# @build append 1 4 call arr 0 def requestval sid state
+
+pub chat_connector_write 1 arg uint uint do 9 j uint pid uint args uint cid uint def uint body uint sid uint prior uint discard uint 16
+  set j call nth 2 call query 2 call str 1 @text r#"
+    SELECT j.project,j.request,j.revision,j.input->'$.arguments.arguments' AS "arguments:json"
+    FROM jobs j JOIN projects p ON p.id=j.project AND p.discriminator=j.session
+    JOIN requests r ON r.id=j.request AND r.project=j.project AND r.revision=j.revision AND r.state='open'
+    WHERE j.id=? AND j.state='executing' AND j.kind='tool' AND j.role='discriminator'
+      AND j.input->>'$.operation'='tool_run'
+      AND j.input->>'$.arguments.tool'='connector.write'
+      AND EXISTS(SELECT 1 FROM submissions s WHERE s.project=j.project AND s.request=j.request)
+  "# call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
+  set discard call require 2 not call same 2 j 0u call str 1 utf8 "The addressed connector write is no longer current"
+  set pid call key 2 j call str 1 utf8 "project"
+  set args call key 2 j call str 1 utf8 "arguments"
+  set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","required":["connector","arguments"],"additionalProperties":false,"properties":{"connector":{"type":"string"},"arguments":{"type":"object"}}}"# args
+  set cid call key 2 args call str 1 utf8 "connector"
+  set body call key 2 args call str 1 utf8 "arguments"
+  set prior call nth 2 call query 2 call str 1 @text r#"
+    SELECT e.id,e.receipt AS "receipt:json"
+    FROM chat_connector_writes w JOIN network_effects e ON e.id=w.invocation
+    WHERE w.request=? AND w.revision=? AND e.project=? AND e.connector=? AND e.arguments=?
+    LIMIT 1
+  "# @build append 1 5 call arr 0 call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" pid cid call encode 1 body 0
+  if not call same 2 prior 0u 2
+    if not call same 2 call key 2 prior call str 1 utf8 "receipt" 0u 1
+      ret call key 2 prior call str 1 utf8 "receipt"
+    0
+    ret call shape 2 call str 1 @text r#"{"invocation":"$0","state":"uncertain","error":"This write was already dispatched. Its outcome could not be confirmed."}"# call append 2 call arr 0 call key 2 prior call str 1 utf8 "id"
+  0
+  set def call key 2 call nth 2 call query 2 call str 1 @text r#"
+    SELECT definition AS "def:json" FROM connectors
+    WHERE id=? AND project=? AND active=1 AND definition->>'$.method'='POST'
+  "# @build append 1 2 call arr 0 cid pid 0 call str 1 utf8 "def"
+  set discard call require 2 not call same 2 def 0u call str 1 utf8 "Use an active POST connector registered in this project"
+  set discard call check 2 call key 2 def call str 1 utf8 "schema" body
+  set sid call uid 0
+  set discard call query 2 call str 1 utf8 "INSERT INTO network_effects VALUES(?,?,?,?,'sending',NULL)" @build append 1 4 call arr 0 sid pid cid call encode 1 body
+  set discard call query 2 call str 1 utf8 "INSERT INTO chat_connector_writes VALUES(?,?,?,?)" @build append 1 4 call arr 0 sid call key 2 arg call str 1 utf8 "job" call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision"
+  ret call net_dispatch 7 pid cid call str 1 utf8 "connector.write" def body sid 0u
+
+fn net_prepare 3 pid uint toolname uint args uint uint do 6 cid uint def uint requestval uint sid uint effect uint discard uint 11
   set cid call key 2 args call str 1 utf8 "connector"
   set def call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT definition AS \"d:json\" FROM connectors WHERE id=? AND project=? AND active=1" call append 2 call append 2 call arr 0 cid pid 0 call str 1 utf8 "d"
   set discard call require 2 not call same 2 def 0u call str 1 utf8 "Connector unavailable"
@@ -51,8 +94,7 @@ fn net_prepare 3 pid uint toolname uint args uint uint do 7 cid uint def uint re
   2
     set sid call uid 0
     set discard call query 2 call str 1 utf8 "INSERT INTO network_effects VALUES(?,?,?,?,'sending',NULL)" call append 2 call append 2 call append 2 call append 2 call arr 0 sid pid cid call encode 1 requestval
-  set state call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"operation\":\"$1\",\"connector\":\"$2\",\"tool\":\"$3\",\"prior\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid sid cid toolname call key 2 effect call str 1 utf8 "state"
-  ret call shape 2 call str 1 utf8 "{\"$http\":{\"definition\":\"$0\",\"arguments\":\"$1\",\"operation\":\"$2\"},\"resume\":\"guest_net_done\",\"state\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 def requestval sid state
+  ret call net_dispatch 7 pid cid toolname def requestval sid call key 2 effect call str 1 utf8 "state"
 
 pub guest_net_done 1 arg uint uint do 10 state uint resultval uint pid uint sid uint aid uint meta uint info uint receipt uint kind uint discard uint 13
   set state call key 2 arg call str 1 utf8 "state"
@@ -89,7 +131,7 @@ pub guest_net_done 1 arg uint uint do 10 state uint resultval uint pid uint sid 
     set aid call uid 0
     set meta call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"artifact_id\":\"$0\",\"display_name\":\"response\",\"media_type\":\"$1\",\"byte_length\":\"$2\",\"digest\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 aid call key 2 resultval call str 1 utf8 "media_type" call key 2 info call str 1 utf8 "size" call key 2 info call str 1 utf8 "digest"
     set discard call query 2 call str 1 utf8 "INSERT INTO artifacts VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 aid pid meta call key 2 resultval call str 1 utf8 "base64"
-    set receipt call shape 2 call str 1 utf8 "{\"invocation\":\"$0\",\"tool\":\"$1\",\"artifact\":\"$2\",\"status\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 sid call key 2 state call str 1 utf8 "tool" meta call key 2 resultval call str 1 utf8 "status"
+    set receipt call shape 2 call str 1 @text r#"{"invocation":"$0","tool":"$1","artifact":"$2","status":"$3","state":"completed"}"# @build append 1 4 call arr 0 sid call key 2 state call str 1 utf8 "tool" meta call key 2 resultval call str 1 utf8 "status"
   set discard call query 2 call str 1 utf8 "UPDATE network_effects SET state=?,receipt=? WHERE id=? AND state='sending'" call append 2 call append 2 call append 2 call arr 0 kind receipt sid
   set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Receipt already recorded"
   set discard call audit 3 pid call str 1 utf8 "Connector receipt" receipt

@@ -59,7 +59,7 @@ fn data_query 2 pid uint args uint uint do 3 idval uint discard uint cursor uint
   0
   ret call require 2 false call str 1 utf8 "Supported templates: recent_events (optional after: nonnegative integer, default 0); request_jobs (required request: request ID)."
 
-fn extended_run 3 pid uint toolname uint args uint uint do 0  15
+fn extended_run 3 pid uint toolname uint args uint uint do 0  16
   if or call same 2 toolname call str 1 utf8 "monitor.start" or call same 2 toolname call str 1 utf8 "monitor.stop" call same 2 toolname call str 1 utf8 "monitor.status" 1
     ret call monitor 3 pid toolname args
   0
@@ -98,6 +98,9 @@ fn extended_run 3 pid uint toolname uint args uint uint do 0  15
   0
   if call same 2 toolname call str 1 utf8 "resource.find" 1
     ret call connector 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"op\":\"list\"}" call append 2 call arr 0 pid
+  0
+  if call same 2 toolname call str 1 utf8 "connector.find" 1
+    ret call query 2 call str 1 @text r#"SELECT id,name,definition->>'$.method' AS method,definition->'$.schema' AS "schema:json",definition->>'$.tool' AS tool FROM connectors WHERE project=? AND active=1 ORDER BY name,id"# call append 2 call arr 0 pid
   0
   if call same 2 toolname call str 1 utf8 "repo.pr_propose" 1
     ret call capture 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"mime\":\"application/json\",\"name\":\"proposal.json\",\"base64\":\"$1\"}" call append 2 call append 2 call arr 0 pid call b64 1 call encode 1 args

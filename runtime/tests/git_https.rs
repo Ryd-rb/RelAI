@@ -123,6 +123,10 @@ async fn authorized_https_push_and_fetch_interoperate_with_git_and_refuse_stale_
     let (_daemon, line) = first_line(
         Command::new(env!("CARGO_BIN_EXE_fluxr-app-host"))
             .env("RELAI_GIT_CA_FILE", &pem)
+            .env_remove("RELAI_CODEX_URL")
+            .env_remove("RELAI_CODEX_TOKEN_FILE")
+            .env_remove("RELAI_QWEN_CHAT_URL")
+            .env_remove("ANTHROPIC_API_KEY")
             .arg(Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"))
             .arg(tmp.path().join("state"))
             .arg("--headless")
@@ -170,6 +174,97 @@ async fn authorized_https_push_and_fetch_interoperate_with_git_and_refuse_stale_
     assert_eq!(next["state"], "pushed", "{next}");
     let divergent = api.operation(&p, &remote, "push", json!(two), &one).await?;
     assert_eq!(divergent["state"], "rejected", "{divergent}");
+    // The foreground scheduler starts a push directly from the checked current job.
+    // Its durable transfer is already sending before the HTTPS write begins.
+    let chat_remote = api.call("remote", json!({"project":p,"op":"register","url":format!("https://localhost:{port}/sample.git"),"branch":"refs/heads/chat"})).await?["id"].clone();
+    let mut db = rusqlite::Connection::open(tmp.path().join("state/state.sqlite3"))?;
+    db.busy_timeout(std::time::Duration::from_secs(5))?;
+    for (job, expected, target, outcome) in [
+        ("chat-first", Value::Null, one.as_str(), "pushed"),
+        ("chat-next", json!(one), two.as_str(), "pushed"),
+        ("chat-divergent", json!(two), one.as_str(), "rejected"),
+    ] {
+        let transaction = db.transaction()?;
+        transaction.execute(
+            "INSERT INTO requests(id,project,intent) VALUES(?,?,'Push this commit')",
+            rusqlite::params![job, p.as_str().unwrap()],
+        )?;
+        transaction.execute(
+            "INSERT INTO submissions VALUES(?,?,?,?,'hash','{}')",
+            rusqlite::params![
+                format!("submission-{job}"),
+                p.as_str().unwrap(),
+                job,
+                format!("key-{job}")
+            ],
+        )?;
+        transaction.execute("INSERT INTO jobs(id,project,request,revision,session,role,kind,input,state) SELECT ?,id,?,1,discriminator,'discriminator','tool',?,'queued' FROM projects WHERE id=?", rusqlite::params![job,job,json!({"operation":"tool_run","arguments":{"project":p,"tool":"git.push","arguments":{"remote":chat_remote,"expected":expected,"target":target}}}).to_string(),p.as_str().unwrap()])?;
+        transaction.commit()?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
+        let receipt = loop {
+            let (state, receipt): (String, Option<String>) =
+                db.query_row("SELECT state,receipt FROM jobs WHERE id=?", [job], |r| {
+                    Ok((r.get(0)?, r.get(1)?))
+                })?;
+            if state == "accepted" {
+                break serde_json::from_str::<Value>(
+                    &receipt.context("Missing foreground receipt")?,
+                )?;
+            }
+            ensure!(
+                std::time::Instant::now() < deadline,
+                "Foreground push stalled in {state}"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        };
+        assert_eq!(receipt["state"], outcome, "{receipt}");
+        assert!(receipt["operation"].is_string());
+        let (count, pending): (i64,i64) = db.query_row("SELECT count(*),sum(t.state IN ('authorized','sending')) FROM chat_git_transfers c JOIN git_transfers t ON t.id=c.transfer WHERE c.job=?", [job], |r| Ok((r.get(0)?,r.get(1)?)))?;
+        assert_eq!((count, pending), (1, 0));
+        db.execute("UPDATE requests SET state='completed' WHERE id=?", [job])?;
+        db.execute(
+            "UPDATE jobs SET state='cancelled' WHERE request=? AND kind!='tool'",
+            [job],
+        )?;
+    }
+    let uncertain: String = db.query_row(
+        "SELECT transfer FROM chat_git_transfers WHERE job='chat-next'",
+        [],
+        |r| r.get(0),
+    )?;
+    db.execute(
+        r#"UPDATE git_transfers SET state='uncertain',receipt='{"state":"uncertain"}' WHERE id=?"#,
+        [&uncertain],
+    )?;
+    let confirmed = api
+        .call(
+            "tool_run",
+            json!({"project":p,"tool":"git.push_status","arguments":{"operation":uncertain}}),
+        )
+        .await?;
+    assert_eq!(confirmed["state"], "completed", "{confirmed}");
+    assert_eq!(
+        db.query_row(
+            "SELECT state FROM git_transfers WHERE id=?",
+            [&uncertain],
+            |r| r.get::<_, String>(0)
+        )?,
+        "completed"
+    );
+    assert_eq!(
+        git(
+            &server_dir.join("sample.git"),
+            &["rev-parse", "refs/heads/chat"]
+        )?,
+        two
+    );
+    assert_eq!(
+        git(
+            &server_dir.join("sample.git"),
+            &["rev-parse", "refs/heads/main"]
+        )?,
+        two
+    );
     let q = api.call("open_project", json!({"root":consumer})).await?["id"].clone();
     let receiver = register(&q).await?["id"].clone();
     let refs = api

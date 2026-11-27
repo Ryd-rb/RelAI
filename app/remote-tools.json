@@ -1,1 +1,1 @@
-["git.fetch","git.push","git.remote_refs"]
+["git.fetch","git.push","git.remote_refs","git.remote_list","git.push_status"]

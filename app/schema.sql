@@ -123,8 +123,11 @@ CREATE TABLE IF NOT EXISTS chat_patch_reviews(effect TEXT PRIMARY KEY REFERENCES
 CREATE INDEX IF NOT EXISTS chat_patch_events ON events(project,cursor) WHERE kind='Patch proposed';
 CREATE TABLE IF NOT EXISTS git_remotes(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,url TEXT NOT NULL,branch TEXT NOT NULL,credential TEXT,active INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS git_transfers(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,remote TEXT NOT NULL REFERENCES git_remotes,operation TEXT NOT NULL,expected TEXT,target TEXT,state TEXT NOT NULL,receipt TEXT);
+CREATE TABLE IF NOT EXISTS chat_git_transfers(transfer TEXT PRIMARY KEY REFERENCES git_transfers(id),job TEXT NOT NULL UNIQUE REFERENCES jobs(id),request TEXT NOT NULL REFERENCES requests(id),revision INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS connectors(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,name TEXT NOT NULL,definition TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS network_effects(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,connector TEXT NOT NULL REFERENCES connectors,arguments TEXT NOT NULL,state TEXT NOT NULL,receipt TEXT);
+CREATE TABLE IF NOT EXISTS chat_connector_writes(invocation TEXT PRIMARY KEY REFERENCES network_effects(id),job TEXT NOT NULL UNIQUE REFERENCES jobs(id),request TEXT NOT NULL REFERENCES requests(id),revision INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS chat_connector_writes_request ON chat_connector_writes(request,revision);
 CREATE VIEW IF NOT EXISTS open_chat_questions AS
 SELECT r.project, q.id, q.request, q.rowid AS sequence, q.body->>'$.question' AS prompt
   FROM questions q JOIN requests r ON r.id=q.request AND r.revision=q.revision

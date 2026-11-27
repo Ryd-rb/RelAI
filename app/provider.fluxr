@@ -58,8 +58,16 @@ pub seal 1 arg uint uint do 21 j uint p uint rid uint role uint k uint presetval
        ORDER BY CAST(key AS INTEGER)
     "# call append 2 call arr 0 call resource 1 call str 1 utf8 "builtin_tools.json"
   0
-  if call same 2 role call str 1 utf8 "discriminator" 1
+  if call same 2 role call str 1 utf8 "discriminator" 2
     set frame call put 3 frame call str 1 utf8 "project_tools" call append 2 call key 2 frame call str 1 utf8 "project_tools" call resource 1 call str 1 utf8 "chat_patch_tool.json"
+    set frame call put 3 frame call str 1 utf8 "project_tools" call add_refs 2 call key 2 frame call str 1 utf8 "project_tools" call query 2 call str 1 @text r#"
+      SELECT key AS tool,value->>'$.description' AS description,value->'$.input' AS "arguments:json"
+      FROM json_each(?1)
+      WHERE (key IN ('connector.write','connector.find') AND EXISTS (
+          SELECT 1 FROM connectors WHERE project=?2 AND active=1 AND definition->>'$.method'='POST'))
+        OR (key IN ('git.remote_list','git.remote_refs','git.push','git.push_status') AND EXISTS (
+          SELECT 1 FROM git_remotes WHERE project=?2 AND active=1))
+    "# @build append 1 2 call arr 0 call asset 1 call str 1 utf8 "services.json" p
   0
   set frame call put 3 frame call str 1 utf8 "selected_host_files" call query 2 call str 1 utf8 "SELECT path FROM selected_sources WHERE request=? AND revision=? AND session=? ORDER BY path" call append 2 call append 2 call append 2 call arr 0 call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "session"
   set frame call put 3 frame call str 1 utf8 "prompt_bytes" call integer 1 call size 1 call key 2 inputval call str 1 utf8 "text"

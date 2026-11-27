@@ -205,7 +205,7 @@ pub init 1 arg uint uint do 1 discard uint 12
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='queued' WHERE state='sealing'" call arr 0
   set discard call query 2 call str 1 @text r#"
     UPDATE jobs SET state='queued',reason=NULL WHERE state='executing' AND kind='tool'
-      AND role='discriminator' AND input->>'$.arguments.tool' IN ('patch.propose','git.stage','git.commit','git.branch')
+      AND role='discriminator' AND input->>'$.arguments.tool' IN ('patch.propose','git.stage','git.commit','git.branch','git.push','connector.write')
       AND EXISTS(SELECT 1 FROM requests r WHERE r.id=jobs.request AND r.project=jobs.project
         AND r.revision=jobs.revision AND r.state='open')
   "# call arr 0

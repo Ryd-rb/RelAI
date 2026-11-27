@@ -387,6 +387,7 @@
               "type": "form",
               "label": "Manage remote branches",
               "op": "remote",
+              "text": "Register an HTTPS repository and branch for this project. You can then ask RelAI to push to it in chat.",
               "fields": [
                 {
                   "name": "payload",
@@ -463,6 +464,7 @@
           "type": "form",
           "label": "Manage connector",
           "op": "connector",
+          "text": "Register a connector with a fixed destination and argument schema. You can then ask RelAI to send a request to it in chat.",
           "fields": [
             {
               "name": "payload",

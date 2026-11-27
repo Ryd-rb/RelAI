@@ -27,7 +27,7 @@ pub remote 1 arg uint uint do 9 pid uint op uint idval uint def uint rid uint ki
   0
   if call same 2 op call str 1 utf8 "reconcile" 3
     set def call nth 2 call query 2 call str 1 utf8 "SELECT t.target,r.branch,r.url,r.credential,'reconcile' AS op FROM git_transfers t JOIN git_remotes r ON r.id=t.remote WHERE t.id=? AND t.project=? AND t.state='uncertain' AND t.operation='push' AND r.active=1" call append 2 call append 2 call arr 0 idval pid 0
-    set discard call require 2 not call same 2 def 0u call str 1 utf8 "Uncertain approved push required"
+    set discard call require 2 not call same 2 def 0u call str 1 utf8 "Uncertain registered push required"
     ret call shape 2 call str 1 utf8 "{\"$smart\":\"$0\",\"state\":{\"project\":\"$1\",\"operation\":\"$2\",\"reconcile\":true}}" call append 2 call append 2 call append 2 call arr 0 def pid idval
   0
   set discard call require 2 call same 2 op call str 1 utf8 "authorize" call str 1 utf8 "Unknown remote control"
@@ -39,15 +39,51 @@ pub remote 1 arg uint uint do 9 pid uint op uint idval uint def uint rid uint ki
     set expected call git_sha1 1 expected
   0
   set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM git_remotes WHERE id=? AND project=? AND active=1" call append 2 call append 2 call arr 0 idval pid 0 0u call str 1 utf8 "Remote is unavailable"
-  set discard call require 2 call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM git_transfers WHERE remote=? AND state IN ('uncertain','sending') AND operation='push' AND ?='push'" call append 2 call append 2 call arr 0 idval kind 0 0u call str 1 utf8 "Resolve the earlier push before authorizing another"
+  set discard call require 2 call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM git_transfers WHERE remote=? AND state IN ('uncertain','sending') AND operation='push' AND ?='push'" call append 2 call append 2 call arr 0 idval kind 0 0u call str 1 utf8 "Resolve the earlier push before starting another"
   set rid call uid 0
   set discard call query 2 call str 1 utf8 "INSERT INTO git_transfers VALUES(?,?,?,?,?,?,'authorized',NULL)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 rid pid idval kind expected target
   ret call shape 2 call str 1 utf8 "{\"operation\":\"$0\"}" call append 2 call arr 0 rid
 
-pub remote_run 1 arg uint uint do 7 pid uint args uint name uint plan uint idval uint kind uint discard uint 11
+pub chat_git_push 1 arg uint uint do 7 jobval uint prior uint args uint target uint expected uint operation uint discard uint 12
+  set jobval call nth 2 call query 2 call str 1 @text r#"
+SELECT j.id,j.project,j.request,j.revision,j.input->'$.arguments.arguments' AS "arguments:json"
+FROM jobs j JOIN projects p ON p.id=j.project AND p.discriminator=j.session
+JOIN requests r ON r.id=j.request AND r.project=j.project AND r.revision=j.revision AND r.state='open'
+WHERE j.id=? AND j.state='executing' AND j.kind='tool' AND j.role='discriminator'
+  AND j.input->>'$.operation'='tool_run' AND j.input->>'$.arguments.tool'='git.push'
+  AND EXISTS(SELECT 1 FROM submissions s WHERE s.project=j.project AND s.request=j.request)
+"# call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
+  set discard call require 2 not call same 2 jobval 0u call str 1 utf8 "The addressed chat push job is no longer current"
+  set prior call nth 2 call query 2 call str 1 @text r#"
+SELECT t.id AS operation,CASE WHEN t.state='sending' THEN 'uncertain' ELSE t.state END AS state,t.receipt AS "receipt:json"
+FROM chat_git_transfers c JOIN git_transfers t ON t.id=c.transfer
+WHERE c.job=? AND t.project=? AND c.request=? AND c.revision=?
+"# @build append 1 4 call arr 0 call key 2 jobval call str 1 utf8 "id" call key 2 jobval call str 1 utf8 "project" call key 2 jobval call str 1 utf8 "request" call key 2 jobval call str 1 utf8 "revision" 0
+  if not call same 2 prior 0u 1
+    ret call put 3 call ui_default 2 call key 2 prior call str 1 utf8 "receipt" prior call str 1 utf8 "operation" call key 2 prior call str 1 utf8 "operation"
+  0
+  set args call key 2 jobval call str 1 utf8 "arguments"
+  set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","additionalProperties":false,"required":["remote","expected","target"],"properties":{"remote":{"type":"string","minLength":1},"expected":{"type":["string","null"]},"target":{"type":"string"}}}"# args
+  set target call git_sha1 1 call key 2 args call str 1 utf8 "target"
+  set expected call key 2 args call str 1 utf8 "expected"
+  if not call same 2 expected 0u 1
+    set expected call git_sha1 1 expected
+  0
+  set operation call remote 1 call shape 2 call str 1 @text r#"{"project":"$0","op":"authorize","id":"$1","kind":"push","expected":"$2","target":"$3"}"# @build append 1 4 call arr 0 call key 2 jobval call str 1 utf8 "project" call key 2 args call str 1 utf8 "remote" expected target
+  set discard call query 2 call str 1 utf8 "INSERT INTO chat_git_transfers(transfer,job,request,revision) VALUES(?,?,?,?)" @build append 1 4 call arr 0 call key 2 operation call str 1 utf8 "operation" call key 2 jobval call str 1 utf8 "id" call key 2 jobval call str 1 utf8 "request" call key 2 jobval call str 1 utf8 "revision"
+  ret call remote_run 1 call shape 2 call str 1 @text r#"{"project":"$0","tool":"git.push","arguments":"$1"}"# @build append 1 2 call arr 0 call key 2 jobval call str 1 utf8 "project" operation
+
+pub remote_run 1 arg uint uint do 7 pid uint args uint name uint plan uint idval uint kind uint discard uint 13
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set args call key 2 arg call str 1 utf8 "arguments"
   set name call key 2 arg call str 1 utf8 "tool"
+  if call same 2 name call str 1 utf8 "git.remote_list" 1
+    ret call query 2 call str 1 utf8 "SELECT id,url,branch FROM git_remotes WHERE project=? AND active=1 ORDER BY rowid" call append 2 call arr 0 pid
+  0
+  if call same 2 name call str 1 utf8 "git.push_status" 2
+    set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","additionalProperties":false,"required":["operation"],"properties":{"operation":{"type":"string","minLength":1}}}"# args
+    ret call remote 1 call shape 2 call str 1 @text r#"{"project":"$0","op":"reconcile","id":"$1"}"# @build append 1 2 call arr 0 pid call key 2 args call str 1 utf8 "operation"
+  0
   set kind call str 1 utf8 "fetch"
   if call same 2 name call str 1 utf8 "git.push" 1
     set kind call str 1 utf8 "push"

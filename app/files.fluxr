@@ -23,7 +23,7 @@ fn file_selection 3 pid uint toolname uint args uint uint do 10 snapshot uint p 
     set meta call scoped_path 3 root path call decode 1 call str 1 utf8 "false"
     set encoded call key 2 meta call str 1 utf8 "base64"
   2
-    set encoded call read64 2 root path
+    set encoded call fresh_read 3 root path call str 1 utf8 "base64"
     set meta call baseinfo 1 encoded
   if call same 2 toolname call str 1 utf8 "fs.stat" 1
     ret call shape 2 call str 1 utf8 "{\"path\":\"$0\",\"host_path\":\"$1\",\"snapshot\":\"$2\",\"kind\":\"$3\",\"size\":\"$4\",\"digest\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 path absolute snapshot call key 2 meta call str 1 utf8 "kind" call key 2 meta call str 1 utf8 "size" call key 2 meta call str 1 utf8 "digest"

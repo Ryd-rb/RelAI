@@ -497,6 +497,31 @@
         },
         {
           "type": "fold",
+          "label": "Retire an uncertain fetch",
+          "foldKey": "git-retire-fetch",
+          "pane": "Changes",
+          "section": "git",
+          "items": [
+            {
+              "type": "form",
+              "label": "Retire fetch",
+              "op": "remote",
+              "text": "Enter the operation ID from the uncertain fetch. RelAI keeps the original receipt and records the retirement locally. The fetch outcome remains unconfirmed.",
+              "fields": [
+                {
+                  "name": "id",
+                  "label": "Fetch operation ID",
+                  "type": "text",
+                  "required": true
+                }
+              ],
+              "fixed": {"op": "retire_fetch"},
+              "showResult": true
+            }
+          ]
+        },
+        {
+          "type": "fold",
           "label": "Install a fetched skill",
           "foldKey": "git-6",
           "pane": "Changes",

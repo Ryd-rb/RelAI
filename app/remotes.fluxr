@@ -1,6 +1,6 @@
 fluxr 1
 
-pub remote 1 arg uint uint do 7 pid uint op uint idval uint def uint rid uint kind uint discard uint 17
+pub remote 1 arg uint uint do 9 pid uint op uint idval uint def uint rid uint kind uint discard uint target uint expected uint 20
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set op call key 2 arg call str 1 utf8 "op"
   set idval call key 2 arg call str 1 utf8 "id"
@@ -9,7 +9,7 @@ pub remote 1 arg uint uint do 7 pid uint op uint idval uint def uint rid uint ki
   0
   if call same 2 op call str 1 utf8 "register" 4
     set idval call uid 0
-    set discard call require 2 and lt 0 call size 1 call key 2 arg call str 1 utf8 "url" lt 0 call size 1 call key 2 arg call str 1 utf8 "branch" call str 1 utf8 "Enter the HTTPS repository and full branch ref"
+    set discard call validate_git_remote 2 call key 2 arg call str 1 utf8 "url" call key 2 arg call str 1 utf8 "branch"
     set discard call query 2 call str 1 utf8 "INSERT INTO git_remotes VALUES(?,?,?,?,?,1)" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 idval pid call key 2 arg call str 1 utf8 "url" call key 2 arg call str 1 utf8 "branch" call key 2 arg call str 1 utf8 "credential"
     ret call shape 2 call str 1 utf8 "{\"id\":\"$0\"}" call append 2 call arr 0 idval
   0
@@ -19,6 +19,12 @@ pub remote 1 arg uint uint do 7 pid uint op uint idval uint def uint rid uint ki
   if call same 2 op call str 1 utf8 "status" 1
     ret call nth 2 call query 2 call str 1 utf8 "SELECT id,state,receipt AS \"receipt:json\" FROM git_transfers WHERE id=? AND project=?" call append 2 call append 2 call arr 0 idval pid 0
   0
+  if call same 2 op call str 1 utf8 "retire_fetch" 4
+    set discard call query 2 call str 1 @text r#"UPDATE git_transfers SET state='retired' WHERE id=? AND project=? AND operation='fetch' AND state='uncertain' RETURNING id"# call append 2 call append 2 call arr 0 idval pid
+    set discard call require 2 eq 1 call size 1 discard call str 1 utf8 "An uncertain fetch in this project is required"
+    set discard call audit 3 pid call str 1 utf8 "Git fetch retired" call shape 2 call str 1 @text r#"{"operation":"$0","state":"retired","previous_state":"uncertain","summary":"Retired locally. The fetch outcome remains unconfirmed."}"# call append 2 call arr 0 idval
+    ret call remote 1 call put 3 arg call str 1 utf8 "op" call str 1 utf8 "status"
+  0
   if call same 2 op call str 1 utf8 "reconcile" 3
     set def call nth 2 call query 2 call str 1 utf8 "SELECT t.target,r.branch,r.url,r.credential,'reconcile' AS op FROM git_transfers t JOIN git_remotes r ON r.id=t.remote WHERE t.id=? AND t.project=? AND t.state='uncertain' AND t.operation='push' AND r.active=1" call append 2 call append 2 call arr 0 idval pid 0
     set discard call require 2 not call same 2 def 0u call str 1 utf8 "Uncertain approved push required"
@@ -27,11 +33,15 @@ pub remote 1 arg uint uint do 7 pid uint op uint idval uint def uint rid uint ki
   set discard call require 2 call same 2 op call str 1 utf8 "authorize" call str 1 utf8 "Unknown remote control"
   set kind call key 2 arg call str 1 utf8 "kind"
   set discard call require 2 or call same 2 kind call str 1 utf8 "fetch" call same 2 kind call str 1 utf8 "push" call str 1 utf8 "Choose fetch or push"
-  set discard call require 2 eq 40 call size 1 call key 2 arg call str 1 utf8 "target" call str 1 utf8 "An exact SHA-1 commit is required"
+  set target call git_sha1 1 call key 2 arg call str 1 utf8 "target"
+  set expected call key 2 arg call str 1 utf8 "expected"
+  if not call same 2 expected 0u 1
+    set expected call git_sha1 1 expected
+  0
   set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM git_remotes WHERE id=? AND project=? AND active=1" call append 2 call append 2 call arr 0 idval pid 0 0u call str 1 utf8 "Remote is unavailable"
   set discard call require 2 call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM git_transfers WHERE remote=? AND state IN ('uncertain','sending') AND operation='push' AND ?='push'" call append 2 call append 2 call arr 0 idval kind 0 0u call str 1 utf8 "Resolve the earlier push before authorizing another"
   set rid call uid 0
-  set discard call query 2 call str 1 utf8 "INSERT INTO git_transfers VALUES(?,?,?,?,?,?,'authorized',NULL)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 rid pid idval kind call key 2 arg call str 1 utf8 "expected" call key 2 arg call str 1 utf8 "target"
+  set discard call query 2 call str 1 utf8 "INSERT INTO git_transfers VALUES(?,?,?,?,?,?,'authorized',NULL)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 rid pid idval kind expected target
   ret call shape 2 call str 1 utf8 "{\"operation\":\"$0\"}" call append 2 call arr 0 rid
 
 pub remote_run 1 arg uint uint do 7 pid uint args uint name uint plan uint idval uint kind uint discard uint 11

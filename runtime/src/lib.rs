@@ -614,6 +614,18 @@ impl Bindings<'_> {
                 worktrees::prepare(Path::new(text(get(0)?)?), self.data, get(1)?)?
             }
             "worktree_inspect" => worktrees::inspect(Path::new(text(get(0)?)?), self.data)?,
+            "validate_git_remote" => {
+                smart_http::validate_remote(text(get(0)?)?, text(get(1)?)?)?;
+                Value::Null
+            }
+            "git_sha1" => {
+                let id = text(get(0)?)?;
+                ensure!(
+                    id.len() == 40 && id.bytes().all(|b| b.is_ascii_hexdigit()),
+                    "Expected exactly 40 hexadecimal SHA-1 digits"
+                );
+                json!(id.to_ascii_lowercase())
+            }
             "git_inspect" => git_operations::inspect(Path::new(text(get(0)?)?), self.data)?,
             "git_prepare" => {
                 git_operations::prepare(Path::new(text(get(0)?)?), self.data, get(1)?)?

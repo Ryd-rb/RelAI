@@ -404,6 +404,97 @@ fn checked_specific_recovery_rechecks_authority_and_preserves_external_index_cha
 }
 
 #[test]
+fn partial_worktree_status_keeps_index_and_does_not_infer_deletions() {
+    let fixture = Repo::new();
+    let baseline = fixture.status();
+    fs::write(fixture.root.join(".gitignore"), "large-output\n").unwrap();
+    fs::write(fixture.root.join("b.txt"), "observed edit\n").unwrap();
+    let output = fs::File::create(fixture.root.join("large-output")).unwrap();
+    output.set_len(8 * 1024 * 1024 + 1).unwrap();
+    fs::remove_file(fixture.root.join("a.txt")).unwrap();
+    let status = fixture.status();
+    assert_eq!(status["worktree_coverage"], "partial");
+    assert_eq!(status["index_digest"], baseline["index_digest"]);
+    assert_eq!(status["branches"], baseline["branches"]);
+    assert!(
+        status["status"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["path"] == "b.txt" && row["worktree"] == "modified_raw_bytes")
+    );
+    assert!(
+        status["status"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row["path"] == "a.txt" && row["worktree"] == "unknown")
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn worktree_owner_execute_bit_respects_filemode() {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = Repo::new();
+    let config = fixture.root.join(".git/config");
+    let base = fs::read_to_string(&config).unwrap();
+    fs::set_permissions(
+        fixture.root.join("a.txt"),
+        fs::Permissions::from_mode(0o744),
+    )
+    .unwrap();
+    for (setting, changed) in [("true", true), ("false", false)] {
+        fs::write(&config, format!("{base}\n[core]\nfileMode = {setting}\n")).unwrap();
+        assert_eq!(
+            fixture.status()["status"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|row| row["path"] == "a.txt" && row["worktree"] == "modified_mode"),
+            changed
+        );
+    }
+}
+
+#[test]
+fn unchanged_selected_tree_is_rejected() {
+    let fixture = Repo::new();
+    let state = fixture.status();
+    let err = native::prepare(&fixture.root, &fixture.private, &json!({"operation":"commit","expected_head":state["head"],"expected_index":state["index_digest"],"paths":["a.txt"],"message":"unchanged"})).unwrap_err();
+    assert!(err.to_string().starts_with("No change:"));
+}
+
+#[cfg(windows)]
+#[test]
+fn marker_inserted_after_prepare_blocks_commit_before_object_publication() {
+    let fixture = Repo::new();
+    fixture.stage("a.txt", b"selected change\n");
+    let state = fixture.status();
+    let plan = native::prepare(&fixture.root, &fixture.private, &json!({"operation":"commit","expected_head":state["head"],"expected_index":state["index_digest"],"paths":["a.txt"],"message":"selected change","author":{"name":"Fixture","email":"fixture@localhost","timestamp":1}})).unwrap();
+    fs::write(
+        fixture.root.join(".git/MERGE_HEAD"),
+        state["head"].as_str().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        native::execute(&plan, &fixture.private).unwrap()["state"],
+        "conflict"
+    );
+    assert_eq!(fixture.status()["head"], state["head"]);
+    assert_eq!(fixture.status()["index_digest"], state["index_digest"]);
+    let repo = gix::open(&fixture.root).unwrap();
+    for object in plan["objects"].as_array().unwrap() {
+        let id = object["id"]
+            .as_str()
+            .unwrap()
+            .parse::<gix::ObjectId>()
+            .unwrap();
+        assert!(repo.find_object(id).is_err());
+    }
+}
+
+#[test]
 fn raw_git_paths_and_alternate_storage_are_rejected_before_writes() {
     let fixture = Repo::new();
     let state = fixture.status();

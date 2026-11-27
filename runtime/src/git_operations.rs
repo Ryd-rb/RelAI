@@ -301,7 +301,13 @@ pub fn inspect(root: &Path, private: &Path) -> Result<Value> {
     let mut pending = vec![root.to_owned()];
     let mut visited = 0;
     let mut total = 0;
-    while let Some(dir) = pending.pop() {
+    let mut partial = false;
+    #[cfg(unix)]
+    let check_mode = repo
+        .config_snapshot()
+        .boolean("core.fileMode")
+        .unwrap_or(true);
+    'scan: while let Some(dir) = pending.pop() {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -314,7 +320,10 @@ pub fn inspect(root: &Path, private: &Path) -> Result<Value> {
                 continue;
             }
             visited += 1;
-            ensure!(visited <= ENTRIES, "Worktree inventory limit");
+            if visited > ENTRIES {
+                partial = true;
+                break 'scan;
+            }
             path_name(&relative)?;
             if linked(&path)? {
                 special.insert(relative);
@@ -324,12 +333,33 @@ pub fn inspect(root: &Path, private: &Path) -> Result<Value> {
             if m.is_dir() {
                 pending.push(path);
             } else if m.is_file() {
-                ensure!(m.len() <= BYTES as u64, "Worktree file exceeds bound");
-                let raw = bytes(&path)?.context("Source disappeared")?;
+                let remaining = BYTES - total;
+                if m.len() > remaining as u64 {
+                    partial = true;
+                    continue;
+                }
+                let mut raw = Vec::new();
+                let file = File::open(&path)?;
+                ensure!(file.metadata()?.is_file(), "Expected regular worktree file");
+                file.take(remaining as u64 + 1).read_to_end(&mut raw)?;
+                if raw.len() > remaining {
+                    partial = true;
+                    break 'scan;
+                }
                 total += raw.len();
-                ensure!(total <= BYTES, "Aggregate worktree byte limit");
                 let id = gix::objs::compute_hash(repo.object_hash(), gix::objs::Kind::Blob, &raw)?;
-                work.insert(relative, (id, 0o100644));
+                #[cfg(unix)]
+                let mode = {
+                    use std::os::unix::fs::PermissionsExt;
+                    if check_mode && m.permissions().mode() & 0o100 != 0 {
+                        0o100755
+                    } else {
+                        0o100644
+                    }
+                };
+                #[cfg(not(unix))]
+                let mode = 0o100644;
+                work.insert(relative, (id, mode));
             } else {
                 special.insert(relative);
             }
@@ -375,10 +405,20 @@ pub fn inspect(root: &Path, private: &Path) -> Result<Value> {
             } else if b.is_none() && w.is_some() {
                 "untracked"
             } else if w.is_none() && b.is_some() {
-                "deleted"
+                if partial { "unknown" } else { "deleted" }
             } else if b.zip(w).is_some_and(|(a, b)| a.0 != b.0) {
                 "modified_raw_bytes"
             } else {
+                #[cfg(unix)]
+                if check_mode
+                    && b.zip(w)
+                        .is_some_and(|(a, b)| matches!(a.1, 0o100644 | 0o100755) && a.1 != b.1)
+                {
+                    "modified_mode"
+                } else {
+                    "clean"
+                }
+                #[cfg(not(unix))]
                 "clean"
             };
             (index_status != "clean" || worktree != "clean")
@@ -393,7 +433,7 @@ pub fn inspect(root: &Path, private: &Path) -> Result<Value> {
         branches.push(json!({"name":reference.name().as_bstr().to_string(),"object":reference.target().try_id().map(|id|id.to_string())}));
     }
     Ok(
-        json!({"root":root,"repository_identity":repository_identity(&repo)?,"head":head,"head_ref":head_ref,"index_digest":raw.as_deref().map(sha),"entries":entry_json(&index)?,"status":status,"branches":branches,"normalization":"raw bytes; no filters or executable helpers"}),
+        json!({"root":root,"repository_identity":repository_identity(&repo)?,"head":head,"head_ref":head_ref,"index_digest":raw.as_deref().map(sha),"entries":entry_json(&index)?,"status":status,"worktree_coverage":if partial { "partial" } else { "complete" },"branches":branches,"normalization":"raw bytes; no filters or executable helpers"}),
     )
 }
 struct Raw<'a> {
@@ -504,6 +544,27 @@ fn actor(value: &Value) -> Result<gix::actor::Signature> {
     })
 }
 
+fn require_no_unfinished_operation(repo: &gix::Repository) -> Result<()> {
+    for marker in [
+        "MERGE_HEAD",
+        "CHERRY_PICK_HEAD",
+        "REVERT_HEAD",
+        "rebase-apply",
+        "rebase-merge",
+        "sequencer",
+    ] {
+        match fs::symlink_metadata(repo.path().join(marker)) {
+            Ok(_) => bail!("conflict: Unfinished repository operation ({marker})"),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (),
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("Cannot inspect Git operation marker {marker}"));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn prepare(root: &Path, private: &Path, request: &Value) -> Result<Value> {
     let repo = open(root, private)?;
     let _metadata = metadata_guards(repo.workdir().unwrap())?;
@@ -590,18 +651,7 @@ pub fn prepare(root: &Path, private: &Path, request: &Value) -> Result<Value> {
                     && request["expected_index"] == json!(index_digest),
                 "conflict: Head or index changed"
             );
-            for marker in [
-                "MERGE_HEAD",
-                "CHERRY_PICK_HEAD",
-                "REVERT_HEAD",
-                "rebase-apply",
-                "rebase-merge",
-            ] {
-                ensure!(
-                    !repo.path().join(marker).exists(),
-                    "Unfinished repository operation is preserved"
-                );
-            }
+            require_no_unfinished_operation(&repo)?;
             let paths = request["paths"]
                 .as_array()
                 .context("Selected paths are required")?;
@@ -637,6 +687,11 @@ pub fn prepare(root: &Path, private: &Path, request: &Value) -> Result<Value> {
                 }
             }
             let tree = build_tree(&files, repo.object_hash(), &mut objects)?;
+            let parent_tree = repo.head_commit()?.tree_id()?.detach();
+            ensure!(
+                tree != parent_tree,
+                "No change: selected paths already match HEAD"
+            );
             let actor = actor(&request["author"])?;
             let message = text(&request["message"])?;
             ensure!(
@@ -855,6 +910,9 @@ fn apply(request: &Value, private: &Path) -> Result<Value> {
             head_ref.as_deref() != Some(name) && !repo.path().join("worktrees").exists(),
             "Checked-out branches are preserved"
         );
+    }
+    if operation == "commit" {
+        require_no_unfinished_operation(&repo)?;
     }
     publish_objects(&repo, request)?;
     use gix::refs::{

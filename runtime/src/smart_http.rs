@@ -128,8 +128,17 @@ async fn response(req: reqwest::RequestBuilder, typ: &str, limit: usize) -> Resu
     }
     Ok(out)
 }
-pub async fn exchange(plan: &Value, private: &Path) -> Result<Value> {
-    let mut base = Url::parse(text(&plan["url"])?)?;
+pub(crate) fn validate_remote(url: &str, branch: &str) -> Result<Url> {
+    let base = Url::parse(url)?;
+    let authority = url
+        .split_once("://")
+        .and_then(|(_, remainder)| remainder.split(['/', '?', '#']).next());
+    ensure!(
+        authority.is_some_and(|s| !s.is_empty() && !s.contains('@'))
+            && !url.contains('\\')
+            && !url.chars().any(char::is_whitespace),
+        "Use an HTTPS repository URL without userinfo"
+    );
     ensure!(
         base.scheme() == "https"
             && base.username().is_empty()
@@ -138,6 +147,17 @@ pub async fn exchange(plan: &Value, private: &Path) -> Result<Value> {
             && base.query().is_none(),
         "Use an approved HTTPS repository URL"
     );
+    ensure!(base.host_str().is_some(), "HTTPS repository host required");
+    ensure!(
+        branch.starts_with("refs/heads/") && branch.len() <= 256,
+        "Expected full branch ref"
+    );
+    let _ = gix::refs::FullName::try_from(branch)?;
+    Ok(base)
+}
+
+pub async fn exchange(plan: &Value, private: &Path) -> Result<Value> {
+    let mut base = validate_remote(text(&plan["url"])?, text(&plan["branch"])?)?;
     if !base.path().ends_with('/') {
         let suffix = format!("{}/", base.path());
         base.set_path(&suffix);
@@ -185,11 +205,6 @@ async fn transfer(plan: &Value, private: &Path, remote: &Endpoint) -> Result<Val
     .await?;
     let ad = advertisement(&listing, service)?;
     let branch = text(&plan["branch"])?;
-    ensure!(
-        branch.starts_with("refs/heads/") && branch.len() <= 256,
-        "Expected full branch ref"
-    );
-    let _ = gix::refs::FullName::try_from(branch)?;
     let advertised = ad.refs.get(branch).copied();
     if op == "reconcile" {
         let observed = advertised.map(|id| id.to_string());

@@ -29,3 +29,37 @@
 - [ ] 064. Start a request with leading whitespace or embedded newlines. Its follow-up target can be blank-looking or span several lines because the label takes the first 64 original characters verbatim. Normalize the short label while preserving the original submission.
 - [ ] 065. Click Attach files after switching projects. The native chooser has no starting directory for the selected project. Start in the active project's existing folder.
 - [ ] 066. Two open projects have the same folder name. Sidebar entries fall back to full paths with long identical prefixes and the differing segments are clipped. Use the shortest distinguishing path suffix while preserving each exact project identity.
+- [ ] 067. Open Automation and inspect a schedule. The due instant is only a Unix integer and its period has no unit. Show UTC date/time and explain the interval, including one-time schedules.
+- [ ] 068. After 32 older cancelled/dispatched schedules, an upcoming active schedule disappears from the Automation list. Prioritize active items before applying the display limit.
+- [ ] 069. Schedule two different reads for the same time. The Automation records omit the action entirely, so you cannot tell which read each schedule will perform. Include the tool name without exposing connector credentials.
+- [ ] 070. Produce over 100 events, then open Activity. Timeline silently discards all but the latest 100 with no way back. Provide bounded browsing to older records with a stable cursor.
+- [ ] 071. With more than 80 matching terms, Dictionary silently cuts off the list. Tell the user when more matches exist and how to narrow the search.
+- [ ] 072. Filter Files in Project graph, then open Relationships. The two inputs share one filter and unrelated edges disappear. Keep the two filters independent.
+- [ ] 073. Page through a long relationship list. The pager has no position or result range. Show which portion of the filtered collection is on screen.
+- [ ] 074. Read page two of Relationships, then enter a filter with multiple pages. The old page offset skips the first matches. Start a new filter at the first result.
+- [ ] 075. Browse the file tree with both an extensionless file and a directory. Both are shown as plain paths. Identify folders in the list while preserving the underlying path used for navigation.
+- [ ] 076. Capture a Rust project using `mod foo;` with `foo/mod.rs`, or a nested `mod child;` in `foo.rs`. Relationships misses these valid module locations. Resolve both conventional layouts with exact snapshot paths.
+- [ ] 077. Capture a .rs or .fluxr file containing invalid UTF-8. Graph coverage counts it as indexed even though the indexer skipped it. Report only files actually examined and retain the total candidate count.
+- [ ] 078. Run verify.build using a version digest in its advertised `source` field. It compiles the digest as source. Publish the separate version argument and clarify the literal-source alternative for the verification tools.
+- [ ] 079. Run data.read_query with the recent_events template and omit after. It returns zero events on a nonempty project. Default the initial cursor to zero and validate explicitly supplied cursors.
+- [ ] 080. Try to discover the available data.read_query templates from the runner. The error only says ‘Unknown parameterized query template’. Expose supported names and their required/optional parameters, including the request ID for request_jobs.
+- [ ] 081. Filter data.transform for an explicitly null value. A row missing the property is included as if the property existed. Distinguish missing keys from JSON null.
+- [ ] 082. Run data.transform on [1,"text"]. It returns both values successfully despite promising object rows. Validate the input array and identify the first non-object row.
+- [ ] 083. Run data.summarize without values. It reports a successful empty summary, identical to the result of passing an intentional empty list. Require an integer array and preserve the empty-list result.
+- [ ] 084. Pass sheets returned by sheet.read straight to sheet.write. Nonformula cells include formula:null, which the writer interprets as a formula and fails with ‘Expected text’. Allow a read/write round trip.
+- [ ] 085. Write two different cells at the same workbook coordinates. The second silently overwrites the first. Reject duplicate coordinates within a sheet and report the conflicting location.
+- [ ] 086. Write integer 9007199254740993 as a spreadsheet number. It reads back as 9007199254740992. Reject integers that cannot round-trip as spreadsheet numbers and explain how to preserve them as text.
+- [ ] 087. Read a DOCX with an empty paragraph written as <w:p/> between two ordinary paragraphs. The extracted text and paragraph count lose that line. Preserve the blank paragraph.
+- [ ] 088. Read a Word text run containing a CDATA section. The extracted text omits its actual content. Preserve CDATA in text runs and retain the expanded-output bound.
+- [ ] 089. Write a DOCX containing tab-separated text. Its XML stores literal tabs inside w:t instead of Word tab elements. Emit actual word-processing tabs and preserve the text when read back.
+- [ ] 090. Write a generated artifact with name set to spaces. Its receipt and saved attachment have a blank-looking display name. Use the format-specific fallback or a clear validation error.
+- [ ] 091. Apply a notebook edit that leaves the source of an executed cell unchanged. Its output and execution count are erased anyway. Clear stale output only when the source text actually changes.
+- [ ] 092. Use an IPYNB cell's existing source array of lines as a notebook edit. The editor wraps it in another array and fails validation. Accept valid line-array and string source forms without nesting.
+- [ ] 093. Look up an installed skill by name with skill.find. A query that matches nothing still returns every installed skill, including inactive versions. Support an optional name query and explicit active-state selection.
+- [ ] 094. Look up a workflow candidate by state with workflow.find. The argument is ignored and unrelated states fill the first 100 rows. Filter before limiting and preserve the unfiltered call.
+- [ ] 095. Check monitor.status before the first observation. latest and updated are null and there is no indication whether it has ever sampled, succeeded, or returned an error. Expose observation status independently of schedule state.
+- [ ] 096. Open a binary file in Project graph after capturing it. Inspect the file description for its size and compare it with a text file. Show the retained byte length for either kind in the visible inspector.
+- [ ] 097. Search project.semantic_find for whitespace only. It accepts the query and searches whitespace in paths/passages. Reject blank queries before indexing.
+- [ ] 098. Save a model preset with a misspelled scope through the model operation. It silently writes a project preset. Validate supplied scopes while preserving the established default when scope is omitted.
+- [ ] 099. Read a workbook produced without cached values for formula-only cells. The reader walks only the cached-value range and can drop formulas outside it. Include actual formula coordinates with a null cached value when necessary.
+- [ ] 100. Inspect an unchanged model assignment and press Save repeatedly. The persisted revision increments each time, making identical assignments appear changed. Keep the existing revision for an identical provider, model and effort.

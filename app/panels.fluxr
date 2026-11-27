@@ -54,14 +54,14 @@ fn model_panel 2 arg uint pid uint uint do 14 assignments uint row uint profile 
 
 fn skill_composer 2 formval uint pid uint uint do 5 items uint names uint fieldval uint rowsval uint i int 9
   set formval call put 3 formval call str 1 utf8 "completion" call decode 1 call str 1 utf8 "{\"field\":\"text\",\"action\":\"suggest_terms\",\"markers\":\"markers\"}"
-  set rowsval call query 2 call str 1 utf8 "SELECT id,name FROM skills WHERE project=? AND active=1 ORDER BY name" call append 2 call arr 0 pid
+  set rowsval call query 2 call str 1 utf8 "SELECT id,CASE WHEN count(*) OVER (PARTITION BY name)>1 THEN name||' ('||substr(digest,1,12)||')' ELSE name END AS label FROM skills WHERE project=? AND active=1 ORDER BY name,digest,id" call append 2 call arr 0 pid
   if eq 0 call size 1 rowsval 1
     ret formval
   0
   set names call arr 0
   set i 0
   while lt i call size 1 rowsval 2
-    set names call append 2 names call shape 2 call str 1 utf8 "{\"value\":\"$0\",\"label\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 call nth 2 rowsval i call str 1 utf8 "id" call key 2 call nth 2 rowsval i call str 1 utf8 "name"
+    set names call append 2 names call shape 2 call str 1 utf8 "{\"value\":\"$0\",\"label\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 call nth 2 rowsval i call str 1 utf8 "id" call key 2 call nth 2 rowsval i call str 1 utf8 "label"
     next i
   set fieldval call shape 2 call str 1 utf8 "{\"name\":\"skills\",\"label\":\"Allow skills for this submission\",\"type\":\"multi\",\"choices\":\"$0\"}" call append 2 call arr 0 names
   set items call append 2 call key 2 formval call str 1 utf8 "fields" fieldval

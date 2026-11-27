@@ -48,6 +48,7 @@ INSERT OR IGNORE INTO term_tool_versions SELECT e.id,e.revision,d.version FROM r
 CREATE TABLE IF NOT EXISTS skill_origins(version TEXT NOT NULL REFERENCES skills,identity TEXT NOT NULL,source TEXT NOT NULL,PRIMARY KEY(version,identity));
 CREATE TABLE IF NOT EXISTS skill_dependencies(version TEXT NOT NULL REFERENCES skills,name TEXT NOT NULL,tool_version TEXT NOT NULL,required INTEGER NOT NULL,PRIMARY KEY(version,name));
 CREATE TABLE IF NOT EXISTS skill_drafts(version TEXT NOT NULL REFERENCES skills,path TEXT NOT NULL,source TEXT NOT NULL,contract TEXT NOT NULL,tests TEXT NOT NULL,PRIMARY KEY(version,path));
+CREATE TABLE IF NOT EXISTS tool_skill_origins(tool_version TEXT NOT NULL REFERENCES tools(version),skill_version TEXT NOT NULL,path TEXT NOT NULL,PRIMARY KEY(tool_version,skill_version,path),FOREIGN KEY(skill_version,path) REFERENCES skill_drafts(version,path));
 CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY,project TEXT NOT NULL,entry TEXT,base_revision INTEGER,proposed TEXT NOT NULL,source TEXT NOT NULL,status TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS proposal_terms(proposal TEXT PRIMARY KEY REFERENCES proposals,dictionary TEXT NOT NULL REFERENCES dictionaries,name TEXT NOT NULL,kind TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS candidate_versions(candidate TEXT PRIMARY KEY REFERENCES candidates,version TEXT NOT NULL,baseline TEXT NOT NULL);

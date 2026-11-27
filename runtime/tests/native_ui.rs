@@ -1837,6 +1837,20 @@ fn changing_composer_skills_updates_the_visible_count_and_keeps_the_message() {
     let send = ui.event(ui.control("Send", "button"), json!({}));
     assert_eq!(send["request"]["input"]["skills"], json!(["notes"]));
     assert_eq!(send["request"]["input"]["text"], "Keep my draft");
+    db.execute(
+        "INSERT INTO skills(id,project,name,digest,description,body,resources) VALUES('new-notes',?,'Notes','different','Write notes','Body','[]')",
+        [ui.view["project"].as_str().unwrap()],
+    ).unwrap();
+    ui.render(true);
+    let choices = ui.control("Allow skills for this submission", "multi")["choices"].clone();
+    assert_eq!(
+        choices[0],
+        json!({"value":"new-notes","label":"Notes (different)"})
+    );
+    assert_eq!(
+        choices[1],
+        json!({"value":"notes","label":"Notes (digest)"})
+    );
 }
 
 #[test]

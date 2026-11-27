@@ -165,6 +165,22 @@ fn installed_skill_drafts_remain_inert_until_explicit_proposal_and_qualification
         )
         .unwrap();
     assert_eq!(draft["status"], "draft");
+    let inspected = app
+        .invoke(
+            "tool_run",
+            json!({"project":p,"tool":"tool.inspect","arguments":{"version":draft["version"]}}),
+        )
+        .unwrap();
+    let origin = &inspected["value"]["skill_draft_origins"][0];
+    assert_eq!(origin["skill_version"], id);
+    assert_eq!(origin["path"], "check.fluxr");
+    assert_eq!(origin["author_cases"][0]["expected"]["i64"], 3);
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM verified_checks", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
     assert_eq!(
         app.invoke(
             "tool_qualify",
@@ -173,8 +189,82 @@ fn installed_skill_drafts_remain_inert_until_explicit_proposal_and_qualification
         .unwrap()["active"],
         true
     );
+
+    manifest["tool_refs"] = json!([{"tool_id":"plus","version":draft["version"],"required":true}]);
+    fs::write(dir.join("relai-skill.json"), manifest.to_string()).unwrap();
+    let dependent = app.invoke("skill", install.clone()).unwrap()["id"].clone();
+    let inspect = json!({"project":p,"op":"inspect","id":dependent});
+    assert_eq!(
+        app.invoke("skill", inspect.clone()).unwrap()["dependencies"][0]["available"],
+        1
+    );
+    db.execute(
+        "UPDATE tools SET runtime='obsolete' WHERE version=?",
+        [draft["version"].as_str().unwrap()],
+    )
+    .unwrap();
+    assert_eq!(
+        app.invoke("skill", inspect).unwrap()["dependencies"][0]["available"],
+        0
+    );
+    let error = app.invoke("submit", json!({"project":p,"key":"old-runtime","text":"Check","attachments":[],"skills":[dependent]}))
+        .unwrap_err().to_string();
+    assert!(
+        error.contains("Required skill tool is unavailable"),
+        "{error}"
+    );
+
     manifest["tool_drafts"][0]["contract_path"] = json!("../contract.json");
     fs::write(dir.join("relai-skill.json"), manifest.to_string()).unwrap();
+    assert!(app.invoke("skill", install).is_err());
+}
+
+#[test]
+fn skill_package_rejects_duplicate_entries_and_incomplete_contracts_on_install() {
+    let (t, mut app) = fixture();
+    let project = open(&mut app, &t.path().join("project"));
+    let package = t.path().join("package");
+    fs::create_dir(&package).unwrap();
+    fs::write(
+        package.join("SKILL.md"),
+        "---\nname: checks\ndescription: Checks\n---\nUse checks.",
+    )
+    .unwrap();
+    let dependency = json!({"tool_id":"test","version":"one","required":true});
+    let draft = json!({"source_path":"code.fluxr","contract_path":"contract.json","test_paths":[]});
+    let install = json!({"project":project,"op":"install","path":package});
+    for (manifest, error) in [
+        (
+            json!({"tool_refs":[dependency,dependency]}),
+            "Duplicate skill dependency",
+        ),
+        (
+            json!({"tool_drafts":[draft,draft]}),
+            "Duplicate skill draft",
+        ),
+    ] {
+        fs::write(package.join("relai-skill.json"), manifest.to_string()).unwrap();
+        let actual = app
+            .invoke("skill", install.clone())
+            .unwrap_err()
+            .to_string();
+        assert!(actual.contains(error), "{actual}");
+    }
+    fs::write(
+        package.join("relai-skill.json"),
+        json!({"tool_drafts":[draft]}).to_string(),
+    )
+    .unwrap();
+    fs::write(
+        package.join("code.fluxr"),
+        "fluxr 1\npub run 1 x int int ret add x 1",
+    )
+    .unwrap();
+    fs::write(
+        package.join("contract.json"),
+        r#"{"name":"test","capability":"integer.increment"}"#,
+    )
+    .unwrap();
     assert!(app.invoke("skill", install).is_err());
 }
 

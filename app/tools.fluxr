@@ -55,21 +55,31 @@ fn tool_evaluation 2 entry uint case uint uint do 0  1
 fn tool_defer 3 evaluation uint resume uint state uint uint do 0  1
   ret call shape 2 call str 1 utf8 "{\"$evaluate\":\"$0\",\"resume\":\"$1\",\"state\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  evaluation resume state
 
-pub tool_propose 1 arg uint uint do 7 pid uint name uint source uint exportname uint capability uint version uint discard uint 12
+fn validate_tool_contract 1 arg uint uint do 4 name uint exportname uint capability uint discard uint 10
+  set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","required":["name","export","capability"],"properties":{"name":{"type":"string"},"export":{"type":"string"},"capability":{"type":"string"}}}"# arg
+  set name call key 2 arg call str 1 utf8 "name"
+  set exportname call key 2 arg call str 1 utf8 "export"
+  set capability call key 2 arg call str 1 utf8 "capability"
+  set discard call require 2 and call nonblank 1 name le call size 1 name 128 call str 1 utf8 "Tool name must be nonblank and at most 128 bytes"
+  set discard call require 2 and call nonblank 1 exportname le call size 1 exportname 128 call str 1 utf8 "Tool export must be nonblank and at most 128 bytes"
+  set discard call require 2 not call tool_known 1 name call str 1 utf8 "Built-in tool identifiers cannot be redefined"
+  set discard call require 2 and call nonblank 1 capability le call size 1 capability 128 call str 1 utf8 "Tool capability must be nonblank and at most 128 bytes"
+  set discard call require 2 not call same 2 call tool_signature 1 capability 0u call str 1 utf8 "No independent fixtures for this capability; request a trusted example"
+  ret 0u
+
+pub tool_propose 1 arg uint uint do 7 pid uint name uint source uint exportname uint capability uint version uint discard uint 10
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set name call key 2 arg call str 1 utf8 "name"
   set source call key 2 arg call str 1 utf8 "source"
   set exportname call key 2 arg call str 1 utf8 "export"
   set capability call key 2 arg call str 1 utf8 "capability"
-  set discard call require 2 and lt 0 call size 1 name le call size 1 name 128 call str 1 utf8 "Tool name must contain 1..128 bytes"
-  set discard call require 2 not call tool_known 1 name call str 1 utf8 "Built-in tool identifiers cannot be redefined"
+  set discard call validate_tool_contract 1 arg
   set discard call require 2 and lt 0 call size 1 source le call size 1 source 65536 call str 1 utf8 "Draft source must contain 1..65536 bytes"
-  set discard call require 2 not call same 2 call tool_signature 1 capability 0u call str 1 utf8 "No independent fixtures for this capability; request a trusted example"
   set version call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  pid name source exportname capability call tool_runtime 0
   set discard call require 2 or not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT version FROM tools WHERE project=? AND version=?" call append 2 call append 2 call arr 0  pid version 0 0u lt call number 1 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM tools WHERE project=?" call append 2 call arr 0  pid 0 call str 1 utf8 "n" 128 call str 1 utf8 "Project tool registry limit reached"
-  ret call tool_defer 3 call shape 2 call str 1 utf8 "{\"source\":\"$0\",\"export\":\"$1\",\"compile_only\":true}" call append 2 call append 2 call arr 0  source exportname call str 1 utf8 "guest_tool_admit" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"name\":\"$1\",\"source\":\"$2\",\"export\":\"$3\",\"capability\":\"$4\",\"version\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  pid name source exportname capability version
+  ret call tool_defer 3 call shape 2 call str 1 utf8 "{\"source\":\"$0\",\"export\":\"$1\",\"compile_only\":true}" call append 2 call append 2 call arr 0  source exportname call str 1 utf8 "guest_tool_admit" call put 3 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"name\":\"$1\",\"source\":\"$2\",\"export\":\"$3\",\"capability\":\"$4\",\"version\":\"$5\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  pid name source exportname capability version call str 1 utf8 "skill_draft_origin" call key 2 arg call str 1 utf8 "skill_draft_origin"
 
-pub guest_tool_admit 1 arg uint uint do 5 state uint resultval uint discard uint version uint entry uint 10
+pub guest_tool_admit 1 arg uint uint do 6 state uint resultval uint discard uint version uint entry uint origin uint 12
   set state call key 2 arg call str 1 utf8 "state"
   set resultval call key 2 arg call str 1 utf8 "result"
   set discard call require 2 call same 2 call key 2 arg call str 1 utf8 "error" 0u call str 1 utf8 "Source admission failed: native code, host imports, or malformed checked source"
@@ -79,6 +89,11 @@ pub guest_tool_admit 1 arg uint uint do 5 state uint resultval uint discard uint
   set version call key 2 state call str 1 utf8 "version"
   set discard call query 2 call str 1 utf8 "INSERT INTO tools(version,project,name,source,export,contract,runtime) VALUES(?,?,?,?,?,?,?) ON CONFLICT(version) DO NOTHING" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  version call key 2 state call str 1 utf8 "project" call key 2 state call str 1 utf8 "name" call key 2 state call str 1 utf8 "source" call key 2 state call str 1 utf8 "export" call key 2 state call str 1 utf8 "capability" call tool_runtime 0
   set entry call tool_entry 2 call key 2 state call str 1 utf8 "project" version
+  set origin call key 2 state call str 1 utf8 "skill_draft_origin"
+  if not call same 2 origin 0u 2
+    set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 @text r#"SELECT 1 AS allowed FROM skill_drafts d JOIN skills s ON s.id=d.version WHERE s.project=?1 AND s.active=1 AND d.version=?2 AND d.path=?3 AND d.source=?4 AND d.contract->>'$.name'=?5 AND d.contract->>'$.export'=?6 AND d.contract->>'$.capability'=?7"# @build append 1 7 call arr 0 call key 2 entry call str 1 utf8 "project" call key 2 origin call str 1 utf8 "skill" call key 2 origin call str 1 utf8 "path" call key 2 entry call str 1 utf8 "source" call key 2 entry call str 1 utf8 "name" call key 2 entry call str 1 utf8 "export" call key 2 entry call str 1 utf8 "contract" 0 0u call str 1 utf8 "Installed draft provenance does not match the proposed tool"
+    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO tool_skill_origins VALUES(?,?,?)" @build append 1 3 call arr 0 version call key 2 origin call str 1 utf8 "skill" call key 2 origin call str 1 utf8 "path"
+  0
   ret call shape 2 call str 1 utf8 "{\"version\":\"$0\",\"name\":\"$1\",\"status\":\"$2\",\"runtime\":\"$3\",\"source_digest\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  version call key 2 entry call str 1 utf8 "name" call key 2 entry call str 1 utf8 "status" call key 2 entry call str 1 utf8 "runtime" call key 2 resultval call str 1 utf8 "source_digest"
 
 fn tool_test_start 1 state uint uint do 4 entry uint case uint tid uint discard uint 7
@@ -408,8 +423,9 @@ fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root u
   ret call tool_transform 1 arguments
   0
 
-  if call same 2 toolname call str 1 utf8 "tool.inspect" 1
-  ret call tool_entry 2 pid call key 2 arguments call str 1 utf8 "version"
+  if call same 2 toolname call str 1 utf8 "tool.inspect" 2
+    set item call tool_entry 2 pid call key 2 arguments call str 1 utf8 "version"
+    ret call put 3 item call str 1 utf8 "skill_draft_origins" call query 2 call str 1 @text r#"SELECT s.id AS skill_version,s.digest,d.path,d.tests AS "author_cases:json" FROM tool_skill_origins o JOIN skill_drafts d ON d.version=o.skill_version AND d.path=o.path JOIN skills s ON s.id=d.version WHERE o.tool_version=? AND s.project=? ORDER BY s.id,d.path"# @build append 1 2 call arr 0 call key 2 item call str 1 utf8 "version" pid
   0
 
   if or call same 2 toolname call str 1 utf8 "document.read" or call same 2 toolname call str 1 utf8 "sheet.read" call same 2 toolname call str 1 utf8 "archive.list" 5

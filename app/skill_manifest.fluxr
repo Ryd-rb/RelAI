@@ -1,6 +1,6 @@
 fluxr 1
 
-fn skill_manifest 2 sid uint pkg uint uint do 12 manifest uint refs uint drafts uint v uint src uint contract uint cases uint casepath uint tests uint discard uint i int k int 12
+fn skill_manifest 2 sid uint pkg uint uint do 12 manifest uint refs uint drafts uint v uint src uint contract uint cases uint casepath uint tests uint discard uint i int k int 14
   set manifest call key 2 pkg call str 1 utf8 "relai-skill.json"
   if call same 2 manifest 0u 1
     ret 0u
@@ -10,6 +10,8 @@ fn skill_manifest 2 sid uint pkg uint uint do 12 manifest uint refs uint drafts 
   set refs call key 2 manifest call str 1 utf8 "tool_refs"
   set drafts call key 2 manifest call str 1 utf8 "tool_drafts"
   set discard call require 2 and le call size 1 refs 32 le call size 1 drafts 8 call str 1 utf8 "Skill manifest exceeds bounds"
+  set discard call require 2 call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS duplicate FROM json_each(?) GROUP BY value->>'$.tool_id' HAVING count(*)>1 LIMIT 1" call append 2 call arr 0 refs 0 0u call str 1 utf8 "Duplicate skill dependency tool_id"
+  set discard call require 2 call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS duplicate FROM json_each(?) GROUP BY value->>'$.source_path' HAVING count(*)>1 LIMIT 1" call append 2 call arr 0 drafts 0 0u call str 1 utf8 "Duplicate skill draft source_path"
   set i 0
   while lt i call size 1 refs 4
     set v call nth 2 refs i
@@ -17,12 +19,14 @@ fn skill_manifest 2 sid uint pkg uint uint do 12 manifest uint refs uint drafts 
     set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO skill_dependencies VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 sid call key 2 v call str 1 utf8 "tool_id" call key 2 v call str 1 utf8 "version" call key 2 v call str 1 utf8 "required"
     next i
   set i 0
-  while lt i call size 1 drafts 12
+  while lt i call size 1 drafts 14
     set v call nth 2 drafts i
     set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"object\",\"properties\":{\"source_path\":{\"type\":\"string\"},\"contract_path\":{\"type\":\"string\"},\"test_paths\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"required\":[\"source_path\",\"contract_path\",\"test_paths\"],\"additionalProperties\":false}" v
     set src call key 2 v call str 1 utf8 "source_path"
     set contract call key 2 v call str 1 utf8 "contract_path"
     set discard call require 2 and not call same 2 call key 2 pkg src 0u not call same 2 call key 2 pkg contract 0u call str 1 utf8 "Declared draft or contract is outside the package"
+    set contract call decode 1 call key 2 pkg contract
+    set discard call validate_tool_contract 1 contract
     set cases call key 2 v call str 1 utf8 "test_paths"
     set discard call require 2 le call size 1 cases 16 call str 1 utf8 "Too many declared cases"
     set tests call arr 0
@@ -32,16 +36,17 @@ fn skill_manifest 2 sid uint pkg uint uint do 12 manifest uint refs uint drafts 
     set discard call require 2 not call same 2 call key 2 pkg casepath 0u call str 1 utf8 "Missing package test"
     set tests call append 2 tests call decode 1 call key 2 pkg casepath
     next k
-    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO skill_drafts VALUES(?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid src call key 2 pkg src call decode 1 call key 2 pkg contract tests
+    set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO skill_drafts VALUES(?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 sid src call key 2 pkg src contract tests
     next i
   ret 0u
 
 fn missing_skill_tools 2 pid uint sid uint uint do 0  1
-  ret call query 2 call str 1 utf8 "SELECT d.name,d.tool_version,d.required FROM skill_dependencies d WHERE d.version=? AND d.required=1 AND NOT EXISTS(SELECT 1 FROM tools t WHERE t.project=? AND t.name=d.name AND t.version=d.tool_version AND t.status='active') ORDER BY d.name" call append 2 call append 2 call arr 0 sid pid
+  ret call query 2 call str 1 utf8 "SELECT d.name,d.tool_version,d.required FROM skill_dependencies d WHERE d.version=? AND d.required=1 AND NOT EXISTS(SELECT 1 FROM tools t WHERE t.project=? AND t.name=d.name AND t.version=d.tool_version AND t.status='active' AND t.runtime=?) ORDER BY d.name" @build append 1 3 call arr 0 sid pid call tool_runtime 0
 
-pub skill_draft 1 arg uint uint do 4 pid uint row uint discard uint requestval uint 5
+pub skill_draft 1 arg uint uint do 4 pid uint row uint discard uint requestval uint 6
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set row call nth 2 call query 2 call str 1 utf8 "SELECT d.source,d.contract AS \"contract:json\" FROM skill_drafts d JOIN skills s ON s.id=d.version WHERE s.project=? AND d.version=? AND d.path=? AND s.active=1" call append 2 call append 2 call append 2 call arr 0 pid call key 2 arg call str 1 utf8 "version" call key 2 arg call str 1 utf8 "path" 0
   set discard call require 2 not call same 2 row 0u call str 1 utf8 "No such installed draft"
   set requestval call put 3 call put 3 call key 2 row call str 1 utf8 "contract" call str 1 utf8 "project" pid call str 1 utf8 "source" call key 2 row call str 1 utf8 "source"
+  set requestval call put 3 requestval call str 1 utf8 "skill_draft_origin" call shape 2 call str 1 @text r#"{"skill":"$0","path":"$1"}"# @build append 1 2 call arr 0 call key 2 arg call str 1 utf8 "version" call key 2 arg call str 1 utf8 "path"
   ret call shape 2 call str 1 utf8 "{\"$call\":\"tool_propose\",\"input\":\"$0\"}" call append 2 call arr 0 requestval

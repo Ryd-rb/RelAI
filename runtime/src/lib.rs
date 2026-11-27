@@ -333,6 +333,7 @@ fn evaluate(r: &Value) -> Result<Value> {
 pub struct App {
     modules: std::collections::BTreeMap<String, Module>,
     config: Value,
+    assets: application::Assets,
     db: Connection,
     pub data: PathBuf,
     pub bundle: PathBuf,
@@ -358,6 +359,7 @@ impl App {
             .context("Another daemon owns the data directory")?;
         let config: Value = serde_json::from_slice(&read(&bundle.join("app.json"))?)?;
         let modules = application::link(&bundle, &config)?;
+        let assets = application::Assets::load(&bundle, &config)?;
         let db = Connection::open(data.join("state.sqlite3"))?;
         db.create_scalar_function(
             "single_line",
@@ -378,6 +380,7 @@ impl App {
         )?;
         let mut app = Self {
             modules,
+            assets,
             config,
             db,
             bundle,
@@ -483,6 +486,7 @@ impl App {
                 db: Mutex::new(&mut self.db),
                 data: &self.data,
                 bundle: &self.bundle,
+                assets: &self.assets,
                 error: Mutex::new(None),
             };
             let result = self
@@ -550,6 +554,7 @@ struct Bindings<'a> {
     db: Mutex<&'a mut Connection>,
     data: &'a Path,
     bundle: &'a Path,
+    assets: &'a application::Assets,
     error: Mutex<Option<String>>,
 }
 impl HostServices for Bindings<'_> {
@@ -756,10 +761,7 @@ impl Bindings<'_> {
                 ensure!(args[0] == Vm::Bool(true), "{}", text(get(1)?)?);
                 Value::Null
             }
-            "asset" => json!(String::from_utf8(read(&join(
-                self.bundle,
-                text(get(0)?)?
-            )?)?)?),
+            "asset" => json!(self.assets.get(self.bundle, text(get(0)?)?)?),
             "sql" => {
                 let conn = self.db.lock().unwrap();
                 let sql = text(get(0)?)?;

@@ -7,3 +7,18 @@
 - [ ] 013. Run project.info and then select fs.read. The previous tool's output remains under the new selection. Associate a displayed result with the tool and version that produced it.
 - [ ] 014. Search for a registered tool with two versions of the same contract. Both matching rows have the same visible name and description. Identify each exact version before the user selects it.
 - [ ] 015. Enter a metadata-only term such as “portable” in the Tools library. It matches hidden routing metadata despite the search box promising a name or description search. Make the desktop search agree with its label and preserve full-record search for tool.find callers.
+- [ ] 016. Follow the published input contract to reopen a generated document, workbook, or ZIP by artifact ID. Using path as instructed returns file-not-found. Document the separate artifact argument on all readers, including notebook editing.
+- [ ] 017. Ask fs.count for the byte count of a three-byte binary file. The operation fails while decoding UTF-8. Count actual bytes and retain text decoding for word and line counts.
+- [ ] 018. Search Tools for a CSV parser. data.parse accepts CSV and returns rows, but the published description and inputs mention JSON only. Make CSV parsing discoverable and describe the format and result.
+- [ ] 019. Look for a regular-expression search of a project file. The fs.search tool supports regex but advertises literal search only. Show its mode argument and how results are addressed.
+- [ ] 020. Look for a checksum of a binary file. The fs.digest description restricts itself to UTF-8 despite correctly hashing binary bytes. Describe raw byte hashing.
+- [ ] 021. Run git.log without an object in a project with one commit. It reports a successful empty history. Use the current HEAD or tell the user which starting commit to supply.
+- [ ] 022. Submit notify.local with no message. It stores a blank notification and returns success. Require nonblank notification text before writing an event.
+- [ ] 023. Submit plan.get, project.lookup or job.status without the identifier in a fresh Tools form. Each returns an empty success indistinguishable from a genuine miss. Identify the required request or job ID and preserve the existing response for a well-formed unknown ID.
+- [ ] 024. Look for worktree operations by what they do in the Tools library. Five built-in rows have no description, so neither the list nor a description search explains them. Supply distinct descriptions for creating, removing, listing, inspecting and applying.
+- [ ] 025. Run git.tree without an object. Its opaque “git_read: Expected text” does not tell the user that a Git tree object ID is required. Give a useful prompt for Git object readers.
+- [ ] 026. Create a dictionary with spaces as its name, or rename one to an empty string. Both succeed and produce an unnamed dictionary. Validate names before recording changes.
+- [ ] 027. Create a dictionary entry whose name is only spaces. It becomes a blank item in the term list. Reject blank term names in both entry forms while preserving intentional edits to an existing definition's body.
+- [ ] 028. Create “Café”, then type “CAFÉ” in term completion or Dictionary search. The match disappears because SQL lower only folds ASCII. Use Unicode case folding consistently for term-name matching.
+- [ ] 029. Archive a linked dictionary, then try to link it again. The operation reports success and the inventory reports it enabled, but its terms remain unavailable. Show archived dictionaries as inactive and reject new links to them.
+- [ ] 030. Repeat Change link with a dictionary already in the chosen state. The link revision increments even though nothing changed. Keep the revision stable on repeated selections.

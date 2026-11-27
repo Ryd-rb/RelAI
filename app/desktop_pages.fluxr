@@ -1,6 +1,6 @@
 fluxr 1
 
-fn ui_pager 5 state uint name uint countval uint newer uint older uint uint do 4 pageval uint discard uint n int p int 7
+fn ui_pager 5 state uint name uint countval uint newer uint older uint uint do 4 pageval uint discard uint n int p int 8
   set n call number 1 countval
   set p call number 1 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "pages" name call integer 1 0
   if le n 12 1
@@ -9,6 +9,7 @@ fn ui_pager 5 state uint name uint countval uint newer uint older uint uint do 4
   if le n mul p 12 1
     set p div sub n 1 12
   0
+  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"label","role":"caption","label":"$1"}"# @build append 1 2 call arr 0 call cat 2 name call str 1 utf8 "/position" call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT CASE WHEN ?1=0 THEN '0 results' ELSE printf('Results %d–%d of %d',?2*12+1,min(?1,(?2+1)*12),?1) END AS label"# @build append 1 2 call arr 0 countval call integer 1 p 0 call str 1 utf8 "label"
   if lt 0 p 1
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 name call str 1 utf8 "/" call str 1 utf8 "previous" newer call shape 2 call str 1 utf8 "{\"action\":\"page\",\"key\":\"$0\",\"page\":\"$1\"}" call append 2 call append 2 call arr 0 name call integer 1 sub p 1 call shape 2 call str 1 utf8 "{\"row\":\"$0\"}" call append 2 call arr 0 name
   0

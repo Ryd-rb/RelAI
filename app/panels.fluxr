@@ -1,7 +1,10 @@
 fluxr 1
 
-fn dictionary_panel 1 pid uint uint do 0  1
-  ret call shape 2 call asset 1 call str 1 utf8 "dictionary_workspace.json" call append 2 call append 2 call arr 0 call dictionary 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"op\":\"list\"}" call append 2 call arr 0 pid call skill 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"op\":\"list\"}" call append 2 call arr 0 pid
+fn dictionary_panel 1 pid uint uint do 3 choices uint dictionaries uint skills uint 4
+  set dictionaries call dictionary 1 call shape 2 call str 1 @text r#"{"project":"$0","op":"list"}"# call append 2 call arr 0 pid
+  set skills call skill 1 call shape 2 call str 1 @text r#"{"project":"$0","op":"list"}"# call append 2 call arr 0 pid
+  set choices call nth 2 call query 2 call asset 1 call str 1 utf8 "workspace_management.sql" @build append 1 2 call arr 0 pid call query 2 call asset 1 call str 1 utf8 "project_labels.sql" call arr 0 0
+  ret call shape 2 call asset 1 call str 1 utf8 "dictionary_workspace.json" @build append 1 5 call arr 0 dictionaries skills call key 2 choices call str 1 utf8 "available" call key 2 choices call str 1 utf8 "owned" call key 2 choices call str 1 utf8 "installed"
 
 fn model_panel 2 arg uint pid uint uint do 14 assignments uint row uint profile uint titleval uint i int rolesval uint choices uint current uint presetval uint sourceval uint formval uint overview uint fields uint discard uint 16
   set rolesval call resource 1 call str 1 utf8 "roles.json"
@@ -13,7 +16,7 @@ fn model_panel 2 arg uint pid uint uint do 14 assignments uint row uint profile 
   while lt i call size 1 choices 5
     set row call nth 2 choices i
     set profile call preset 2 pid call key 2 row call str 1 utf8 "value"
-    set titleval call cat 2 call cat 2 call key 2 row call str 1 utf8 "label" call str 1 utf8 "   ·   " call key 2 profile call str 1 utf8 "model"
+    set titleval call cat 2 call cat 2 call key 2 row call str 1 utf8 "label" call str 1 utf8 "   ·   " call cat 2 call cat 2 call key 2 profile call str 1 utf8 "model" call str 1 utf8 " · effort: " call key 2 profile call str 1 utf8 "effort"
     set assignments call append 2 assignments call put 3 row call str 1 utf8 "label" titleval
     next i
   set presetval call preset 2 pid current
@@ -47,7 +50,7 @@ fn model_panel 2 arg uint pid uint uint do 14 assignments uint row uint profile 
   "pane": "Configuration",
   "section": "model-settings"
 }"# call append 2 call append 2 call arr 0 fields current
-  ret call shape 2 call str 1 utf8 "{\"type\":\"group\",\"items\":\"$0\"}" call append 2 call arr 0 call append 2 call append 2 call arr 0 overview formval
+  ret call shape 2 call str 1 utf8 "{\"type\":\"group\",\"items\":\"$0\"}" call append 2 call arr 0 call append 2 call append 2 call arr 0 overview call ui_merge 2 formval call decode 1 call str 1 @text r#"{"text":"Saved settings apply to subsequently sealed turns. They do not change the model, provider or reasoning effort of a turn whose input is already sealed."}"#
 
 fn skill_composer 2 formval uint pid uint uint do 5 items uint names uint fieldval uint rowsval uint i int 9
   set formval call put 3 formval call str 1 utf8 "completion" call decode 1 call str 1 utf8 "{\"field\":\"text\",\"action\":\"suggest_terms\",\"markers\":\"markers\"}"

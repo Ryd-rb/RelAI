@@ -1,6 +1,6 @@
 fluxr 1
 
-fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint do 8 kind uint labelval uint discard uint event uint detail uint patch uint tabs uint props uint 20
+fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint do 8 kind uint labelval uint discard uint event uint detail uint patch uint tabs uint props uint 22
   set kind call key 2 spec call str 1 utf8 "type"
   set labelval call key 2 spec call str 1 utf8 "label"
   if call same 2 kind call str 1 utf8 "button" 8
@@ -55,6 +55,12 @@ fn ui_node 6 state uint pid uint spec uint base uint extra uint pane uint uint d
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "title" call str 1 utf8 "heading" call key 2 spec call str 1 utf8 "label" call obj 0
     set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"$1\",\"label\":\"$2\",\"value\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "description" call str 1 utf8 "label" call key 2 spec call str 1 utf8 "text" call shape 2 call str 1 utf8 "{\"role\":\"muted\"}" call arr 0
     ret 0u
+  0
+  if call same 2 kind call str 1 utf8 "snapshot_children" 1
+    ret call workspace_children 3 state base call key 2 spec call str 1 utf8 "value"
+  0
+  if call same 2 kind call str 1 utf8 "proposal_review" 1
+    ret call workspace_proposals 3 state pid base
   0
   if call same 2 kind call str 1 utf8 "journal" 1
     ret call activity_journal 4 state pid base pane

@@ -135,8 +135,12 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     0
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
-  if call same 2 actionval call str 1 utf8 "filter" 2
-    set state call put 3 state call str 1 utf8 "filter" v
+  if call same 2 actionval call str 1 utf8 "filter" 4
+    set keyval call ui_default 2 call key 2 event call str 1 utf8 "filterKey" call str 1 utf8 "filter"
+    if and call same 2 keyval call str 1 utf8 "relationshipFilter" not call same 2 call key 2 state keyval v 1
+      set state call ui_set_map 4 state call str 1 utf8 "pages" call str 1 utf8 "edges" call integer 1 0
+    0
+    set state call put 3 state keyval v
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
   if call same 2 actionval call str 1 utf8 "path" 2

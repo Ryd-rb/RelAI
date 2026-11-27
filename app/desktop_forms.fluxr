@@ -1,6 +1,6 @@
 fluxr 1
 
-fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fields uint draft uint area uint dest uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint picker uint props uint styleval uint discard uint i int j int 21
+fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fields uint draft uint area uint dest uint fieldval uint kind uint widget uint name uint base uint event uint v uint item uint matches uint picker uint props uint styleval uint discard uint i int j int 22
   set scope call ui_form_key 2 pid spec
   set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
   set area call obj 0
@@ -31,6 +31,9 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
     if not call same 2 item 0u 1
       set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"detail","label":"Selected tool input contract","lines":5,"value":"$1"}"# @build append 1 2 call arr 0 call cat 2 scope call str 1 utf8 "/input-contract" call ui_show 1 call ui_default 2 call key 2 item call str 1 utf8 "input" call ui_default 2 call key 2 item call str 1 utf8 "contract" call str 1 utf8 "No input contract is published for this tool."
     0
+  0
+  if not call same 2 call key 2 spec call str 1 utf8 "text" 0u 1
+    set discard call ui_prose 2 call cat 2 scope call str 1 utf8 "/explanation" call key 2 spec call str 1 utf8 "text"
   0
   set fields call key 2 spec call str 1 utf8 "fields"
   set picker 0u

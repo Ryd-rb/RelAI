@@ -49,7 +49,8 @@
     "desktop_frame.fluxr",
     "desktop_files.fluxr",
     "desktop_pages.fluxr",
-    "desktop_workspace.fluxr"
+    "desktop_workspace.fluxr",
+    "workspace_inspectors.fluxr"
   ],
   "assets": [
     "SYSTEM.txt",
@@ -82,6 +83,7 @@
     "providers/anthropic.json",
     "providers/codex.json",
     "providers/qwen.json",
+    "project_labels.sql",
     "question_batch.sql",
     "question_wait.sql",
     "remote-tools.json",
@@ -95,6 +97,7 @@
     "tool_selection.sql",
     "tools_workspace.json",
     "workspace_activity.sql",
+    "workspace_management.sql",
     "workspace_terms.sql",
     "workspace_tree.sql",
     "workspace_views.json"

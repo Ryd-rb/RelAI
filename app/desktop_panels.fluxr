@@ -85,10 +85,10 @@ fn ui_layers 3 state uint spec uint base uint uint do 8 widgets uint versions ui
     set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "inspectPrompt" call arr 0
     ret 0u
   0
-  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "edgeFilter" @build append 1 1 call arr 0 call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""#
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "edgeFilter" @build append 1 1 call arr 0 call ui_default 2 call key 2 state call str 1 utf8 "relationshipFilter" call str 1 utf8 ""
   set summary call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('%s of %s source files indexed · %d relationships',?1,?2,json_array_length(?3)) AS text"# @build append 1 3 call arr 0 call key 2 call key 2 layer call str 1 @text r#"coverage"# call str 1 @text r#"indexed"# call key 2 call key 2 layer call str 1 @text r#"coverage"# call str 1 @text r#"total"# call key 2 layer call str 1 @text r#"edges"# 0 call str 1 @text r#"text"#
   set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "coverage" @build append 1 1 call arr 0 summary
-  set rows call key 2 call nth 2 call query 2 call asset 1 call str 1 utf8 "graph_relationships.sql" @build append 1 2 call arr 0 call key 2 layer call str 1 @text r#"edges"# call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""# 0 call str 1 @text r#"items"#
+  set rows call key 2 call nth 2 call query 2 call asset 1 call str 1 utf8 "graph_relationships.sql" @build append 1 2 call arr 0 call key 2 layer call str 1 @text r#"edges"# call ui_default 2 call key 2 state call str 1 utf8 "relationshipFilter" call str 1 @text r#""# 0 call str 1 @text r#"items"#
   if eq 0 call size 1 rows 1
     set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "noEdges" call arr 0
   0

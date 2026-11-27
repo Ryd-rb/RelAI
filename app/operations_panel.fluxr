@@ -3,5 +3,5 @@ fluxr 1
 fn operations_panel 1 pid uint uint do 3 fsrows uint gitrows uint schedules uint 4
   set fsrows call query 2 call str 1 utf8 "SELECT id,operation,state,digest,json_extract(request,'$.path') AS path,error FROM file_effects WHERE project=? ORDER BY rowid DESC LIMIT 32" call append 2 call arr 0 pid
   set gitrows call query 2 call str 1 utf8 "SELECT id,operation,state,digest,error FROM git_mutations WHERE project=? ORDER BY rowid DESC LIMIT 32" call append 2 call arr 0 pid
-  set schedules call query 2 call str 1 utf8 "SELECT id,due,period,state,revision FROM schedules WHERE project=? ORDER BY due LIMIT 32" call append 2 call arr 0 pid
+  set schedules call query 2 call str 1 utf8 "SELECT id,due,period,state,revision,strftime('%Y-%m-%d %H:%M:%S UTC',due,'unixepoch') AS due_utc,CASE WHEN period=0 THEN 'One-time' ELSE printf('Every %d seconds',period) END AS interval,action->>'$.tool' AS tool FROM schedules WHERE project=? ORDER BY CASE WHEN state='active' THEN 0 ELSE 1 END,due,id LIMIT 32" call append 2 call arr 0 pid
   ret call shape 2 call asset 1 call str 1 utf8 "tools_workspace.json" @build append 1 3 call arr 0 fsrows gitrows schedules

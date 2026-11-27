@@ -42,8 +42,10 @@
           "fields": [
             {
               "name": "dictionary",
-              "label": "Dictionary ID",
-              "type": "text"
+              "label": "Dictionary and link state",
+              "type": "select",
+              "choices": "$2",
+              "required": true
             },
             {
               "name": "op",
@@ -57,6 +59,30 @@
           ],
           "fixed": {},
           "showResult": true
+        },
+        {
+          "type": "form",
+          "label": "Rename owned dictionary",
+          "op": "dictionary",
+          "fields": [
+            {
+              "name": "dictionary",
+              "label": "Owned dictionary",
+              "type": "select",
+              "choices": "$3",
+              "required": true
+            },
+            {
+              "name": "name",
+              "label": "New name",
+              "type": "text",
+              "required": true
+            }
+          ],
+          "fixed": {
+            "op": "rename"
+          },
+          "showResult": true
         }
       ],
       "pane": "Dictionaries",
@@ -64,17 +90,19 @@
     },
     {
       "type": "fold",
-      "label": "Edit definitions",
+      "label": "Create or review definitions",
       "items": [
         {
           "type": "form",
-          "label": "Edit definition",
+          "label": "Create new definition",
           "op": "dictionary",
           "fields": [
             {
               "name": "dictionary",
-              "label": "Owner dictionary ID",
-              "type": "text"
+              "label": "Owned dictionary",
+              "type": "select",
+              "choices": "$3",
+              "required": true
             },
             {
               "name": "name",
@@ -100,31 +128,12 @@
           "fixed": {
             "op": "save"
           },
-          "showResult": true
+          "showResult": true,
+          "text": "To edit a saved entry, select it in Terms and choose Open definition."
         },
         {
-          "type": "form",
-          "label": "Review proposed definitions",
-          "op": "review_definition",
-          "fields": [
-            {
-              "name": "op",
-              "label": "Decision",
-              "type": "select",
-              "choices": [
-                "list",
-                "accept",
-                "decline"
-              ]
-            },
-            {
-              "name": "proposal",
-              "label": "Proposal ID",
-              "type": "text"
-            }
-          ],
-          "fixed": {},
-          "showResult": true
+          "type": "proposal_review",
+          "label": "Pending definition proposals"
         }
       ],
       "pane": "Terms",
@@ -157,8 +166,10 @@
           "fields": [
             {
               "name": "id",
-              "label": "Installed version ID",
-              "type": "text"
+              "label": "Installed skill version",
+              "type": "select",
+              "choices": "$4",
+              "required": true
             }
           ],
           "fixed": {

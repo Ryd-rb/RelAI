@@ -8,7 +8,7 @@ pub save_term 1 arg uint uint do 2 p uint discard uint 5
   ret call query 2 call str 1 utf8 "INSERT INTO terms VALUES(?,?,?,?,1,'knowledge') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,revision=terms.revision+1" call append 2 call append 2 call append 2 call append 2 call arr 0 call hash 1 call encode 1 call append 2 call append 2 call arr 0 p call key 2 arg call str 1 utf8 "name" p call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "definition"
 
 pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uint components uint tabs uint row uint viewname uint i int 15
-  set projects call query 2 call str 1 utf8 "WITH names AS (SELECT rowid AS ord,id,root,coalesce(nullif((SELECT value FROM json_each('['||replace(json_quote(rtrim(replace(p.root,char(92),'/'),'/')), '/',char(34)||','||char(34))||']') ORDER BY key DESC LIMIT 1),''),root) AS leaf FROM projects AS p) SELECT id,root,CASE WHEN count(*) OVER (PARTITION BY lower(leaf))=1 THEN leaf ELSE root END AS short FROM names ORDER BY ord" call arr 0
+  set projects call query 2 call asset 1 call str 1 utf8 "project_labels.sql" call arr 0
   set pid call key 2 arg call str 1 utf8 "project"
   if call same 2 pid 0u 1
     set pid call key 2 call nth 2 call query 2 call str 1 @text r#"

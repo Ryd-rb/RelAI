@@ -508,6 +508,40 @@ fn unicode_completion_shifts_pinned_markers_and_explicit_definition_history() {
 }
 
 #[test]
+fn dictionary_proposal_review_shows_wording_and_decides_the_selected_proposal() {
+    let mut ui = Desktop::open();
+    let source = ui.invoke(
+        "submit",
+        json!({"key":"proposal-evidence","text":"Two terms for review.","attachments":[]}),
+    );
+    let mut ids = Vec::new();
+    for (name, wording) in [
+        ("First", "Original wording"),
+        ("Second", "Selected wording"),
+    ] {
+        ids.push(ui.invoke("tool_run", json!({"tool":"dictionary.propose","arguments":{"name":name,"definition":wording,"source":source["id"]}}))["value"].clone());
+    }
+    ui.click("Dictionary");
+    ui.click("Create or review definitions");
+    let choice = ui.control("Pending proposals", "list");
+    let selected = ui.event(choice, json!({"value":ids[1]}));
+    ui.apply(selected);
+    ui.find(|c| c["kind"] == "detail" && c["value"] == "Selected wording");
+    let accept = ui.control("Accept proposal", "button");
+    assert_eq!(accept["event"]["spec"]["fixed"]["proposal"], ids[1]);
+    ui.click("Accept proposal");
+    let remaining = ui.control("Pending proposals", "list");
+    assert_eq!(remaining["choices"].as_array().unwrap().len(), 1);
+    assert_eq!(remaining["value"], ids[0]);
+    ui.click("Decline proposal");
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["label"] == "Accept proposal")
+    );
+}
+
+#[test]
 fn workspace_search_and_selected_activity_survive_navigation_and_refresh() {
     let mut ui = Desktop::open();
     for (name, definition) in [
@@ -594,6 +628,37 @@ fn completing_terms_right_to_left_submits_in_text_order() {
     assert_eq!(args["markers"][0]["start"], 0);
     assert_eq!(args["markers"][1]["start"], 5);
     ui.apply(submit);
+}
+
+#[test]
+fn graph_browses_snapshot_children_and_restores_project_zoom() {
+    let mut ui = Desktop::open();
+    fs::create_dir_all(ui.root.join("src/nested")).unwrap();
+    fs::write(ui.root.join("src/nested/file.txt"), "unchanged").unwrap();
+    ui.click("Project graph");
+    ui.click("Capture snapshot");
+    let snapshot = ui.state["nav"]["snapshot"].clone();
+    ui.change("Project paths", "list", json!({"value":"src/nested"}));
+    ui.click("src/nested/file.txt · file");
+    assert_eq!(ui.state["nav"]["snapshot"], snapshot);
+    ui.find(|c| c["kind"] == "detail" && c["value"] == "unchanged");
+    ui.click("Up one directory");
+    assert_eq!(ui.state["nav"]["selected"], "src/nested");
+    ui.click("Zoom in");
+
+    let second = ui.root.with_file_name("second");
+    fs::create_dir(&second).unwrap();
+    ui.click("Open project");
+    ui.click("Enter folder path");
+    ui.change("Existing project folder", "input", json!({"value":second}));
+    ui.click("Open project");
+    ui.click("Project graph");
+    ui.click("Capture snapshot");
+    ui.control("Zoom 100%", "label");
+    ui.click("Zoom out");
+    ui.click("project");
+    ui.click("Project graph");
+    ui.control("Zoom 120%", "label");
 }
 
 #[test]
@@ -1512,6 +1577,7 @@ fn large_history_and_graph_comparison_remain_browsable() {
     ui.control("Open previous file-12", "button");
     ui.click("More relationships");
     ui.control("source → target-12 · call", "button");
+    ui.control("Results 13–24 of 512", "label");
     assert_eq!(
         ui.controls()
             .iter()
@@ -1542,7 +1608,7 @@ fn large_history_and_graph_comparison_remain_browsable() {
     ui.render(false);
     ui.find(|c| c["id"] == "graph/inspect-prompt");
     assert!(!ui.controls().iter().any(|c| c["id"] == "graph/coverage"));
-    ui.state["filter"] = json!("");
+    ui.state["relationshipFilter"] = json!("");
     ui.state["layers"] = json!({"snapshot":"new","coverage":{"indexed":2,"total":2},"edges":[{"source":"same","target":"target","name":"call"},{"source":"same","target":"target","name":"call"}],"changes":[]});
     ui.render(false);
     assert_eq!(

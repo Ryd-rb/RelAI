@@ -50,13 +50,17 @@ fn activity_journal 4 state uint pid uint base uint pane uint uint do 5 rows uin
   set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/details","kind":"detail","label":"Event details","lines":6,"value":"$0"}"# call append 2 call arr 0 call ui_show 1 call key 2 item call str 1 utf8 "record"
   ret 0u
 
-fn workspace_lexicon 3 state uint pid uint base uint uint do 5 values uint queryval uint rows uint item uint discard uint 9
+fn workspace_lexicon 3 state uint pid uint base uint uint do 5 values uint queryval uint rows uint item uint discard uint 10
   set values call key 2 call key 2 state call str 1 utf8 "workspaceSelection" pid
   set queryval call ui_default 2 call key 2 values call str 1 utf8 "termQuery" call str 1 utf8 ""
   set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"dictionary/search","kind":"input","label":"Search terms","caption":false,"placeholder":"Search linked dictionaries…","value":"$0","event":{"action":"workspace_select","scope":"$1","name":"termQuery"}}"# @build append 1 2 call arr 0 queryval pid
   set rows call query 2 call asset 1 call str 1 utf8 "workspace_terms.sql" @build append 1 2 call arr 0 pid queryval
   if eq 0 call size 1 rows 1
     ret call ui_emit 1 call decode 1 call str 1 @text r#"{"id":"dictionary/empty","kind":"label","role":"muted","value":"No matching terms in the linked dictionaries."}"#
+  0
+  if lt 80 call size 1 rows 2
+    set discard call ui_emit 1 call decode 1 call str 1 @text r#"{"id":"dictionary/more","kind":"label","role":"caption","label":"Showing the first 80 matches. More terms match; narrow the search to find them."}"#
+    set rows call query 2 call str 1 @text r#"SELECT value->>'$.value' AS value,value->>'$.label' AS label,value->>'$.name' AS name,value->>'$.definition' AS definition,value->'$.ref' AS "ref:json" FROM json_each(?) ORDER BY CAST(key AS INTEGER) LIMIT 80"# call append 2 call arr 0 rows
   0
   set item call workspace_pick 2 rows call key 2 values call str 1 utf8 "term"
   set discard call workspace_list 6 pid call cat 2 base call str 1 utf8 "/terms" call str 1 utf8 "Terms" rows item call str 1 utf8 "term"

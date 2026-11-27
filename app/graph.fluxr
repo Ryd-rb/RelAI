@@ -64,21 +64,25 @@ fn graph_view 2 arg uint pid uint uint do 8 sid uint rowsval uint components uin
   if call same 2 call key 2 arg call str 1 @text r#"selected"# 0u 1
     set components call append 2 components call shape 2 call str 1 @text r#"{"type":"empty","label":"Choose a file or folder","text":"Select a path above to read its captured contents. Snapshot selection never reads newer working-file bytes.","pane":"Files","section":"inspection"}"# call arr 0
   2
-    set node call nth 2 call query 2 call str 1 @text r#"SELECT kind,digest,path,bytes FROM inventory WHERE snapshot=? AND path=?"# @build append 1 2 call arr 0 sid call key 2 arg call str 1 @text r#"selected"# 0
+    set node call nth 2 call query 2 call str 1 @text r#"SELECT kind,digest,path,parent,bytes FROM inventory WHERE snapshot=? AND path=?"# @build append 1 2 call arr 0 sid call key 2 arg call str 1 @text r#"selected"# 0
     if call same 2 node 0u 1
       set components call append 2 components call shape 2 call str 1 @text r#"{"type":"empty","label":"Path not in this snapshot","text":"Choose another captured path or switch snapshots. Your filter and zoom are retained.","pane":"Files","section":"inspection"}"# call arr 0
-    2
-      if call same 2 call key 2 node call str 1 @text r#"kind"# call str 1 @text r#"directory"# 3
-        set a call query 2 call str 1 @text r#"SELECT path,kind,bytes,digest FROM inventory WHERE snapshot=? AND parent=? ORDER BY path"# @build append 1 2 call arr 0 sid call key 2 node call str 1 @text r#"path"#
-        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"card","label":"$0","text":"$1","details":"$2","pane":"Files","section":"inspection"}"# @build append 1 3 call arr 0 call key 2 node call str 1 @text r#"path"# call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('Folder · %d captured entries',?1) AS text"# @build append 1 1 call arr 0 call integer 1 call size 1 a 0 call str 1 @text r#"text"# call ui_merge 2 node call shape 2 call str 1 @text r#"{"snapshot":"$0"}"# @build append 1 1 call arr 0 sid
-        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"data","label":"Directory contents","value":"$0","pane":"Files","section":"inspection"}"# @build append 1 1 call arr 0 a
+    3
+      if not call same 2 call key 2 node call str 1 utf8 "parent" call str 1 utf8 "" 1
+        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"button","label":"Up one directory","navigate":{"view":"graph","snapshot":"$0","selected":"$1","pane":"Files"},"pane":"Files","section":"inspection"}"# @build append 1 2 call arr 0 sid call key 2 node call str 1 utf8 "parent"
       0
-      if call same 2 call key 2 node call str 1 @text r#"kind"# call str 1 @text r#"file"# 4
+      if call same 2 call key 2 node call str 1 @text r#"kind"# call str 1 @text r#"directory"# 3
+        set a call query 2 call str 1 @text r#"SELECT path,kind,bytes,digest,snapshot FROM inventory WHERE snapshot=? AND parent=? ORDER BY path"# @build append 1 2 call arr 0 sid call key 2 node call str 1 @text r#"path"#
+        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"card","label":"$0","text":"$1","details":"$2","pane":"Files","section":"inspection"}"# @build append 1 3 call arr 0 call key 2 node call str 1 @text r#"path"# call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('Folder · %d captured entries',?1) AS text"# @build append 1 1 call arr 0 call integer 1 call size 1 a 0 call str 1 @text r#"text"# call ui_merge 2 node call shape 2 call str 1 @text r#"{"snapshot":"$0"}"# @build append 1 1 call arr 0 sid
+        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"snapshot_children","label":"Directory contents","value":"$0","pane":"Files","section":"inspection"}"# @build append 1 1 call arr 0 a
+      0
+      if call same 2 call key 2 node call str 1 @text r#"kind"# call str 1 @text r#"file"# 5
         set body call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT content FROM blobs WHERE project=? AND digest=?"# @build append 1 2 call arr 0 pid call key 2 node call str 1 @text r#"digest"# 0 call str 1 @text r#"content"#
         set a call key 2 call baseinfo 1 body call str 1 @text r#"text"#
         if call same 2 a 0u 1
           set a call str 1 @text r#"Binary file · captured bytes are retained in this snapshot."#
         0
+        set components call append 2 components call shape 2 call str 1 @text r#"{"type":"card","label":"$0","pane":"Files","section":"inspection"}"# call append 2 call arr 0 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT printf('%d retained byte%s',?1,CASE ?1 WHEN 1 THEN '' ELSE 's' END) AS caption" call append 2 call arr 0 call key 2 node call str 1 utf8 "bytes" 0 call str 1 utf8 "caption"
         set components call append 2 components call shape 2 call str 1 @text r#"{"type":"card","label":"$0","text":"$1","details":"$2","pane":"Files","section":"inspection"}"# @build append 1 3 call arr 0 call key 2 node call str 1 @text r#"path"# a call ui_merge 2 node call shape 2 call str 1 @text r#"{"snapshot":"$0"}"# @build append 1 1 call arr 0 sid
       0
   ret components

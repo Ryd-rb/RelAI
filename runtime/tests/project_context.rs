@@ -517,6 +517,33 @@ fn graph_reindexes_legacy_coverage_and_resolves_module_file_layouts() {
 }
 
 #[test]
+fn graph_reports_relationship_and_identifier_limits_with_partial_results() {
+    let (t, mut app) = fixture();
+    let folder = t.path().join("repo");
+    let project = open(&mut app, &folder);
+    let mut source = String::from("fluxr 1\npub scan 0 int do 1 x int 4098\n");
+    source.push_str(&"set x call h 0\n".repeat(4097));
+    source.push_str("ret x\n");
+    fs::write(folder.join("calls.fluxr"), source).unwrap();
+    fs::write(folder.join("target.fluxr"), "fluxr 1\npub h 0 int ret 1\n").unwrap();
+    let snapshot = app
+        .invoke("capture_graph", json!({"project":project}))
+        .unwrap();
+    let layers = app
+        .invoke(
+            "graph_layers",
+            json!({"project":project,"snapshot":snapshot["snapshot"]}),
+        )
+        .unwrap();
+    assert_eq!(layers["edges"].as_array().unwrap().len(), 512);
+    assert_eq!(layers["partial"], true);
+    let coverage = layers["coverage_label"].as_str().unwrap();
+    assert!(coverage.contains("source files examined"));
+    assert!(coverage.contains("4,096"));
+    assert!(coverage.contains("first 512"));
+}
+
+#[test]
 fn graph_edges_reference_snapshot_bytes_and_stale_evidence_survives_comparison() {
     let (t, mut a) = fixture();
     let folder = t.path().join("repo");

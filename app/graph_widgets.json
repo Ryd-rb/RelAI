@@ -153,15 +153,16 @@
   },
   "coverage": {
     "id": "graph/coverage",
-    "kind": "label",
-    "role": "caption",
-    "label": "$0"
+    "kind": "detail",
+    "role": "body",
+    "lines": 3,
+    "value": "$0"
   },
   "noEdges": {
     "id": "graph/no-edges",
     "kind": "label",
     "role": "muted",
-    "label": "No cross-file relationships match this filter in the indexed source."
+    "label": "No displayed cross-file relationships match this filter."
   },
   "sourceLink": {
     "id": "$0",

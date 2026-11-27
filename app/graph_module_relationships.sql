@@ -28,4 +28,4 @@ WITH targets AS (
       AND s.role='symbols' AND s.kind='external_module'
 )
 SELECT * FROM (SELECT * FROM calls UNION ALL SELECT * FROM modules)
-ORDER BY source,start,target LIMIT 512
+ORDER BY source,start,target LIMIT 513

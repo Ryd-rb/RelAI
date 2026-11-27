@@ -27,12 +27,14 @@ fn index_graph 2 pid uint sid uint uint do 11 rowsval uint row uint tree uint by
   set discard call query 2 call str 1 utf8 "INSERT INTO graph_index_versions VALUES(?,2) ON CONFLICT(snapshot) DO UPDATE SET version=2" call append 2 call arr 0 sid
   ret call nth 2 call query 2 call str 1 utf8 "SELECT indexed,total FROM graph_indexes WHERE snapshot=?" call append 2 call arr 0 sid 0
 
-pub graph_layers 1 arg uint uint do 7 pid uint sid uint path uint state uint out uint before uint discard uint 9
+pub graph_layers 1 arg uint uint do 7 pid uint sid uint path uint state uint out uint before uint discard uint 11
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set sid call key 2 arg call str 1 utf8 "snapshot"
   set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid sid 0 0u call str 1 utf8 "Unknown project snapshot"
   set state call index_graph 2 pid sid
-  set out call shape 2 call str 1 utf8 "{\"snapshot\":\"$0\",\"coverage\":\"$1\",\"edges\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 sid state call query 2 call asset 1 call str 1 utf8 "graph_module_relationships.sql" call append 2 call arr 0 sid
+  set path call query 2 call asset 1 call str 1 utf8 "graph_module_relationships.sql" call append 2 call arr 0 sid
+  set out call shape 2 call str 1 @text r#"{"snapshot":"$0","coverage":"$1","edges":"$2","partial":"$3"}"# @build append 1 4 call arr 0 sid state call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json_remove(?,'$[512]') AS "edges:json""# call append 2 call arr 0 path 0 call str 1 utf8 "edges" call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json(CASE WHEN ?>512 THEN 'true' ELSE 'false' END) AS "partial:json""# call append 2 call arr 0 call integer 1 call size 1 path 0 call str 1 utf8 "partial"
+  set out call put 3 out call str 1 utf8 "coverage_label" call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('%s of %s source files examined · %d relationships shown',?1,?2,min(?3,512))||char(10)||'The index examines up to 128 files and retains up to 4,096 declarations and 4,096 references per file.'||CASE WHEN ?3>512 THEN char(10)||'The filter covers the first 512 relationships.' ELSE '' END AS label"# @build append 1 3 call arr 0 call key 2 state call str 1 utf8 "indexed" call key 2 state call str 1 utf8 "total" call integer 1 call size 1 path 0 call str 1 utf8 "label"
   set before call key 2 arg call str 1 utf8 "before"
   if not call same 2 before 0u 4
     set out call put 3 out call str 1 utf8 "changes" call extra_run 3 pid call str 1 utf8 "snapshot.diff" call shape 2 call str 1 utf8 "{\"before\":\"$0\",\"after\":\"$1\"}" call append 2 call append 2 call arr 0 before sid

@@ -34,8 +34,16 @@ fn workspace_list 6 pid uint base uint titleval uint rows uint item uint keyval 
   set choices call query 2 call str 1 @text r#"SELECT value->>'$.label' AS label,value->>'$.value' AS value FROM json_each(?) ORDER BY CAST(key AS INTEGER)"# call append 2 call arr 0 rows
   ret call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"list","label":"$1","choices":"$2","value":"$3","lines":6,"event":{"action":"workspace_select","scope":"$4","name":"$5"}}"# @build append 1 6 call arr 0 base titleval choices call key 2 item call str 1 utf8 "value" pid keyval
 
-fn activity_journal 4 state uint pid uint base uint pane uint uint do 5 rows uint item uint keyval uint message uint discard uint 8
-  set rows call query 2 call asset 1 call str 1 utf8 "workspace_activity.sql" @build append 1 2 call arr 0 pid pane
+fn activity_journal 4 state uint pid uint base uint pane uint uint do 7 rows uint item uint keyval uint message uint discard uint pagekey uint before uint 12
+  set pagekey call cat 2 call cat 2 call str 1 utf8 "activity/" pane call str 1 utf8 "/before"
+  set before call key 2 call key 2 call key 2 state call str 1 utf8 "workspaceSelection" pid pagekey
+  set rows call query 2 call asset 1 call str 1 utf8 "workspace_activity.sql" @build append 1 3 call arr 0 pid pane before
+  if not call same 2 before 0u 1
+    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/latest","kind":"button","label":"Return to latest activity","event":{"action":"activity_page","key":"$0","before":null}}"# call append 2 call arr 0 pagekey
+  0
+  if call same 2 call integer 1 1 call key 2 call nth 2 rows 0 call str 1 utf8 "has_older" 1
+    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"activity/older","kind":"button","label":"Older activity","event":{"action":"activity_page","key":"$0","before":"$1"}}"# @build append 1 2 call arr 0 pagekey call key 2 call nth 2 rows 99 call str 1 utf8 "value"
+  0
   if eq 0 call size 1 rows 3
     set message call str 1 utf8 "No activity yet. Send a message to start the project history."
     if call same 2 pane call str 1 utf8 "Needs attention" 1

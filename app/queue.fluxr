@@ -2,7 +2,7 @@ fluxr 1
 
 pub hold 1 arg uint uint do 2 j uint discard uint 6
   set j call nth 2 call query 2 call str 1 utf8 "SELECT project,request,state,attempt FROM jobs WHERE id=?" call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
-  set discard call query 2 call str 1 utf8 "UPDATE attempts SET state='uncertain',ended=unixepoch() WHERE id=? AND state='sending'" call append 2 call arr 0 call key 2 arg call str 1 utf8 "attempt"
+  set discard call query 2 call str 1 utf8 "UPDATE attempts SET state=CASE WHEN ?2 THEN 'rejected' ELSE 'uncertain' END,ended=unixepoch() WHERE id=?1 AND state='sending'" call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "attempt" call key 2 arg call str 1 utf8 "body_received"
   if call same 2 call key 2 j call str 1 utf8 "state" call str 1 utf8 "superseded" 1
     ret 0u
   0

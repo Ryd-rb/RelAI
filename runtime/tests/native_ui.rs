@@ -596,9 +596,141 @@ fn workspace_search_and_selected_activity_survive_navigation_and_refresh() {
             .contains("Worker failed")
     );
     ui.click("Needs attention");
-    let filtered = ui.control("Events", "list");
-    assert_eq!(filtered["choices"].as_array().unwrap().len(), 1);
-    assert_eq!(filtered["value"], saved);
+    ui.find(|c| c["id"] == "activity/empty");
+}
+
+#[test]
+fn term_search_and_chat_completion_fold_unicode_without_changing_the_inserted_name() {
+    let mut ui = Desktop::open();
+    for (name, search) in [("Straße", "STRASSE"), ("Café", "CAFE\u{301}")] {
+        ui.invoke(
+            "dictionary",
+            json!({"op":"save","name":name,"kind":"knowledge","definition":name}),
+        );
+        let suggestions = ui.invoke("suggest_terms", json!({"prefix":search}));
+        assert!(
+            suggestions
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|hit| hit["name"] == name)
+        );
+        ui.click("Dictionary");
+        ui.change("Search terms", "input", json!({"value":search}));
+        assert_eq!(
+            ui.control("Terms", "list")["choices"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        ui.click("Relay");
+        ui.type_message(search);
+        let completion = ui.find(|c| c["event"]["hit"]["name"] == name);
+        let selected = ui.event(completion, json!({}));
+        ui.apply(selected);
+        assert_eq!(
+            ui.control("Message", "multiline")["value"]
+                .as_str()
+                .unwrap()
+                .trim_end(),
+            name
+        );
+    }
+}
+
+#[test]
+fn activity_pages_are_stable_and_attention_tracks_an_open_question() {
+    let mut ui = Desktop::open();
+    let project = ui.view["project"].as_str().unwrap().to_owned();
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    db.execute("DELETE FROM events WHERE project=?", [&project])
+        .unwrap();
+    for index in 0..200 {
+        db.execute(
+            "INSERT INTO events(project,kind,payload) VALUES(?,'Recorded',?)",
+            (
+                &project,
+                json!({"text":format!("event {index}")}).to_string(),
+            ),
+        )
+        .unwrap();
+    }
+    db.execute(
+        "DELETE FROM event_times WHERE cursor=(SELECT min(cursor) FROM events WHERE project=?)",
+        [&project],
+    )
+    .unwrap();
+    ui.click("Activity");
+    let choices = ui.control("Events", "list")["choices"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(choices.len(), 100);
+    assert!(choices[0]["label"].as_str().unwrap().contains("UTC"));
+    assert!(choices[0]["label"].as_str().unwrap().ends_with("event 199"));
+    ui.click("Older activity");
+    let older = ui.control("Events", "list")["choices"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(older.len(), 100);
+    assert!(
+        older[99]["label"]
+            .as_str()
+            .unwrap()
+            .to_lowercase()
+            .contains("unknown")
+    );
+    assert!(older[99]["label"].as_str().unwrap().ends_with("event 0"));
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["label"] == "Older activity" && c["enabled"] != false)
+    );
+    db.execute(
+        "INSERT INTO events(project,kind,payload) VALUES(?,'Recorded','{}')",
+        [&project],
+    )
+    .unwrap();
+    ui.render(true);
+    assert_eq!(ui.control("Events", "list")["choices"], json!(older));
+    ui.click("Return to latest activity");
+    assert_ne!(
+        ui.control("Events", "list")["choices"][0]["value"],
+        choices[0]["value"]
+    );
+
+    ui.click("Relay");
+    ui.invoke(
+        "submit",
+        json!({"key":"current-question","text":"Choose.","attachments":[]}),
+    );
+    ui.receive_intake("Choose.",json!([{"type":"ASK","summary":"Choose a layout.","question":"Which layout?","work":"Choose a layout","choices":["List","Grid"]}]),"wait_for");
+    ui.click("Activity");
+    ui.click("Needs attention");
+    let pending = ui.control("Events", "list")["choices"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert_eq!(pending.len(), 1);
+    assert!(
+        pending[0]["label"]
+            .as_str()
+            .unwrap()
+            .contains("Which layout?")
+    );
+    db.execute("UPDATE questions SET state='answered' WHERE request IN (SELECT id FROM requests WHERE project=?)", [&project]).unwrap();
+    ui.render(true);
+    ui.find(|c| c["id"] == "activity/empty");
+    ui.click("Timeline");
+    assert!(
+        ui.control("Events", "list")["choices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["value"] == pending[0]["value"])
+    );
 }
 
 #[test]
@@ -980,7 +1112,9 @@ fn chat_pages_keep_durable_messages_visible_across_internal_traffic() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|r| r["label"] == "Internal trace")
+            .any(|r| r["label"]
+                .as_str()
+                .is_some_and(|label| label.ends_with(" · Internal trace")))
     );
     ui.click("Needs attention");
     ui.find(|c| c["id"] == "activity/empty");

@@ -171,6 +171,75 @@ fn chat_uses_safe_operation_and_failure_copy_without_echoing_private_details() {
 }
 
 #[test]
+fn a_received_response_stays_distinct_from_an_interrupted_provider_call_after_reopening() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("project");
+    fs::create_dir(&root).unwrap();
+    let data = temp.path().join("state");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let project = app.invoke("open_project", json!({"root":root})).unwrap()["id"].clone();
+    app.invoke(
+        "submit",
+        json!({"project":project,"key":"oversize","text":"Read this.","attachments":[]}),
+    )
+    .unwrap();
+    let seal = app.invoke("poll", Value::Null).unwrap();
+    app.invoke("seal", seal).unwrap();
+    let model = app.invoke("poll", Value::Null).unwrap();
+    app.invoke("hold",json!({"job":model["job"],"attempt":model["attempt"],"body_received":true,"error":"require: Action limit exceeded"})).unwrap();
+    let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+    let attempt = model["attempt"].as_str().unwrap();
+    let attempt_state = || {
+        sql.query_row("SELECT state FROM attempts WHERE id=?", [attempt], |r| {
+            r.get::<_, String>(0)
+        })
+        .unwrap()
+    };
+    let check_rejected = |app: &mut App| {
+        assert!(status(app, &project).unwrap().contains("received"));
+        let view = app.invoke("dashboard", json!({"project":project})).unwrap();
+        let frame = app
+            .invoke("desktop_frame", json!({"view":view,"state":{}}))
+            .unwrap();
+        assert!(frame["controls"].as_array().unwrap().iter().all(|c| {
+            !c["value"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Delivery could not be confirmed")
+        }));
+    };
+    assert_eq!(attempt_state(), "rejected");
+    check_rejected(&mut app);
+    drop(app);
+    sql.execute(
+        "UPDATE attempts SET state='uncertain' WHERE id=?",
+        [attempt],
+    )
+    .unwrap();
+    let mut reopened = App::open(&bundle(), &data).unwrap();
+    assert_eq!(attempt_state(), "rejected");
+    check_rejected(&mut reopened);
+    sql.execute(
+        "UPDATE jobs SET reason='Connection lost' WHERE id=?",
+        [model["job"].as_str().unwrap()],
+    )
+    .unwrap();
+    sql.execute(
+        "UPDATE attempts SET state='uncertain' WHERE id=?",
+        [attempt],
+    )
+    .unwrap();
+    drop(reopened);
+    let mut reopened = App::open(&bundle(), &data).unwrap();
+    assert_eq!(attempt_state(), "uncertain");
+    assert!(
+        status(&mut reopened, &project)
+            .unwrap()
+            .contains("interrupted")
+    );
+}
+
+#[test]
 fn chat_prioritizes_actionable_questions_and_approval_and_scopes_progress() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("project");

@@ -68,6 +68,7 @@
     "graph_compare.sql",
     "graph_paths.sql",
     "graph_relationships.sql",
+    "graph_module_relationships.sql",
     "graph_snapshots.sql",
     "graph_widgets.json",
     "improver-tools.json",

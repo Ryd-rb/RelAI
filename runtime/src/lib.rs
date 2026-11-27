@@ -375,6 +375,14 @@ impl App {
                     .join(" "))
             },
         )?;
+        db.create_scalar_function(
+            "unicode_fold",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC
+                | rusqlite::functions::FunctionFlags::SQLITE_INNOCUOUS,
+            |ctx| Ok(resources::fold(&ctx.get::<String>(0)?)),
+        )?;
         db.execute_batch(
             "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
         )?;

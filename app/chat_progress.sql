@@ -19,6 +19,8 @@ SELECT
            (a.state='awaiting_acceptance' OR (a.state='evidence' AND EXISTS (SELECT 1 FROM branches b WHERE b.report=a.id AND b.accepted IS NULL)
              AND NOT EXISTS (SELECT 1 FROM questions q WHERE q.session=j.session AND q.revision=r.revision AND q.state!='answered'))))
           THEN NULL
+         WHEN EXISTS (SELECT 1 FROM current_jobs j WHERE state='held' AND EXISTS(SELECT 1 FROM attempts a WHERE a.id=j.attempt AND a.state='rejected'))
+          THEN 'The model response was received but rejected. Retry delivery to request another response.'
          WHEN EXISTS (SELECT 1 FROM current_jobs j WHERE state='uncertain'
              OR (state='held' AND EXISTS (SELECT 1 FROM attempts a WHERE a.id=j.attempt AND a.state='uncertain')))
           THEN 'This request was interrupted. Review before retrying.'

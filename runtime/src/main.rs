@@ -146,7 +146,7 @@ async fn work(app: Arc<Mutex<App>>, changed: Option<std::sync::mpsc::Sender<Valu
                     if let Err(e) = app.invoke("receive", payload.clone()) {
                         let _ = app.invoke(
                             "hold",
-                            json!({"job":v["job"],"attempt":v["attempt"],"error":format!("{e:#}")}),
+                            json!({"job":v["job"],"attempt":v["attempt"],"body_received":payload.get("response").is_some(),"error":format!("{e:#}")}),
                         );
                     }
                     notify(&changed);

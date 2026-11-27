@@ -1,9 +1,15 @@
 use super::{join, linked, read, relative, text};
 use anyhow::{Context, Result, ensure};
+use caseless::Caseless;
 use serde_json::{Map, Value, json};
 use std::{collections::BTreeMap, fs, io::Read, path::Path};
 use unicode_normalization::UnicodeNormalization;
 use unicode_segmentation::UnicodeSegmentation;
+
+pub(crate) fn fold(s: &str) -> String {
+    s.nfd().default_case_fold().nfc().collect()
+}
+
 const CAP: usize = 2 * 1024 * 1024;
 pub fn package(path: &Path, private: &Path) -> Result<Value> {
     let root = path.canonicalize()?;
@@ -82,7 +88,7 @@ pub fn frontmatter(input: &str) -> Result<Value> {
 pub fn matches(input: &str, names: &Value) -> Result<Value> {
     ensure!(input.len() <= 262144, "Text exceeds span limit");
     let mut terms = BTreeMap::<String, Vec<&Value>>::new();
-    let norm = |s: &str| s.nfc().flat_map(char::to_lowercase).collect::<String>();
+    let norm = fold;
     for row in names.as_array().context("Expected vocabulary")? {
         let name = text(&row["name"])?;
         ensure!(name.len() <= 256, "Term too long");

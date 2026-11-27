@@ -378,6 +378,55 @@ fn explicit_selection_disambiguates_two_dictionaries_and_validates_exact_utf8_sp
     );
 }
 #[test]
+fn graph_reindexes_legacy_coverage_and_resolves_module_file_layouts() {
+    let (t, mut app) = fixture();
+    let folder = t.path().join("repo");
+    let project = open(&mut app, &folder);
+    fs::create_dir_all(folder.join("src/foo")).unwrap();
+    fs::create_dir_all(folder.join("src/sub")).unwrap();
+    for (file, text) in [
+        ("src/lib.rs", "mod foo; mod sub;"),
+        ("src/foo/mod.rs", "mod leaf;"),
+        ("src/foo/leaf.rs", "pub fn leaf() {}"),
+        ("src/sub.rs", "mod inner;"),
+        ("src/sub/inner.rs", "pub fn inner() {}"),
+    ] {
+        fs::write(folder.join(file), text).unwrap();
+    }
+    fs::write(folder.join("src/bad.rs"), [0xff, 0xff]).unwrap();
+    let snapshot = app
+        .invoke("capture_graph", json!({"project":project}))
+        .unwrap()["snapshot"]
+        .clone();
+    let input = json!({"project":project,"snapshot":snapshot});
+    let sql = rusqlite::Connection::open(app.data.join("state.sqlite3")).unwrap();
+    sql.execute(
+        "INSERT OR REPLACE INTO graph_indexes VALUES(?,6,6)",
+        [snapshot.as_str().unwrap()],
+    )
+    .unwrap();
+    let indexed = app.invoke("graph_layers", input.clone()).unwrap();
+    assert_eq!(indexed["coverage"], json!({"indexed":5,"total":6}));
+    let modules = indexed["edges"].as_array().unwrap();
+    for (src, dst) in [
+        ("src/lib.rs", "src/foo/mod.rs"),
+        ("src/lib.rs", "src/sub.rs"),
+        ("src/foo/mod.rs", "src/foo/leaf.rs"),
+        ("src/sub.rs", "src/sub/inner.rs"),
+    ] {
+        assert!(
+            modules
+                .iter()
+                .any(|edge| edge["source"] == src && edge["target"] == dst)
+        );
+    }
+    assert_eq!(
+        app.invoke("graph_layers", input).unwrap()["edges"],
+        indexed["edges"]
+    );
+}
+
+#[test]
 fn graph_edges_reference_snapshot_bytes_and_stale_evidence_survives_comparison() {
     let (t, mut a) = fixture();
     let folder = t.path().join("repo");

@@ -38,22 +38,10 @@ async fn subscription_attachment() {
     )
     .unwrap();
     let db = rusqlite::Connection::open(temp.path().join("db/state.sqlite3")).unwrap();
-    let (count,msg):(i64,String)=db.query_row("SELECT count(*),coalesce(json_extract(payload,'$.findings'),'') FROM actions WHERE state='awaiting_acceptance'",[],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+    let (count,msg):(i64,String)=db.query_row("SELECT count(*),coalesce(json_extract(payload,'$.findings'),'') FROM finals JOIN actions ON actions.id=finals.action",[],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
     assert_eq!(count, 1);
     assert!(msg.to_lowercase().contains("marigold"));
     let foreground = start.elapsed();
-    let action: String = db
-        .query_row(
-            "SELECT id FROM actions WHERE state='awaiting_acceptance'",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap();
-    app.invoke(
-        "control",
-        json!({"op":"accept","project":p,"action":action}),
-    )
-    .unwrap();
     let seal = app.invoke("poll", Value::Null).unwrap();
     app.invoke("seal", seal).unwrap();
     let improvement = app.invoke("poll", Value::Null).unwrap();
@@ -171,7 +159,7 @@ async fn subscription_reads_open_project() {
         );
         let answer: Option<String> = db
             .query_row(
-                "SELECT max(payload->>'$.findings') FROM actions WHERE state='awaiting_acceptance'",
+                "SELECT max(payload->>'$.findings') FROM finals JOIN actions ON actions.id=finals.action",
                 [],
                 |r| r.get(0),
             )

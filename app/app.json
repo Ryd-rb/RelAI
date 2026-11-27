@@ -98,6 +98,7 @@
     "schedule-tools.json",
     "schema.sql",
     "services.json",
+    "settled_reports.sql",
     "tool_batch.sql",
     "tool_choices.sql",
     "tool_search.sql",
@@ -124,6 +125,7 @@
     "tool_test",
     "tool_reproduction_plan",
     "tool_reproduce",
+    "tool_reproduce_case",
     "tool_qualify",
     "tool_promote",
     "tool_retire",
@@ -138,17 +140,18 @@
     "effect_propose",
     "effect_authorize",
     "effect_apply",
+    "apply_file_change",
     "effect_revoke",
     "effects_recover",
     "patch_preview",
     "patch_stage",
     "patch_apply",
-    "chat_patch_apply",
     "suggest_terms",
     "graph_layers",
     "git_propose",
     "git_authorize",
     "git_apply",
+    "apply_git_change",
     "git_get",
     "git_revoke",
     "git_recover",
@@ -217,6 +220,9 @@
     "tool_reproduce": {
       "$evaluate": ["reproduction_done"]
     },
+    "tool_reproduce_case": {
+      "$evaluate": ["reproduction_done"]
+    },
     "reproduction_done": {
       "$evaluate": ["reproduction_done"]
     },
@@ -230,6 +236,9 @@
         "guest_effect_finished"
       ]
     },
+    "apply_file_change": {
+      "$filesystem": ["guest_effect_finished"]
+    },
     "effects_recover": {
       "$filesystem": [
         "guest_effect_reconciled"
@@ -240,7 +249,7 @@
         "guest_effect_finished"
       ]
     },
-    "chat_patch_apply": {
+    "chat_patch_propose": {
       "$filesystem": [
         "guest_effect_finished"
       ]
@@ -283,6 +292,12 @@
       "$git": [
         "guest_git_finished"
       ]
+    },
+    "apply_git_change": {
+      "$git": ["guest_git_finished"]
+    },
+    "chat_git_mutate": {
+      "$git": ["guest_git_finished"]
     },
     "git_recover": {
       "$git": [

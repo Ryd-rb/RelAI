@@ -145,7 +145,7 @@ fn reads() -> Value {
 
 #[test]
 #[cfg(windows)]
-fn checking_two_effects_returns_one_answer_that_can_be_accepted() {
+fn checking_two_effects_returns_one_automatically_completed_answer() {
     let mut h = Harness::new();
     let mut ids = Vec::new();
     for name in ["first", "second"] {
@@ -179,20 +179,6 @@ fn checking_two_effects_returns_one_answer_that_can_be_accepted() {
         assert_eq!(entry["receipt"]["id"], id);
     }
     h.respond(&resumed,json!([{"type":"RESULT","summary":"Checked both proposals.","findings":"Both proposals await approval.","result_kind":"final","evidence":[],"outcome":null}]),"complete_when");
-    let answer: String = h
-        .sql()
-        .query_row(
-            "SELECT id FROM actions WHERE state='awaiting_acceptance'",
-            [],
-            |row| row.get(0),
-        )
-        .unwrap();
-    h.app
-        .invoke(
-            "control",
-            json!({"project":h.project,"op":"accept","action":answer}),
-        )
-        .unwrap();
     let state: String = h
         .sql()
         .query_row(
@@ -664,20 +650,6 @@ fn a_background_improvement_keeps_its_legacy_single_tool_continuation() {
     h.submit(json!({}));
     let first = h.provider();
     h.respond(&first,json!([{"type":"RESULT","summary":"Read the findings.","result_kind":"final","findings":"Project reviewed.","evidence":[],"outcome":null}]),"complete_when");
-    let action: String = h
-        .sql()
-        .query_row(
-            "SELECT id FROM actions WHERE state='awaiting_acceptance'",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap();
-    h.app
-        .invoke(
-            "control",
-            json!({"project":h.project,"op":"accept","action":action}),
-        )
-        .unwrap();
     let background = h.provider();
     let assignment = h.delivery(&background);
     h.respond(

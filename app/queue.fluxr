@@ -10,7 +10,8 @@ pub hold 1 arg uint uint do 2 j uint discard uint 6
   set discard call audit 3 call key 2 j call str 1 utf8 "project" call str 1 utf8 "Job held" call put 3 arg call str 1 utf8 "request" call key 2 j call str 1 utf8 "request"
   ret 0u
 
-pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint count uint discard uint finalrow uint i int 23
+pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint count uint discard uint finalrow uint i int 24
+  set discard call advance_previous_requests 0
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='queued',reason=NULL WHERE state='waiting' AND revision=(SELECT revision FROM requests r WHERE r.id=jobs.request AND r.state='open') AND NOT EXISTS(SELECT 1 FROM current_prerequisites c WHERE c.job=jobs.id AND c.satisfied=0)" call arr 0
   set files call query 2 call str 1 @text r#"
     SELECT f.path,f.content,f.digest FROM files f

@@ -15,10 +15,9 @@ WITH current_jobs AS (
 SELECT
     CASE WHEN EXISTS (SELECT 1 FROM open_chat_questions q WHERE q.project=r.project AND q.request=r.id)
           THEN NULL
-         WHEN EXISTS (SELECT 1 FROM actions a JOIN current_jobs j ON j.id=a.job WHERE
-           (a.state='awaiting_acceptance' OR (a.state='evidence' AND EXISTS (SELECT 1 FROM branches b WHERE b.report=a.id AND b.accepted IS NULL)
-             AND NOT EXISTS (SELECT 1 FROM questions q WHERE q.session=j.session AND q.revision=r.revision AND q.state!='answered'))))
-          THEN NULL
+         WHEN EXISTS (SELECT 1 FROM actions a JOIN current_jobs j ON j.id=a.job
+                      WHERE a.state='awaiting_acceptance')
+          THEN 'Finalizing the answer…'
          WHEN EXISTS (SELECT 1 FROM current_jobs j JOIN model_delivery_limits l ON l.job=j.id
                        WHERE j.state IN ('held','uncertain') AND l.request_exhausted=1)
           THEN 'This topic reached its model call limit. Start a new topic to send another request.'
@@ -59,7 +58,7 @@ SELECT
              WHEN tool IN ('verify.format','verify.lint','verify.build','verify.test','verify.benchmark')
                THEN CASE state WHEN 'queued' THEN 'Preparing project checks…' ELSE 'Checking the project…' END
              WHEN tool='patch.propose'
-               THEN CASE state WHEN 'queued' THEN 'Preparing a patch for review…' ELSE 'Checking the patch against the current files…' END
+               THEN CASE state WHEN 'queued' THEN 'Preparing a patch…' ELSE 'Checking and applying the patch…' END
              WHEN operation IN ('tool_test','tool_qualify') THEN 'Checking a project tool…'
              WHEN operation='tool_propose' THEN 'Preparing a project tool…'
              ELSE CASE state WHEN 'queued' THEN 'Preparing the next project step…' ELSE 'Running the next project step…' END

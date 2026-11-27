@@ -99,18 +99,6 @@ fn submission_recovery_retries_and_single_improvement() {
     )
     .unwrap();
     let sql = rusqlite::Connection::open(db.join("state.sqlite3")).unwrap();
-    let action: String = sql
-        .query_row(
-            "SELECT id FROM actions WHERE state='awaiting_acceptance'",
-            [],
-            |r| r.get(0),
-        )
-        .unwrap();
-    app.invoke(
-        "control",
-        json!({"project":p,"op":"accept","action":action}),
-    )
-    .unwrap();
     let improvement = next(&mut app);
     let mut report = result("report", "No reusable improvement.");
     report["outcome"] = json!("no_change");
@@ -269,7 +257,7 @@ fn aggregate_attachment_pressure_is_checked_before_submission() {
 }
 
 #[test]
-fn updating_a_request_while_reading_the_project_can_reach_acceptance() {
+fn updating_a_request_while_reading_the_project_finishes_automatically() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("project");
     fs::create_dir(&root).unwrap();
@@ -309,20 +297,10 @@ fn updating_a_request_while_reading_the_project_can_reach_acceptance() {
         intake(json!([result("final", "Hello.")]), "Say hello.".len()),
     )
     .unwrap();
+    assert_eq!(app.invoke("poll", Value::Null).unwrap()["local"], "seal");
     let view = app.invoke("dashboard", json!({"project":project})).unwrap();
-    let transcript = view["components"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|c| c["type"] == "transcript")
-        .unwrap();
-    let answer = &transcript["destination"]["bind"]["revise"];
-    assert!(answer.is_string());
-    app.invoke(
-        "control",
-        json!({"project":project,"op":"accept","action":answer}),
-    )
-    .unwrap();
+    assert!(view.to_string().contains("Hello."));
+    assert!(view.to_string().contains("\"follow\""));
 }
 
 #[test]
@@ -343,6 +321,7 @@ fn a_chat_follow_up_uses_only_the_selected_exchange_and_preserves_the_new_prompt
     .unwrap();
     let job = next(&mut app);
     deliver(&mut app, &job, intake(json!([result("final", "Blue.")]), 7)).unwrap();
+    let improvement = next(&mut app);
     let render = |app: &mut App| {
         let view = app.invoke("dashboard", json!({"project":project})).unwrap();
         app.invoke("desktop_frame", json!({"view":view,"state":{}}))
@@ -363,15 +342,12 @@ fn a_chat_follow_up_uses_only_the_selected_exchange_and_preserves_the_new_prompt
     assert!(controls.iter().any(|c| c["id"] == frame["composer"]
         && c["kind"] == "multiline"
         && c["area"] == "composer"));
-    let accept = controls
+    let action = controls
         .iter()
-        .find(|c| c["label"] == "Accept answer")
-        .unwrap();
-    let mut args = accept["event"]["spec"]["fixed"].clone();
-    let action = args["action"].clone();
-    args["project"] = project.clone();
-    app.invoke("control", args).unwrap();
-    let improvement = next(&mut app);
+        .find(|c| c["label"] == "Send")
+        .unwrap()["event"]["spec"]["destination"]["bind"]["follow"]
+        .clone();
+    assert!(action.is_string());
     let mut report = result("report", "internal workflow note");
     report["outcome"] = json!("no_change");
     deliver(&mut app, &improvement, envelope(json!([report]))).unwrap();
@@ -429,7 +405,7 @@ fn a_chat_follow_up_uses_only_the_selected_exchange_and_preserves_the_new_prompt
 }
 
 #[test]
-fn two_workers_require_separate_receipts_before_review() {
+fn two_workers_report_before_the_relay_releases_review() {
     let t = tempfile::tempdir().unwrap();
     let work = t.path().join("files");
     fs::create_dir(&work).unwrap();
@@ -445,39 +421,34 @@ fn two_workers_require_separate_receipts_before_review() {
     let task = |name: &str| json!({"type":"TASK","summary":"Prepare the answer.","role":"planner","assignment":name,"deliverable":name,"criterion":name,"constraints":[],"skills":[],"targets":[],"attachments":[],"prerequisites":[],"sources":[]});
     deliver(&mut a, &j, intake(json!([task("A"), task("B")]), 7)).unwrap();
     let sql = rusqlite::Connection::open(db.join("state.sqlite3")).unwrap();
-    for msg in ["First", "Second"] {
+    for (index, msg) in ["First", "Second"].into_iter().enumerate() {
         let worker = next(&mut a);
         deliver(&mut a, &worker, envelope(json!([result("report", msg)]))).unwrap();
-        let action: String = sql
-            .query_row("SELECT id FROM actions WHERE state='evidence'", [], |r| {
-                r.get(0)
-            })
+        let acceptance: String = sql
+            .query_row("SELECT accepted FROM branches JOIN actions ON actions.id=branches.report WHERE payload->>'$.findings'=?", [msg], |r| r.get(0))
             .unwrap();
-        let conversation = |app: &mut App| {
-            let view = app.invoke("dashboard", json!({"project":p})).unwrap();
-            app.invoke("desktop_frame", json!({"view":view,"state":{}}))
-                .unwrap()
-        };
-        let before = conversation(&mut a);
-        let message = before["controls"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|c| c["role"] == "incoming" && c["value"] == msg)
-            .unwrap();
-        a.invoke(
-            "control",
-            json!({"project":p,"op":"accept","action":action}),
-        )
-        .unwrap();
-        let after = conversation(&mut a);
-        let controls = after["controls"].as_array().unwrap();
-        assert!(controls.iter().any(|c| c == message));
-        assert!(
-            !controls
-                .iter()
-                .any(|c| c["event"]["spec"]["fixed"]["action"] == action)
+        assert_eq!(
+            serde_json::from_str::<Value>(&acceptance).unwrap()["verifier"],
+            "relay"
         );
+        let view = a.invoke("dashboard", json!({"project":p})).unwrap();
+        let frame = a
+            .invoke("desktop_frame", json!({"view":view,"state":{}}))
+            .unwrap();
+        assert!(
+            frame["controls"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|c| c["role"] == "incoming" && c["value"] == msg)
+        );
+        if index == 0 {
+            assert_eq!(
+                sql.query_row("SELECT count(*) FROM reviews", [], |r| r.get::<_, i64>(0))
+                    .unwrap(),
+                0
+            );
+        }
     }
     let review = next(&mut a);
     let rid: String = sql
@@ -545,16 +516,6 @@ fn nested_review_settles_before_the_parent_review_is_released() {
         ])),
     )
     .unwrap();
-    let accept = |app: &mut App| {
-        let a: String = sql
-            .query_row("SELECT id FROM actions WHERE state='evidence'", [], |r| {
-                r.get(0)
-            })
-            .unwrap();
-        app.invoke("control", json!({"project":p,"op":"accept","action":a}))
-            .unwrap();
-    };
-    accept(&mut app);
     assert_eq!(
         sql.query_row("SELECT count(*) FROM reviews", [], |r| r.get::<_, i64>(0))
             .unwrap(),
@@ -567,7 +528,6 @@ fn nested_review_settles_before_the_parent_review_is_released() {
         envelope(json!([result("report", "Child evidence")])),
     )
     .unwrap();
-    accept(&mut app);
     let review = next(&mut app);
     let (review_id, root): (String, Option<String>) = sql
         .query_row(
@@ -984,7 +944,7 @@ fn a_direct_checked_tool_result_needs_no_followup_model_turn() {
     let receipt = app.invoke("tool_run", local["arguments"].clone()).unwrap();
     app.invoke("tool_done", json!({"job":local["job"],"result":receipt}))
         .unwrap();
-    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
+    assert_eq!(app.invoke("poll", Value::Null).unwrap()["local"], "seal");
     let db = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
     assert_eq!(
         2,
@@ -994,7 +954,7 @@ fn a_direct_checked_tool_result_needs_no_followup_model_turn() {
     assert_eq!(
         1,
         db.query_row(
-            "SELECT count(*) FROM branches WHERE report IS NOT NULL AND accepted IS NULL",
+            "SELECT count(*) FROM branches WHERE report IS NOT NULL AND accepted->>'$.verifier'='relay'",
             [],
             |r| r.get::<_, i64>(0)
         )

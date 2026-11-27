@@ -148,7 +148,7 @@ fn publication_requires_a_reproduced_defect_and_preserves_the_same_receipt() {
 }
 
 #[test]
-fn owner_reproduction_is_approved_and_scoped_to_one_candidate() {
+fn owner_reproduction_runs_directly_and_preserves_exact_candidate_proof() {
     let mut f = Fixture::new();
     let baseline = f.propose(
         "increment",
@@ -211,6 +211,13 @@ fn owner_reproduction_is_approved_and_scoped_to_one_candidate() {
         )
         .is_err()
     );
+    assert!(
+        f.call(
+            "tool_run",
+            json!({"tool":"tool_reproduce_case","arguments":plan})
+        )
+        .is_err()
+    );
     let review = f.call("tool_reproduction_plan", plan).unwrap();
     assert_eq!(review["case"], case);
     assert_eq!(review["scope"]["baseline"], baseline);
@@ -241,14 +248,8 @@ fn owner_reproduction_is_approved_and_scoped_to_one_candidate() {
     negative_case["expected"] = json!({"i64":44});
     let negative = f
         .call(
-            "tool_reproduction_plan",
+            "tool_reproduce_case",
             json!({"candidate":candidate,"case":negative_case}),
-        )
-        .unwrap();
-    let negative = f
-        .call(
-            "tool_reproduce",
-            json!({"review":negative["review"],"digest":negative["digest"]}),
         )
         .unwrap();
     assert_eq!(negative["reproduced"], false);
@@ -284,6 +285,17 @@ fn owner_reproduction_is_approved_and_scoped_to_one_candidate() {
     assert_eq!(f.call("tool_reproduce", approval).unwrap(), proof);
     assert_eq!(verified(), before);
     assert_eq!(count("SELECT count(*) FROM owner_reproduction_evidence"), 1);
+    let direct = f
+        .call(
+            "tool_reproduce_case",
+            json!({"candidate":"other-candidate","case":case}),
+        )
+        .unwrap();
+    assert_eq!(direct["reproduced"], true);
+    assert_eq!(direct["checks"][0]["version"], baseline);
+    assert_eq!(direct["checks"][1]["version"], correction);
+    assert_eq!(count("SELECT count(*) FROM owner_reproduction_evidence"), 2);
+    assert_eq!(verified(), before);
 }
 
 #[test]

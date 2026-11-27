@@ -199,6 +199,9 @@ impl Desktop {
             "dispositions":[{"start":0,"end":prompt.len(),"attachment":null,"disposition":"Answer the question."}]
         });
         self.app.invoke("receive",json!({"job":job["job"],"attempt":job["attempt"],"response":{"message":{"params":{"item":{"text":response.to_string()}}}}})).unwrap();
+        if next == "complete_when" {
+            self.app.invoke("poll", Value::Null).unwrap();
+        }
         self.render(true);
         job["job"].clone()
     }
@@ -206,7 +209,7 @@ impl Desktop {
 
 #[test]
 #[cfg(windows)]
-fn chat_patch_requires_review_and_an_exact_grant_before_changing_files() {
+fn chat_applies_an_exact_patch_and_retains_its_multifile_diff() {
     let mut ui = Desktop::empty();
     let topic = "Correct the README and add a second file.";
     let path = ui.root.join("README.md");
@@ -251,6 +254,8 @@ fn chat_patch_requires_review_and_an_exact_grant_before_changing_files() {
     ui.receive_intake(topic, json!([{"type":"RUN_TOOL","summary":"Prepare the change.","tool":"patch.propose","arguments_json":arguments.to_string()}]), "wait_for");
     let job = ui.app.invoke("poll", Value::Null).unwrap();
     assert_eq!(job["local"], "chat_patch_propose");
+    assert_eq!(fs::read_to_string(&path).unwrap(), "wrong\n");
+    assert!(!new_path.exists());
     let proposed = ui
         .app
         .invoke("chat_patch_propose", job["arguments"].clone())
@@ -259,31 +264,56 @@ fn chat_patch_requires_review_and_an_exact_grant_before_changing_files() {
         .app
         .invoke("chat_patch_propose", job["arguments"].clone())
         .unwrap();
-    assert_eq!(proposed["effect"], replay["effect"]);
-    assert_eq!(proposed["state"], "planned");
+    assert_eq!(proposed, replay);
+    assert_eq!(proposed["state"], "completed");
+    assert_eq!(fs::read_to_string(&path).unwrap(), "correct\n");
+    assert_eq!(fs::read_to_string(&new_path).unwrap(), "Guide\n");
+
+    let Desktop {
+        _temp,
+        root,
+        app,
+        state,
+        view,
+        frame,
+    } = ui;
+    drop(app);
+    let app = App::open(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"),
+        &_temp.path().join("state"),
+    )
+    .unwrap();
+    let mut ui = Desktop {
+        _temp,
+        root,
+        app,
+        state,
+        view,
+        frame,
+    };
+    let resumed = ui.app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(resumed["local"], "chat_patch_propose");
+    assert_eq!(resumed["job"], job["job"]);
+    assert_ne!(resumed["state"], job["state"]);
+    let replay = ui
+        .app
+        .invoke("chat_patch_propose", resumed["arguments"].clone())
+        .unwrap();
+    assert_eq!(replay, proposed);
     ui.app
         .invoke(
             "tool_done",
-            json!({"job":job["job"],"state":job["state"],"result":proposed}),
+            json!({"job":resumed["job"],"state":resumed["state"],"result":replay}),
         )
         .unwrap();
     ui.render(true);
-    assert_eq!(fs::read_to_string(&path).unwrap(), "wrong\n");
-    assert!(!new_path.exists());
-    ui.control("Patch ready for review", "heading");
+    ui.control("Patch applied", "heading");
     assert!(
         ui.controls()
             .iter()
             .all(|c| c["label"] != "Approve and apply patch")
     );
-    assert!(
-        ui.app
-            .invoke(
-                "chat_patch_apply",
-                json!({"project":ui.view["project"],"effect":proposed["effect"],"digest":"wrong"})
-            )
-            .is_err()
-    );
+    ui.type_message("Draft to preserve");
     ui.click("Review patch");
     let preview = ui.control("README.md", "detail");
     assert!(
@@ -299,18 +329,15 @@ fn chat_patch_requires_review_and_an_exact_grant_before_changing_files() {
     let new_file = ui.control("guide.md · New file", "detail");
     assert!(new_file["value"].as_str().unwrap().contains("+Guide"));
     assert!(ui.controls().iter().all(|c| c["label"] != "README.md"));
-    ui.type_message("Draft to preserve");
-    ui.click("Approve and apply patch");
-    ui.control("Patch applied", "heading");
-    assert_eq!(ui.control("Review patch", "button")["expanded"], false);
     assert_eq!(
         ui.control("Message", "multiline")["value"],
         "Draft to preserve"
     );
-    assert_eq!(fs::read_to_string(&path).unwrap(), "correct\n");
-    assert_eq!(fs::read_to_string(&new_path).unwrap(), "Guide\n");
-    let replay = ui.app.invoke("chat_patch_apply", json!({"project":ui.view["project"],"effect":proposed["effect"],"digest":proposed["digest"]})).unwrap();
-    assert_eq!(replay["state"], "completed");
+    assert!(
+        ui.app
+            .invoke("chat_patch_propose", job["arguments"].clone())
+            .is_err()
+    );
 }
 
 #[test]
@@ -966,7 +993,7 @@ fn revision_proposal_keeps_base_wording_and_reports_a_conflict() {
             .as_str()
             .is_some_and(|v| v.contains(source["id"].as_str().unwrap()))
     });
-    ui.click("Accept proposal");
+    ui.click("Use suggested wording");
     assert!(
         ui.state["status"]
             .as_str()
@@ -1004,17 +1031,17 @@ fn dictionary_proposal_review_shows_wording_and_decides_the_selected_proposal() 
     let selected = ui.event(choice, json!({"value":ids[1]}));
     ui.apply(selected);
     ui.find(|c| c["kind"] == "detail" && c["value"] == "Selected wording");
-    let accept = ui.control("Accept proposal", "button");
+    let accept = ui.control("Use suggested wording", "button");
     assert_eq!(accept["event"]["spec"]["fixed"]["proposal"], ids[1]);
-    ui.click("Accept proposal");
+    ui.click("Use suggested wording");
     let remaining = ui.control("Pending proposals", "list");
     assert_eq!(remaining["choices"].as_array().unwrap().len(), 1);
     assert_eq!(remaining["value"], ids[0]);
-    ui.click("Decline proposal");
+    ui.click("Dismiss suggestion");
     assert!(
         !ui.controls()
             .iter()
-            .any(|c| c["label"] == "Accept proposal")
+            .any(|c| c["label"] == "Use suggested wording")
     );
 }
 
@@ -1738,6 +1765,57 @@ fn changes_forms_send_labeled_effect_and_completed_fetch_ids() {
 }
 
 #[test]
+fn tools_forms_dispatch_changes_and_reproduction_directly() {
+    let mut ui = Desktop::open();
+    ui.click("Tools");
+    ui.click("Versions");
+    ui.click("Run reproduction");
+    let run = ui.find(|c| c["event"]["spec"]["op"] == "tool_reproduce_case");
+    let case = json!({"input":2,"expected":4});
+    ui.change(
+        "Deferred candidate ID",
+        "input",
+        json!({"value":"candidate-id"}),
+    );
+    ui.change("Test case", "multiline", json!({"value":case.to_string()}));
+    let event = ui.event(run, json!({}));
+    assert_eq!(event["request"]["op"], "tool_reproduce_case");
+    let input = &event["request"]["input"];
+    assert_eq!(input["candidate"], "candidate-id");
+    assert_eq!(input["case"], case);
+    assert!(input["review"].is_null() && input["digest"].is_null());
+
+    ui.click("Changes");
+    for (label, op, payload) in [
+        (
+            "Run file change",
+            "apply_file_change",
+            json!({"operation":"fs.mkdir","path":"notes"}),
+        ),
+        (
+            "Run Git change",
+            "apply_git_change",
+            json!({"operation":"git.stage","files":[]}),
+        ),
+    ] {
+        ui.click(label);
+        let run = ui.find(|c| c["event"]["spec"]["op"] == op);
+        ui.change(
+            "Typed request",
+            "multiline",
+            json!({"value":payload.to_string()}),
+        );
+        let event = ui.event(run, json!({}));
+        assert_eq!(event["request"]["op"], op);
+        assert_eq!(event["request"]["input"]["operation"], payload["operation"]);
+        assert!(event["request"]["input"]["grant"].is_null());
+        let fold = ui.find(|c| c["label"] == label && c["event"]["action"] == "fold");
+        let event = ui.event(fold, json!({}));
+        ui.apply(event);
+    }
+}
+
+#[test]
 fn tool_search_discloses_truncation_and_lists_extended_contracts() {
     let mut ui = Desktop::open();
     let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
@@ -2090,7 +2168,7 @@ fn changing_composer_skills_updates_the_visible_count_and_keeps_the_message() {
 }
 
 #[test]
-fn long_answer_preview_preserves_the_exact_answer_and_its_accept_action() {
+fn long_answer_publishes_automatically_and_preserves_its_exact_text() {
     let mut ui = Desktop::open();
     let prompt = "Explain the changes.";
     let answer = (1..=50)
@@ -2100,7 +2178,7 @@ fn long_answer_preview_preserves_the_exact_answer_and_its_accept_action() {
     ui.type_message(prompt);
     ui.click("Send");
     ui.receive_intake(prompt, json!([{"type":"RESULT","summary":"Explanation","findings":answer,"result_kind":"final","evidence":[],"outcome":null}]),"complete_when");
-    let preview = ui.control("RelAI · Answer ready for review", "detail");
+    let preview = ui.control("RelAI", "detail");
     assert_eq!(
         preview["value"],
         format!("{}…", answer.lines().take(8).collect::<Vec<_>>().join("\n"))
@@ -2116,22 +2194,16 @@ fn long_answer_preview_preserves_the_exact_answer_and_its_accept_action() {
             .iter()
             .any(|c| c["role"] == "incoming" && c["value"] == answer)
     );
-    ui.control("Request changes", "button");
     ui.click("Show less");
-    ui.click("Accept answer");
-    assert!(
-        ui.controls()
-            .iter()
-            .any(|c| c["label"] == "RelAI · Accepted answer")
-    );
+    assert!(ui.controls().iter().all(|c| c["label"] != "Accept answer"));
+    assert!(ui.event(ui.control("Send", "button"), json!({}))["request"].is_null());
 }
 
 #[test]
-fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
+fn following_up_on_a_completed_answer_keeps_the_exchange_and_draft() {
     let mut ui = Desktop::open();
     let question = "Which command?";
     let change = "Include the port.";
-    let project = ui.view["project"].clone();
     let reply = |ui: &mut Desktop, prompt: &str, answer: &str| {
         ui.receive_intake(prompt,json!([{"type":"RESULT","summary":"Preview command.","findings":answer,"result_kind":"final","evidence":[],"outcome":null}]),"complete_when")
     };
@@ -2140,30 +2212,29 @@ fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
     ui.type_message("Unrelated draft");
     reply(&mut ui, question, "Use garden preview.");
     let untargeted = ui.event(ui.control("Send", "button"), json!({}));
-    assert!(untargeted["request"]["input"]["steer"].is_null());
-    let revise = ui.control("Request changes", "button");
-    assert_eq!(revise["row"], ui.control("Accept answer", "button")["row"]);
-    let selected = ui.event(revise.clone(), json!({}));
+    assert!(untargeted["request"]["input"]["follow"].is_null());
+    let follow = ui.control("Follow up", "button");
+    let original = follow["event"]["patch"]["follow"].clone();
+    let selected = ui.event(follow, json!({}));
     assert_eq!(selected["focus"], ui.control("Message", "multiline")["id"]);
     ui.apply(selected);
     assert_eq!(
         ui.control("Message", "multiline")["value"],
         "Unrelated draft"
     );
+    ui.control("Following up on “Which command?”", "label");
     assert_eq!(
         ui.control("Message", "multiline")["placeholder"],
-        "Describe the change…"
+        "Ask a follow-up…"
     );
     ui.click("New topic");
     let fresh = ui.event(ui.control("Send", "button"), json!({}));
-    assert!(fresh["request"]["input"]["revise"].is_null());
-    assert!(fresh["request"]["input"]["steer"].is_null());
-    ui.click("Request changes");
+    assert!(fresh["request"]["input"]["follow"].is_null());
+    ui.click("Follow up");
     ui.type_message(change);
     let send = ui.event(ui.control("Send", "button"), json!({}));
     let submitted = send["request"]["input"].clone();
-    let original = revise["event"]["patch"]["revise"].clone();
-    assert_eq!(submitted["revise"], original);
+    assert_eq!(submitted["follow"], original);
     assert_eq!(submitted["text"], change);
     let other = ui.root.with_file_name("other");
     fs::create_dir(&other).unwrap();
@@ -2175,10 +2246,7 @@ fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
         .clone();
     assert!(ui.app.invoke("submit", foreign).is_err());
     ui.apply(send);
-    assert!(ui.app.invoke("submit", submitted.clone()).is_ok());
-    let mut late = submitted;
-    late["key"] = json!("late-change");
-    assert!(ui.app.invoke("submit", late).is_err());
+    assert!(ui.app.invoke("submit", submitted).is_ok());
 
     let job = reply(&mut ui, change, "Use garden preview on port 4317.");
     let path = ui
@@ -2192,45 +2260,13 @@ fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
         sealed["delivery"]["previous_exchange"],
         json!({"user_message":question,"answer":"Use garden preview.","answer_id":original})
     );
-    ui.control("RelAI · Earlier answer", "detail");
-    let stale = ui.event(revise, json!({}));
-    ui.apply(stale);
-    ui.type_message("Keep me");
-    assert_eq!(ui.control("Send", "button")["enabled"], false);
-    assert!(
-        ui.app
-            .invoke(
-                "control",
-                json!({"project":project,"op":"accept","action":original})
-            )
-            .is_err()
-    );
-    ui.click("Request changes");
     ui.type_message("Does it reload?");
-    let accepted =
-        ui.control("Accept answer", "button")["event"]["spec"]["fixed"]["action"].clone();
-    let command = ui.event(ui.control("Accept answer", "button"), json!({}));
-    let request = &command["request"];
-    let result = ui.invoke("control", request["input"].clone());
-    let reply = ui.invoke(
-        "desktop_result",
-        json!({"state":command["state"],"after":request["after"],"result":result}),
-    );
-    assert_eq!(reply["focus"], ui.control("Message", "multiline")["id"]);
-    ui.apply(reply);
-    ui.control("RelAI · Accepted answer", "detail");
-    ui.control("Following up on “Which command?”", "label");
-    assert_eq!(
-        ui.control("Message", "multiline")["value"],
-        "Does it reload?"
-    );
-    assert_eq!(
-        ui.control("Message", "multiline")["placeholder"],
-        "Ask a follow-up…"
-    );
     let next = ui.event(ui.control("Send", "button"), json!({}));
-    assert_eq!(next["request"]["input"]["follow"], accepted);
-    assert!(next["request"]["input"]["revise"].is_null());
+    let destination = &next["request"]["input"];
+    assert!(destination["follow"].is_string());
+    assert_ne!(destination["follow"], original);
+    assert!(destination["revise"].is_null());
+    assert_eq!(destination["text"], "Does it reload?");
 }
 
 #[test]
@@ -2267,13 +2303,12 @@ fn a_newer_answer_keeps_the_draft_and_older_questions_can_be_reached_from_any_pa
         ui.receive_intake("Check the build.",json!([{"type":"RESULT","summary":"Build checked.","findings":"The build passes.","result_kind":"final","outcome":null,"evidence":[]}]),"complete_when");
         ui.control("Earlier messages", "button");
         assert!(!ui.controls().iter().any(|c| c["value"] == "Which colour?"));
-        let answer =
-            ui.control("Accept answer", "button")["event"]["spec"]["fixed"]["action"].clone();
         ui.type_message("Keep this draft.");
         let send_target = |ui: &mut Desktop| {
             ui.event(ui.control("Send", "button"), json!({}))["request"]["input"].clone()
         };
-        assert_eq!(send_target(&mut ui)["revise"], answer);
+        let answer = send_target(&mut ui)["follow"].clone();
+        assert!(answer.is_string());
         ui.click("Other questions");
         let picker = ui.control("Question to answer", "select");
         assert_eq!(picker["choices"].as_array().unwrap().len(), count + 1);
@@ -2284,8 +2319,6 @@ fn a_newer_answer_keeps_the_draft_and_older_questions_can_be_reached_from_any_pa
             .find(|c| c["label"] == "Which colour?")
             .unwrap()["value"]
             .clone();
-        assert_eq!(send_target(&mut ui)["revise"], answer);
-        ui.click("Accept answer");
         assert_eq!(send_target(&mut ui)["follow"], answer);
         if !ui
             .controls()

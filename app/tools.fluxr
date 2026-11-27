@@ -637,7 +637,7 @@ fn tool_markdown_input 2 pid uint arguments uint uint do 15 sid uint snapshotval
 
 pub tool_run 1 arg uint uint do 2 name uint discard uint 4
   set name call key 2 arg call str 1 utf8 "tool"
-  set discard call require 2 not call reproduction_owner_operation 1 name call str 1 utf8 "Use the owner review forms for reproduction"
+  set discard call require 2 not call reproduction_owner_operation 1 name call str 1 utf8 "Run candidate reproduction from the Tools workspace"
   if call same 2 call key 2 arg call str 1 utf8 "version" 0u 6
     if call worktree_known 1 name 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"worktree_run\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0
     if call has_ref 2 call resource 1 call str 1 utf8 "remote-tools.json" name 1 ret call shape 2 call str 1 utf8 "{\"$call\":\"remote_run\",\"input\":\"$0\"}" call append 2 call arr 0 arg 0

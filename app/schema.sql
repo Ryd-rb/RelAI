@@ -109,6 +109,7 @@ CREATE TABLE IF NOT EXISTS managed_worktrees(id TEXT PRIMARY KEY,project TEXT NO
 CREATE TABLE IF NOT EXISTS worktree_grants(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects(id),worktree TEXT NOT NULL REFERENCES managed_worktrees(id),digest TEXT NOT NULL,state TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS git_mutations(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,operation TEXT NOT NULL,request TEXT NOT NULL,digest TEXT NOT NULL,state TEXT NOT NULL,grant_id TEXT,result TEXT,error TEXT);
 CREATE TABLE IF NOT EXISTS git_grants(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,mutation TEXT NOT NULL REFERENCES git_mutations,digest TEXT NOT NULL,state TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS chat_git_mutations(mutation TEXT PRIMARY KEY REFERENCES git_mutations(id),job TEXT NOT NULL UNIQUE REFERENCES jobs(id),request TEXT NOT NULL REFERENCES requests(id),revision INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS graph_symbols(snapshot TEXT NOT NULL,path TEXT NOT NULL,digest TEXT NOT NULL,language TEXT NOT NULL,role TEXT NOT NULL,kind TEXT,name TEXT,start INTEGER,end INTEGER);
 CREATE INDEX IF NOT EXISTS graph_symbol_lookup ON graph_symbols(snapshot,language,role,name);
 CREATE TABLE IF NOT EXISTS graph_indexes(snapshot TEXT PRIMARY KEY,indexed INTEGER NOT NULL,total INTEGER NOT NULL);
@@ -144,3 +145,35 @@ SELECT r.project, r.id AS request, r.intent AS user_message,
   JOIN actions a ON a.job=j.id
  WHERE r.state='open' AND a.kind='RESULT' AND a.state='awaiting_acceptance'
    AND a.payload->>'$.result_kind'='final';
+
+
+CREATE VIEW IF NOT EXISTS ready_branch_reports AS
+SELECT b.id,b.request,b.revision,b.report
+FROM branches b JOIN requests r ON r.id=b.request AND r.revision=b.revision AND r.state='open'
+WHERE b.accepted IS NULL AND b.report IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM actions a JOIN jobs j ON j.id=a.job
+    WHERE a.id=b.report AND a.kind='RESULT' AND a.state='evidence'
+      AND j.request=b.request AND j.revision=b.revision AND j.session=b.id
+      AND j.state='accepted')
+  AND NOT EXISTS (
+    SELECT 1 FROM jobs j WHERE j.request=b.request AND j.revision=b.revision AND j.session=b.id
+      AND j.state NOT IN ('accepted','superseded','cancelled'))
+  AND NOT EXISTS (
+    SELECT 1 FROM questions q WHERE q.request=b.request AND q.revision=b.revision
+      AND q.session=b.id AND q.state!='answered')
+  AND NOT EXISTS (
+    SELECT 1 FROM actions a JOIN jobs j ON j.id=a.job WHERE j.request=b.request
+      AND j.revision=b.revision AND j.session=b.id AND a.state='held')
+  AND NOT EXISTS (
+    SELECT 1 FROM branch_descendants d JOIN branches child ON child.id=d.child
+    WHERE d.ancestor=b.id AND child.request=b.request AND child.revision=b.revision
+      AND (child.accepted IS NULL OR NOT EXISTS (
+        SELECT 1 FROM reviews rv JOIN jobs j ON j.id=rv.job
+        WHERE rv.fan=child.fan AND rv.revision=b.revision AND j.state='accepted')));
+
+CREATE VIEW IF NOT EXISTS request_blockers AS
+SELECT request,revision FROM jobs WHERE state NOT IN ('accepted','superseded','cancelled')
+UNION ALL SELECT request,revision FROM branches WHERE accepted IS NULL
+UNION ALL SELECT request,revision FROM questions WHERE state!='answered'
+UNION ALL SELECT j.request,j.revision FROM actions a JOIN jobs j ON j.id=a.job WHERE a.state='held';

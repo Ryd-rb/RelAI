@@ -330,7 +330,7 @@ fn a_received_response_stays_distinct_from_an_interrupted_provider_call_after_re
 }
 
 #[test]
-fn chat_prioritizes_actionable_questions_and_approval_and_scopes_progress() {
+fn chat_prioritizes_actionable_questions_and_finalization_and_scopes_progress() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("project");
     let other = temp.path().join("other");
@@ -354,7 +354,10 @@ fn chat_prioritizes_actionable_questions_and_approval_and_scopes_progress() {
     sql.execute("UPDATE questions SET state='answered'", [])
         .unwrap();
     sql.execute("INSERT INTO actions(id,job,kind,payload,state) SELECT 'answer',id,'RESULT','{}','awaiting_acceptance' FROM jobs", []).unwrap();
-    assert_eq!(status(&mut app, &project), None);
+    assert_eq!(
+        status(&mut app, &project).as_deref(),
+        Some("Finalizing the answer…")
+    );
     sql.execute("UPDATE actions SET state='accepted'", [])
         .unwrap();
     sql.execute("UPDATE jobs SET state='accepted'", []).unwrap();

@@ -47,7 +47,7 @@ fn record_action 4 j uint aid uint a uint state uint uint do 3 path uint name ui
   ret path
 
 fn clear_work 2 r uint rev uint bool do 0  1
-  ret call same 2 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT NOT EXISTS(SELECT 1 FROM jobs WHERE request=?1 AND revision=?2 AND state NOT IN ('accepted','superseded','cancelled')) AND NOT EXISTS(SELECT 1 FROM branches WHERE request=?1 AND revision=?2 AND accepted IS NULL) AND NOT EXISTS(SELECT 1 FROM questions WHERE request=?1 AND revision=?2 AND state!='answered') AND NOT EXISTS(SELECT 1 FROM actions a JOIN jobs j ON j.id=a.job WHERE j.request=?1 AND j.revision=?2 AND a.state='held') AS ok" call append 2 call append 2 call arr 0 r rev 0 call str 1 utf8 "ok" call integer 1 1
+  ret call same 2 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT NOT EXISTS(SELECT 1 FROM request_blockers WHERE request=?1 AND revision=?2) AS ok" call append 2 call append 2 call arr 0 r rev 0 call str 1 utf8 "ok" call integer 1 1
 
 fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint kind uint s uint rev uint payloadval uint discard uint parent uint q uint destination uint task uint body uint path uint n uint 14
   set p call key 2 j call str 1 utf8 "project"
@@ -133,7 +133,7 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
     set discard call job 6 p r destination role call str 1 utf8 "message" body
     ret 0u
   0
-  if call same 2 kind call str 1 utf8 "RESULT" 9
+  if call same 2 kind call str 1 utf8 "RESULT" 8
     if call same 2 role call str 1 utf8 "workflow_improver" 3
     if and call same 2 call key 2 a call str 1 utf8 "outcome" call str 1 utf8 "published" not call published_refs 3 p r call key 2 a call str 1 utf8 "evidence" 1
     ret call str 1 utf8 "Missing verified improvement receipts."
@@ -141,20 +141,19 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
     set discard call record_action 4 j aid a call str 1 utf8 "reported"
     ret 0u
   0
-    if call same 2 call key 2 a call str 1 utf8 "result_kind" call str 1 utf8 "report" 3
+    if call same 2 call key 2 a call str 1 utf8 "result_kind" call str 1 utf8 "report" 4
+    if call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 FROM branches WHERE id=? AND request=? AND revision=?" @build append 1 3 call arr 0 s r rev 0 0u 1
+      ret call str 1 utf8 "A report belongs to an assigned branch."
+    0
     set discard call record_action 4 j aid a call str 1 utf8 "evidence"
     set discard call query 2 call str 1 utf8 "UPDATE branches SET report=?,accepted=NULL WHERE id=? AND request=? AND revision=?" call append 2 call append 2 call append 2 call append 2 call arr 0 aid s r rev
     ret 0u
   0
     if not call clear_work 2 r rev 1
-    ret call str 1 utf8 "Outstanding work or acceptance receipts."
+    ret call str 1 utf8 "Outstanding work needs to finish first."
   0
     set n call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM branches WHERE request=? AND revision=?" call append 2 call append 2 call arr 0 r rev 0 call str 1 utf8 "n"
-    if call same 2 n call integer 1 0 2
-    set discard call record_action 4 j aid a call str 1 utf8 "awaiting_acceptance"
-    ret 0u
-  0
-    if not and call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" call same 2 call key 2 payloadval call str 1 utf8 "parent" 0u 1
+    if and not call same 2 n call integer 1 0 not and call same 2 call key 2 j call str 1 utf8 "kind" call str 1 utf8 "review" call same 2 call key 2 payloadval call str 1 utf8 "parent" 0u 1
     ret call str 1 utf8 "A first-level review is required."
   0
     set path call record_action 4 j aid a call str 1 utf8 "closing"
@@ -163,11 +162,27 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
   0
   ret call schedule_tool 3 j aid a
 
-fn review_ready 1 r uint uint do 11 info uint fans uint fan uint branches uint sig uint prior uint rid uint body uint jobid uint discard uint i int 6
+fn advance_previous_requests 0 uint do 3 row uint aid uint discard uint 4
+  set row call nth 2 call query 2 call str 1 @text r#"
+    SELECT r.id AS request,r.project,r.revision,p.answer_id,a.payload AS "result:json"
+    FROM pending_chat_answers p JOIN requests r ON r.id=p.request JOIN actions a ON a.id=p.answer_id
+    JOIN files d ON d.path='actions/'||a.id||'/RESULT-'||a.id||'.json'
+    WHERE NOT EXISTS(SELECT 1 FROM request_blockers b WHERE b.request=r.id AND b.revision=r.revision)
+    ORDER BY a.rowid LIMIT 1
+  "# call arr 0 0
+  if not call same 2 row 0u 2
+    set aid call key 2 row call str 1 utf8 "answer_id"
+    ret call close_request 4 row aid call cat 2 call cat 2 call cat 2 call cat 2 call str 1 utf8 "actions/" aid call str 1 utf8 "/RESULT-" aid call str 1 utf8 ".json" call key 2 row call str 1 utf8 "result"
+  0
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT request FROM ready_branch_reports LIMIT 1" call arr 0 0
+  ret call review_ready 1 call key 2 row call str 1 utf8 "request"
+
+fn review_ready 1 r uint uint do 11 info uint fans uint fan uint branches uint sig uint prior uint rid uint body uint jobid uint discard uint i int 7
   set info call nth 2 call query 2 call str 1 utf8 "SELECT r.project,r.revision,r.intent,p.discriminator FROM requests r JOIN projects p ON p.id=r.project WHERE r.id=? AND r.state='open'" call append 2 call arr 0 r 0
   if call same 2 info 0u 1
     ret 0u
   0
+  set discard call query 2 call asset 1 call str 1 utf8 "settled_reports.sql" @build append 1 2 call arr 0 r call key 2 info call str 1 utf8 "revision"
   set fans call query 2 call str 1 utf8 "SELECT b.fan,b.parent FROM branch_outcomes b WHERE b.request=? AND b.revision=? GROUP BY b.fan,b.parent HAVING max(b.busy)=0 AND min(b.accepted IS NOT NULL OR b.questions!='[]' OR b.waits!='[]' OR b.holds!='[]')=1 ORDER BY max((SELECT rowid FROM branches x WHERE x.id=b.id)) DESC" call append 2 call append 2 call arr 0 r call key 2 info call str 1 utf8 "revision"
   set i 0
   while lt i call size 1 fans 6

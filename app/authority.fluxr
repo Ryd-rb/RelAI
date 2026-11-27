@@ -1,17 +1,20 @@
 fluxr 1
 
+fn chat_git_tool 1 name uint bool do 0 1
+  ret or call same 2 name call str 1 utf8 "git.stage" or call same 2 name call str 1 utf8 "git.commit" call same 2 name call str 1 utf8 "git.branch"
+
 fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 21
   if call reproduction_owner_operation 1 name 1
-    ret call str 1 utf8 "Reproduction review and approval require the owner surface."
+    ret call str 1 utf8 "Candidate reproduction runs from the Tools workspace."
   0
   set role call key 2 j call str 1 utf8 "role"
   set body call key 2 j call str 1 utf8 "body"
   if not call selected_source_ok 2 call key 2 j call str 1 utf8 "id" arguments 1 ret call str 1 utf8 "Select this live host file for the addressed request and session, or attach it." 0
-  if and call same 2 name call str 1 utf8 "patch.propose" not call same 2 role call str 1 utf8 "discriminator" 1
-    ret call str 1 utf8 "Only the foreground chat can propose a reviewed patch."
+  if and or call same 2 name call str 1 utf8 "patch.propose" call chat_git_tool 1 name not call same 2 role call str 1 utf8 "discriminator" 1
+    ret call str 1 utf8 "Only the foreground chat can edit the checkout."
   0
   if and call same 2 name call str 1 utf8 "effect.apply" not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 FROM chat_patch_reviews WHERE effect=?" call append 2 call arr 0 call key 2 arguments call str 1 utf8 "effect" 0 0u 1
-    ret call str 1 utf8 "Approve and apply this patch in the desktop chat."
+    ret call str 1 utf8 "Chat patches run automatically through their current request."
   0
   if and call same 2 role call str 1 utf8 "workflow_improver" not call has_ref 2 call resource 1 call str 1 utf8 "improver-tools.json" name 1
     ret call str 1 utf8 "Improvement scope excludes this operation."

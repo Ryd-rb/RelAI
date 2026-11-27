@@ -1,7 +1,11 @@
 fluxr 1
 
 fn reproduction_owner_operation 1 name uint bool do 0 1
-  ret or call same 2 name call str 1 utf8 "tool_reproduction_plan" call same 2 name call str 1 utf8 "tool_reproduce"
+  ret or call same 2 name call str 1 utf8 "tool_reproduce_case" or call same 2 name call str 1 utf8 "tool_reproduction_plan" call same 2 name call str 1 utf8 "tool_reproduce"
+
+pub tool_reproduce_case 1 arg uint uint do 1 review uint 2
+  set review call tool_reproduction_plan 1 arg
+  ret call tool_reproduce 1 call shape 2 call str 1 @text r#"{"project":"$0","review":"$1","digest":"$2"}"# @build append 1 3 call arr 0 call key 2 review call str 1 utf8 "project" call key 2 review call str 1 utf8 "review" call key 2 review call str 1 utf8 "digest"
 
 fn reproduction_scope 2 pid uint cid uint uint do 4 pair uint baseline uint correction uint discard uint 8
   set pair call nth 2 call query 2 call str 1 @text r#"SELECT v.baseline,v.version,c.operation FROM candidate_versions v JOIN candidates c ON c.id=v.candidate WHERE c.project=? AND c.id=? AND c.state='deferred'"# @build append 1 2 call arr 0 pid cid 0

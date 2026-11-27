@@ -163,29 +163,19 @@
     },
     {
       "type": "fold",
-      "label": "Reproduce a candidate defect",
+      "label": "Run reproduction",
       "foldKey": "tool-versions-reproduce",
       "pane": "Versions",
       "section": "tool-versions",
       "items": [
         {
           "type": "form",
-          "label": "Prepare case for review",
-          "op": "tool_reproduction_plan",
-          "text": "Prepare a bounded case with arguments, empty inputs and an expected value. Review the full returned case and both version IDs before approving.",
+          "label": "Run reproduction",
+          "op": "tool_reproduce_case",
+          "text": "Run one bounded case against the exact baseline and correction versions. RelAI records the case, version digests and both results automatically.",
           "fields": [
             {"name": "candidate", "label": "Deferred candidate ID", "type": "text", "required": true},
             {"name": "case", "label": "Test case", "type": "json", "required": true}
-          ],
-          "showResult": true
-        },
-        {
-          "type": "form",
-          "label": "Approve and run reviewed case",
-          "op": "tool_reproduce",
-          "fields": [
-            {"name": "review", "label": "Review ID", "type": "text", "required": true},
-            {"name": "digest", "label": "Reviewed digest", "type": "text", "required": true}
           ],
           "showResult": true
         }
@@ -299,84 +289,24 @@
         },
         {
           "type": "fold",
-          "label": "Authorize file change",
-          "foldKey": "files-3",
+          "label": "Run file change",
+          "foldKey": "files-run",
           "pane": "Changes",
           "section": "files",
           "items": [
             {
               "type": "form",
-              "label": "Authorize file change",
-              "op": "effect_authorize",
+              "label": "Run file change",
+              "op": "apply_file_change",
               "fields": [
                 {
-                  "name": "effect",
-                  "label": "Effect ID",
-                  "type": "text"
-                },
-                {
-                  "name": "digest",
-                  "label": "Reviewed proposal digest",
-                  "type": "text"
-                },
-                {
-                  "name": "destructive",
-                  "label": "Authorize destructive scope",
-                  "type": "boolean"
+                  "name": "payload",
+                  "label": "Typed request",
+                  "type": "json",
+                  "required": true
                 }
               ],
-              "fixed": {},
-              "showResult": true
-            }
-          ]
-        },
-        {
-          "type": "fold",
-          "label": "Apply authorized change",
-          "foldKey": "files-4",
-          "pane": "Changes",
-          "section": "files",
-          "items": [
-            {
-              "type": "form",
-              "label": "Apply authorized change",
-              "op": "effect_apply",
-              "fields": [
-                {
-                  "name": "effect",
-                  "label": "Effect ID",
-                  "type": "text"
-                },
-                {
-                  "name": "grant",
-                  "label": "Grant ID",
-                  "type": "text"
-                }
-              ],
-              "fixed": {},
-              "showResult": true
-            }
-          ]
-        },
-        {
-          "type": "fold",
-          "label": "Revoke unused grant",
-          "foldKey": "files-5",
-          "pane": "Changes",
-          "section": "files",
-          "items": [
-            {
-              "type": "form",
-              "label": "Revoke unused grant",
-              "op": "effect_revoke",
-              "fields": [
-                {
-                  "name": "grant",
-                  "label": "Grant ID",
-                  "type": "text"
-                }
-              ],
-              "fixed": {},
+              "jsonPayload": "payload",
               "showResult": true
             }
           ]
@@ -398,25 +328,27 @@
         },
         {
           "type": "fold",
-          "label": "Propose Git change",
+          "label": "Run Git change",
           "foldKey": "git-1",
           "pane": "Changes",
           "section": "git",
           "items": [
             {
               "type": "form",
-              "label": "Propose Git change",
-              "op": "git_propose",
+              "label": "Run Git change",
+              "op": "apply_git_change",
               "fields": [
                 {
                   "name": "payload",
                   "label": "Typed request",
-                  "type": "json"
+                  "type": "json",
+                  "required": true
                 }
               ],
               "fixed": {},
               "showResult": true,
-              "jsonPayload": "payload"
+              "jsonPayload": "payload",
+              "text": "Run an exact git.stage, git.commit or git.branch request. Include the expected HEAD and index for staging or committing, or the expected branch tip for creation or deletion."
             }
           ]
         },
@@ -446,71 +378,14 @@
         },
         {
           "type": "fold",
-          "label": "Authorize Git change",
-          "foldKey": "git-3",
-          "pane": "Changes",
-          "section": "git",
-          "items": [
-            {
-              "type": "form",
-              "label": "Authorize Git change",
-              "op": "git_authorize",
-              "fields": [
-                {
-                  "name": "mutation",
-                  "label": "Mutation ID",
-                  "type": "text"
-                },
-                {
-                  "name": "digest",
-                  "label": "Reviewed proposal digest",
-                  "type": "text"
-                },
-                {
-                  "name": "destructive",
-                  "label": "Authorize destructive scope",
-                  "type": "boolean"
-                }
-              ],
-              "fixed": {},
-              "showResult": true
-            }
-          ]
-        },
-        {
-          "type": "fold",
-          "label": "Apply Git change",
-          "foldKey": "git-4",
-          "pane": "Changes",
-          "section": "git",
-          "items": [
-            {
-              "type": "form",
-              "label": "Apply Git change",
-              "op": "git_apply",
-              "fields": [
-                {
-                  "name": "payload",
-                  "label": "Typed request",
-                  "type": "json"
-                }
-              ],
-              "fixed": {},
-              "showResult": true,
-              "jsonPayload": "payload"
-            }
-          ]
-        },
-        {
-          "type": "fold",
-          "label": "Manage remote branch grants",
+          "label": "Manage remote branches",
           "foldKey": "git-5",
           "pane": "Changes",
           "section": "git",
           "items": [
             {
               "type": "form",
-              "label": "Manage remote branch grants",
+              "label": "Manage remote branches",
               "op": "remote",
               "fields": [
                 {
@@ -545,7 +420,9 @@
                   "required": true
                 }
               ],
-              "fixed": {"op": "retire_fetch"},
+              "fixed": {
+                "op": "retire_fetch"
+              },
               "showResult": true
             }
           ]
@@ -566,7 +443,9 @@
                 {"name": "transfer", "label": "Completed fetch transfer ID", "type": "text", "required": true},
                 {"name": "path", "label": "Package directory in the fetched tree", "type": "text"}
               ],
-              "fixed": {"op": "install_git"},
+              "fixed": {
+                "op": "install_git"
+              },
               "showResult": true
             }
           ]

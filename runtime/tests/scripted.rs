@@ -199,6 +199,9 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
         reply(&mut app, &worker, &response).unwrap();
         assert_eq!(details(&mut app, &project, &worker)["state"], "accepted");
         reports.push(evidence_action(&mut app, &project, findings));
+        if reports.len() == 1 {
+            assert_eq!(count(&db, "SELECT count(*) FROM reviews"), 0);
+        }
     }
     assert_ne!(reports[0], reports[1]);
     assert_eq!(
@@ -213,33 +216,16 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
             &db,
             "SELECT count(*) FROM branches WHERE accepted IS NOT NULL"
         ),
-        0,
-        "Worker claims cannot accept themselves"
+        2,
+        "Each branch retains its scoped report for independent review"
     );
-    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
-    assert_eq!(count(&db, "SELECT count(*) FROM reviews"), 0);
-    app.invoke(
-        "control",
-        json!({"project":project,"op":"accept","action":reports[0]}),
-    )
-    .unwrap();
-    assert!(
-        app.invoke("poll", Value::Null).unwrap().is_null(),
-        "One sibling receipt cannot release the fan-out review"
-    );
+    assert_eq!(count(&db, "SELECT count(*) FROM reviews"), 1);
     drop(app);
     let mut app = App::open(&bundle(), &data).unwrap();
     assert_eq!(
         app.invoke("open_project", json!({"root":root})).unwrap(),
         opened
     );
-    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
-    app.invoke(
-        "control",
-        json!({"project":project,"op":"accept","action":reports[1]}),
-    )
-    .unwrap();
-
     let review = next_model(&mut app);
     let review_details = details(&mut app, &project, &review);
     let input = frame(&data, &review);
@@ -248,7 +234,7 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
     assert_eq!(review_details["session"], discriminator);
     assert_eq!(branches.len(), 2);
     for branch in branches {
-        assert_eq!(branch["acceptance"]["verifier"], "user");
+        assert_eq!(branch["acceptance"]["verifier"], "relay");
         assert_eq!(branch["acceptance"]["evidence"], branch["report"]);
         assert_eq!(branch["acceptance"]["revision"], review_details["revision"]);
     }

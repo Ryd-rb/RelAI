@@ -1,45 +1,45 @@
 fluxr 1
 
-pub chat_patch_propose 1 arg uint uint do 7 jobval uint prior uint pid uint prepared uint effectval uint files uint discard uint 11
+fn current_chat_effect 2 pid uint eid uint bool do 0 1
+  ret call same 2 call key 2 call nth 2 call query 2 call str 1 @text r#"
+    SELECT NOT EXISTS(SELECT 1 FROM chat_patch_reviews WHERE effect=?1) OR EXISTS(
+      SELECT 1
+      FROM chat_patch_reviews c JOIN file_effects e ON e.id=c.effect
+      JOIN projects p ON p.id=e.project
+      JOIN requests r ON r.id=c.request AND r.project=e.project
+      JOIN jobs j ON j.id=c.job AND j.project=e.project AND j.request=r.id
+      WHERE e.id=?1 AND e.project=?2 AND r.state='open'
+        AND r.revision=c.revision AND j.revision=c.revision
+        AND j.role='discriminator' AND p.discriminator=j.session
+        AND j.state NOT IN ('cancelled','superseded')) AS allowed
+  "# @build append 1 2 call arr 0 eid pid 0 call str 1 utf8 "allowed" call integer 1 1
+
+pub chat_patch_propose 1 arg uint uint do 9 jobval uint prior uint pid uint prepared uint effectval uint files uint discard uint eid uint grantval uint 13
   set jobval call nth 2 call query 2 call str 1 @text r#"
     SELECT j.id,j.project,j.request,j.revision,p.root,j.input->'$.arguments.arguments.files' AS "files:json"
-    FROM jobs j JOIN projects p ON p.id=j.project
+    FROM jobs j JOIN projects p ON p.id=j.project AND p.discriminator=j.session
     JOIN requests r ON r.id=j.request AND r.project=j.project AND r.revision=j.revision AND r.state='open'
     WHERE j.id=? AND j.state='executing' AND j.kind='tool' AND j.role='discriminator'
         AND j.input->>'$.arguments.tool'='patch.propose'
+        AND EXISTS(SELECT 1 FROM submissions s WHERE s.project=j.project AND s.request=j.request)
   "# call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
   set discard call require 2 not call same 2 jobval 0u call str 1 utf8 "The addressed chat patch job is no longer current"
   set prior call nth 2 call query 2 call str 1 @text r#"
-    SELECT e.id AS effect,e.digest,e.state,json_array_length(c.files) AS file_count
+    SELECT e.id AS effect,e.digest,e.state,e.result AS "receipt:json",json_array_length(c.files) AS file_count
     FROM chat_patch_reviews c JOIN file_effects e ON e.id=c.effect WHERE c.job=?
   "# call append 2 call arr 0 call key 2 jobval call str 1 utf8 "id" 0
   if not call same 2 prior 0u 1
-    ret prior
+    ret call ui_default 2 call key 2 prior call str 1 utf8 "receipt" prior
   0
   set prepared call prepare_chat_patch 2 call key 2 jobval call str 1 utf8 "root" call key 2 jobval call str 1 utf8 "files"
   set pid call key 2 jobval call str 1 utf8 "project"
   set files call key 2 prepared call str 1 utf8 "files"
   set effectval call effect_record 3 pid call str 1 utf8 "patch.apply" call key 2 prepared call str 1 utf8 "request"
-  set discard call query 2 call str 1 utf8 "INSERT INTO chat_patch_reviews(effect,job,request,revision,files) VALUES(?,?,?,?,?)" @build append 1 5 call arr 0 call key 2 effectval call str 1 utf8 "effect" call key 2 jobval call str 1 utf8 "id" call key 2 jobval call str 1 utf8 "request" call key 2 jobval call str 1 utf8 "revision" call encode 1 files
-  set discard call audit 3 pid call str 1 utf8 "Patch proposed" call shape 2 call str 1 @text r#"{"request":"$0","effect":"$1","summary":"Patch available for review"}"# @build append 1 2 call arr 0 call key 2 jobval call str 1 utf8 "request" call key 2 effectval call str 1 utf8 "effect"
-  ret call shape 2 call str 1 @text r#"{"effect":"$0","digest":"$1","state":"planned","requires_user_grant":true,"file_count":"$2"}"# @build append 1 3 call arr 0 call key 2 effectval call str 1 utf8 "effect" call key 2 effectval call str 1 utf8 "digest" call integer 1 call size 1 files
-
-pub chat_patch_apply 1 arg uint uint do 5 pid uint eid uint patchval uint auth uint discard uint 8
-  set pid call key 2 call project 1 arg call str 1 utf8 "id"
-  set eid call key 2 arg call str 1 utf8 "effect"
-  set patchval call nth 2 call query 2 call str 1 @text r#"
-    SELECT e.state,e.result AS "receipt:json",c.revision=r.revision AND r.state IN ('open','completed') AS current
-    FROM chat_patch_reviews c JOIN file_effects e ON e.id=c.effect
-    JOIN requests r ON r.id=c.request AND r.project=e.project
-    WHERE e.id=? AND e.project=? AND e.digest=?
-  "# @build append 1 3 call arr 0 eid pid call key 2 arg call str 1 utf8 "digest" 0
-  set discard call require 2 not call same 2 patchval 0u call str 1 utf8 "Review the exact patch for this project before approving it"
-  if call same 2 call key 2 patchval call str 1 utf8 "state" call str 1 utf8 "completed" 1
-    ret call key 2 patchval call str 1 utf8 "receipt"
-  0
-  set discard call require 2 call same 2 call key 2 patchval call str 1 utf8 "current" call integer 1 1 call str 1 utf8 "The request changed or stopped. Ask RelAI for a fresh patch."
-  set auth call effect_authorize 1 call put 3 call put 3 arg call str 1 utf8 "project" pid call str 1 utf8 "destructive" call decode 1 call str 1 utf8 "true"
-  ret call effect_apply 1 call put 3 auth call str 1 utf8 "project" pid
+  set eid call key 2 effectval call str 1 utf8 "effect"
+  set discard call query 2 call str 1 utf8 "INSERT INTO chat_patch_reviews(effect,job,request,revision,files) VALUES(?,?,?,?,?)" @build append 1 5 call arr 0 eid call key 2 jobval call str 1 utf8 "id" call key 2 jobval call str 1 utf8 "request" call key 2 jobval call str 1 utf8 "revision" call encode 1 files
+  set discard call audit 3 pid call str 1 utf8 "Patch proposed" call shape 2 call str 1 @text r#"{"request":"$0","effect":"$1","summary":"Patch prepared for the current request"}"# @build append 1 2 call arr 0 call key 2 jobval call str 1 utf8 "request" eid
+  set grantval call issue_effect_grant 4 pid eid call key 2 effectval call str 1 utf8 "digest" call decode 1 call str 1 utf8 "true"
+  ret call effect_apply 1 call put 3 grantval call str 1 utf8 "project" pid
 
 fn chat_patch_card 3 state uint pid uint effectval uint uint do 6 controls uint keyval uint expanded uint selected uint discard uint i int 7
   set keyval call cat 2 call str 1 utf8 "chat/patch/" effectval

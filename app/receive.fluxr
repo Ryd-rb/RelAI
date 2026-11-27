@@ -71,25 +71,10 @@ fn check_delivery_budget 2 jid uint retrying bool uint do 2 limits uint discard 
   set discard call require 2 not call same 2 call key 2 limits call str 1 utf8 "request_exhausted" call integer 1 1 call str 1 utf8 "Request call limit reached. Start a new topic to send another request."
   ret call require 2 not and retrying call same 2 call key 2 limits call str 1 utf8 "job_exhausted" call integer 1 1 call str 1 utf8 "Attempt limit reached for this job. Start a fresh attempt instead."
 
-pub control 1 arg uint uint do 10 p uint cmd uint jid uint aid uint j uint r uint discard uint requestid uint state uint row uint 9
+pub control 1 arg uint uint do 7 p uint cmd uint jid uint j uint r uint discard uint row uint 7
   set p call key 2 call project 1 arg call str 1 utf8 "id"
   set cmd call key 2 arg call str 1 utf8 "op"
   set jid call key 2 arg call str 1 utf8 "job"
-  set aid call key 2 arg call str 1 utf8 "action"
-  if call same 2 cmd call str 1 utf8 "accept" 7
-    set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,a.payload AS \"proposal:json\",a.state AS action_state FROM actions a JOIN jobs j ON j.id=a.job JOIN requests r ON r.id=j.request AND r.revision=j.revision AND r.state='open' WHERE a.id=? AND j.project=? AND a.kind='RESULT'" call append 2 call append 2 call arr 0 aid p 0
-    set discard call require 2 not call same 2 j 0u call str 1 utf8 "Evidence is unavailable or superseded"
-    set r call key 2 j call str 1 utf8 "request"
-    if call same 2 call key 2 j call str 1 utf8 "action_state" call str 1 utf8 "awaiting_acceptance" 2
-    set discard call require 2 call clear_work 2 r call key 2 j call str 1 utf8 "revision" call str 1 utf8 "Outstanding work"
-    set discard call close_request 4 j aid call cat 2 call cat 2 call cat 2 call cat 2 call str 1 utf8 "actions/" aid call str 1 utf8 "/RESULT-" aid call str 1 utf8 ".json" call key 2 j call str 1 utf8 "proposal"
-  2
-    set discard call query 2 call str 1 utf8 "UPDATE branches SET accepted=? WHERE id=? AND report=? AND accepted IS NULL AND NOT EXISTS(SELECT 1 FROM questions WHERE session=? AND revision=? AND state!='answered')" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call shape 2 call str 1 utf8 "{\"verifier\":\"user\",\"evidence\":\"$0\",\"revision\":\"$1\"}" call append 2 call append 2 call arr 0 aid call key 2 j call str 1 utf8 "revision" call key 2 j call str 1 utf8 "session" aid call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "revision"
-    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Evidence no longer current"
-    set discard call query 2 call str 1 utf8 "UPDATE actions SET state='verified' WHERE id=?" call append 2 call arr 0 aid
-    set discard call audit 3 p call str 1 utf8 "Accepted" call shape 2 call str 1 utf8 "{\"request\":\"$0\",\"evidence\":\"$1\"}" call append 2 call append 2 call arr 0 r aid
-    ret call review_ready 1 r
-  0
   if call same 2 cmd call str 1 utf8 "stop" 5
     set r call key 2 arg call str 1 utf8 "request"
     set discard call query 2 call str 1 utf8 "UPDATE requests SET state='cancelled' WHERE project=? AND id=? AND state='open'" call append 2 call append 2 call arr 0 p r

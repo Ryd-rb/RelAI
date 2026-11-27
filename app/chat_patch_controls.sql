@@ -18,7 +18,7 @@ WITH review AS (
     SELECT 0 AS sort,json_object('id',?3||'/title','kind','heading','section',?3,
         'label',CASE
             WHEN state='completed' THEN 'Patch applied'
-            WHEN state='planned' AND current THEN 'Patch ready for review'
+            WHEN state='planned' AND current THEN 'Patch needs a fresh request'
             WHEN state='planned' THEN 'Patch superseded'
             WHEN state IN ('authorized','executing') THEN 'Applying patch…'
             WHEN state='uncertain' THEN 'Patch outcome needs attention'
@@ -51,12 +51,5 @@ WITH review AS (
     SELECT 5,json_object('id',?3||'/file/'||position,'kind','detail',
         'section',?3,'label',label,'value',diff,'lines',9)
     FROM displayed
-    UNION ALL
-    SELECT 6,json_object('id',?3||'/approve','kind','button','role','primary','section',?3,
-        'label','Approve and apply patch','width',225,
-        'event',json_object('action','command','spec',json_object(
-            'type','button','label','Approve and apply patch','op','chat_patch_apply',
-            'fixed',json_object('effect',id,'digest',digest))))
-    FROM review WHERE ?4 AND state='planned' AND current
 )
 SELECT control AS "control:json" FROM controls ORDER BY sort

@@ -232,7 +232,7 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
   0
   ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
 
-pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint scope uint name uint pid uint result uint v uint bag uint spec uint patch uint keysval uint k uint stack uint i int 24
+pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint scope uint name uint pid uint result uint v uint bag uint spec uint patch uint keysval uint k uint stack uint i int 22
   set state call key 2 arg call str 1 utf8 "state"
   set event call key 2 arg call str 1 utf8 "after"
   set pid call key 2 arg call str 1 utf8 "project"
@@ -282,15 +282,6 @@ pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint sc
   if and call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "review_definition" call same 2 call key 2 result call str 1 utf8 "status" call str 1 utf8 "conflict" 2
     set state call put 3 state call str 1 utf8 "status" call str 1 utf8 "Proposal conflict: the base revision is no longer current. The current definition was not changed."
     ret call shape 2 call str 1 @text r#"{"state":"$0","refresh":"data"}"# call append 2 call arr 0 state
-  0
-  if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "chat_patch_apply" 2
-    if call same 2 call key 2 result call str 1 utf8 "state" call str 1 utf8 "completed" 1
-      set state call ui_set_map 4 state call str 1 utf8 "folds" call cat 2 call str 1 utf8 "chat/patch/" call key 2 result call str 1 utf8 "effect" call decode 1 call str 1 utf8 "false"
-    0
-    ret call chat_focus 2 state pid
-  0
-  if and call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "control" call same 2 call key 2 call key 2 spec call str 1 utf8 "fixed" call str 1 utf8 "op" call str 1 utf8 "accept" 1
-    ret call chat_focus 2 state pid
   0
   if call same 2 call key 2 spec call str 1 utf8 "op" call str 1 utf8 "save_model" 2
     set state call ui_set_map 4 state call str 1 utf8 "panes" call cat 2 pid call str 1 utf8 "/models" call str 1 utf8 "Overview"

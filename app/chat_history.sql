@@ -39,16 +39,10 @@ SELECT p.cursor, p.kind, p.request, p.state, CASE WHEN p.kind='Final result' THE
         THEN p.payload->'$.payload.choices' ELSE '[]' END AS "quick_choices:json",
     CASE WHEN p.kind='ASK' AND EXISTS (
         SELECT 1 FROM open_chat_questions oq WHERE oq.project=?1 AND oq.id=q.id) THEN 'reply'
-      WHEN p.kind='RESULT' AND p.state='open' AND j.revision=p.revision THEN
-        CASE WHEN a.state='awaiting_acceptance' THEN 'accept'
-          WHEN a.state='evidence' AND EXISTS (SELECT 1 FROM branches b WHERE b.report=a.id AND b.accepted IS NULL)
-            AND NOT EXISTS (SELECT 1 FROM questions q WHERE q.session=j.session AND q.revision=j.revision AND q.state!='answered')
-            THEN 'review' END
       WHEN (p.kind='Final result' OR (p.kind='RESULT' AND f.action=a.id)) AND p.state='completed' THEN 'follow'
       END AS interaction,
     CASE WHEN p.kind='RESULT' AND p.payload->>'$.state'='awaiting_acceptance' THEN
-      CASE WHEN f.action=a.id AND p.state='completed' THEN 'accepted'
-           WHEN j.revision<p.revision THEN 'earlier' END
+      CASE WHEN j.revision<p.revision THEN 'earlier' END
     END AS answer_status,
     CASE WHEN p.kind='Submission' AND p.state='open' AND p.payload->>'$.submission'=(
       SELECT s.id FROM submissions s WHERE s.request=p.request ORDER BY s.rowid DESC LIMIT 1)

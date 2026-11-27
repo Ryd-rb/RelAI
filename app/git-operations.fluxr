@@ -12,6 +12,58 @@ pub git_get 1 arg uint uint do 1 pid uint 2
 set pid call key 2 call project 1 arg call str 1 utf8 "id"
 ret call git_record 2 pid call key 2 arg call str 1 utf8 "mutation"
 
+fn prepare_user_git_change 1 arg uint uint do 1 discard uint 2
+set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","additionalProperties":false,"required":["project","operation"],"properties":{"project":{"type":"string"},"operation":{"type":"string","enum":["git.stage","git.commit","git.branch"]},"expected_head":{"type":["string","null"]},"expected_index":{"type":["string","null"]},"files":{"type":"array","minItems":1,"maxItems":64,"items":{"type":"object","additionalProperties":false,"required":["path"],"properties":{"path":{"type":"string"},"artifact":{"type":"string"},"remove":{"type":"boolean"},"mode":{"type":"string","enum":["100644","100755"]}}}},"paths":{"type":"array","minItems":1,"maxItems":64,"items":{"type":"string"}},"message":{"type":"string"},"author":{"type":"object"},"action":{"type":"string","enum":["create","delete"]},"name":{"type":"string"},"expected":{"type":["string","null"]},"target":{"type":"string"}}}"# arg
+ret call git_propose 1 arg
+
+fn execute_user_git_change 2 arg uint proposal uint uint do 2 grantval uint destructive uint 4
+set destructive call decode 1 call str 1 utf8 "false"
+if call same 2 call key 2 arg call str 1 utf8 "action" call str 1 utf8 "delete" 1
+set destructive call decode 1 call str 1 utf8 "true"
+0
+set grantval call git_authorize 1 call shape 2 call str 1 @text r#"{"project":"$0","mutation":"$1","digest":"$2","destructive":"$3"}"# @build append 1 4 call arr 0 call key 2 arg call str 1 utf8 "project" call key 2 proposal call str 1 utf8 "mutation" call key 2 proposal call str 1 utf8 "digest" destructive
+ret call git_apply 1 call put 3 grantval call str 1 utf8 "project" call key 2 arg call str 1 utf8 "project"
+
+pub apply_git_change 1 arg uint uint do 0 1
+ret call execute_user_git_change 2 arg call prepare_user_git_change 1 arg
+
+fn current_chat_git 2 pid uint mid uint bool do 0 1
+ret call same 2 call key 2 call nth 2 call query 2 call str 1 @text r#"
+SELECT NOT EXISTS(SELECT 1 FROM chat_git_mutations WHERE mutation=?1) OR EXISTS(
+  SELECT 1
+  FROM chat_git_mutations c JOIN git_mutations m ON m.id=c.mutation
+  JOIN projects p ON p.id=m.project
+  JOIN requests r ON r.id=c.request AND r.project=m.project
+  JOIN jobs j ON j.id=c.job AND j.project=m.project AND j.request=r.id
+  WHERE m.id=?1 AND m.project=?2 AND r.state='open'
+    AND r.revision=c.revision AND j.revision=c.revision
+    AND j.role='discriminator' AND p.discriminator=j.session
+    AND j.state NOT IN ('cancelled','superseded')) AS allowed
+"# @build append 1 2 call arr 0 mid pid 0 call str 1 utf8 "allowed" call integer 1 1
+
+pub chat_git_mutate 1 arg uint uint do 5 jobval uint prior uint requestval uint proposal uint discard uint 8
+set jobval call nth 2 call query 2 call str 1 @text r#"
+SELECT j.id,j.project,j.request,j.revision,j.input->>'$.arguments.tool' AS operation,
+    j.input->'$.arguments.arguments' AS "arguments:json"
+FROM jobs j JOIN projects p ON p.id=j.project AND p.discriminator=j.session
+JOIN requests r ON r.id=j.request AND r.project=j.project AND r.revision=j.revision AND r.state='open'
+WHERE j.id=? AND j.state='executing' AND j.kind='tool' AND j.role='discriminator'
+  AND j.input->>'$.arguments.tool' IN ('git.stage','git.commit','git.branch')
+  AND EXISTS(SELECT 1 FROM submissions s WHERE s.project=j.project AND s.request=j.request)
+"# call append 2 call arr 0 call key 2 arg call str 1 utf8 "job" 0
+set discard call require 2 not call same 2 jobval 0u call str 1 utf8 "The addressed chat Git job is no longer current"
+set prior call nth 2 call query 2 call str 1 @text r#"
+SELECT m.id AS mutation,m.digest,m.state,m.result AS "receipt:json"
+FROM chat_git_mutations c JOIN git_mutations m ON m.id=c.mutation WHERE c.job=?
+"# call append 2 call arr 0 call key 2 jobval call str 1 utf8 "id" 0
+if not call same 2 prior 0u 1
+ret call ui_default 2 call key 2 prior call str 1 utf8 "receipt" prior
+0
+set requestval call put 3 call put 3 call key 2 jobval call str 1 utf8 "arguments" call str 1 utf8 "project" call key 2 jobval call str 1 utf8 "project" call str 1 utf8 "operation" call key 2 jobval call str 1 utf8 "operation"
+set proposal call prepare_user_git_change 1 requestval
+set discard call query 2 call str 1 utf8 "INSERT INTO chat_git_mutations(mutation,job,request,revision) VALUES(?,?,?,?)" @build append 1 4 call arr 0 call key 2 proposal call str 1 utf8 "mutation" call key 2 jobval call str 1 utf8 "id" call key 2 jobval call str 1 utf8 "request" call key 2 jobval call str 1 utf8 "revision"
+ret call execute_user_git_change 2 requestval proposal
+
 pub git_propose 1 arg uint uint do 15 p uint pid uint operation uint nativeop uint requestval uint files uint selected uint entry uint body uint modeval uint prepared uint mid uint digestval uint discard uint i int 12
 set p call project 1 arg
 set pid call key 2 p call str 1 utf8 "id"
@@ -60,7 +112,7 @@ set discard call require 2 call same 2 call key 2 arg call str 1 utf8 "destructi
 set gid call uid 0
 set discard call query 2 call str 1 utf8 "INSERT INTO git_grants VALUES(?,?,?,?,'active')" call append 2 call append 2 call append 2 call append 2 call arr 0  gid pid call key 2 record call str 1 utf8 "id" call key 2 record call str 1 utf8 "digest"
 set discard call query 2 call str 1 utf8 "UPDATE git_mutations SET state='authorized',grant_id=? WHERE id=? AND project=?" call append 2 call append 2 call append 2 call arr 0  gid call key 2 record call str 1 utf8 "id" pid
-set discard call audit 3 pid call str 1 utf8 "Git user grant" call shape 2 call str 1 utf8 "{\"mutation\":\"$0\",\"grant\":\"$1\",\"digest\":\"$2\",\"destructive\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" gid call key 2 record call str 1 utf8 "digest" call key 2 arg call str 1 utf8 "destructive"
+set discard call audit 3 pid call str 1 utf8 "Git change scoped" call shape 2 call str 1 utf8 "{\"mutation\":\"$0\",\"grant\":\"$1\",\"digest\":\"$2\",\"destructive\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" gid call key 2 record call str 1 utf8 "digest" call key 2 arg call str 1 utf8 "destructive"
 ret call shape 2 call str 1 utf8 "{\"mutation\":\"$0\",\"grant\":\"$1\",\"digest\":\"$2\",\"state\":\"authorized\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" gid call key 2 record call str 1 utf8 "digest"
 
 pub git_revoke 1 arg uint uint do 2 pid uint discard uint 5
@@ -75,13 +127,14 @@ ret call decode 1 call str 1 utf8 "{\"revoked\":true}"
 fn git_defer 3 requestval uint resume uint stateval uint uint do 0  1
 ret call shape 2 call str 1 utf8 "{\"$git\":\"$0\",\"resume\":\"$1\",\"state\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  requestval resume stateval
 
-pub git_apply 1 arg uint uint do 4 pid uint record uint grantval uint discard uint 8
+pub git_apply 1 arg uint uint do 4 pid uint record uint grantval uint discard uint 9
 set pid call key 2 call project 1 arg call str 1 utf8 "id"
 set record call git_record 2 pid call key 2 arg call str 1 utf8 "mutation"
 if call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "completed" 1
 ret call key 2 record call str 1 utf8 "result"
 0
 
+set discard call require 2 call current_chat_git 2 pid call key 2 record call str 1 utf8 "id" call str 1 utf8 "The addressed chat Git request is no longer current"
 set grantval call nth 2 call query 2 call str 1 utf8 "SELECT id,state,digest FROM git_grants WHERE id=? AND project=? AND mutation=?" call append 2 call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "grant" pid call key 2 record call str 1 utf8 "id" 0
 set discard call require 2 and call same 2 call key 2 grantval call str 1 utf8 "state" call str 1 utf8 "active" and call same 2 call key 2 grantval call str 1 utf8 "digest" call key 2 record call str 1 utf8 "digest" call same 2 call key 2 record call str 1 utf8 "grant_id" call key 2 grantval call str 1 utf8 "id" call str 1 utf8 "Exact active Git user grant is unavailable"
 set discard call require 2 or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "authorized" or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "old" or call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "failed" call same 2 call key 2 record call str 1 utf8 "state" call str 1 utf8 "unsupported" call str 1 utf8 "Uncertain Git outcomes require reconciliation before retry"
@@ -131,7 +184,7 @@ ret call git_finish 3 stateval nativeval call key 2 arg call str 1 utf8 "error"
 if call same 2 call key 2 nativeval call str 1 utf8 "state" call str 1 utf8 "old" 4
 set record call git_record 2 call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation"
 set grantval call nth 2 call query 2 call str 1 utf8 "SELECT id,state,digest FROM git_grants WHERE id=? AND project=? AND mutation=?" call append 2 call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "grant" call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation" 0
-if and call same 2 call key 2 grantval call str 1 utf8 "state" call str 1 utf8 "active" call same 2 call key 2 grantval call str 1 utf8 "digest" call key 2 record call str 1 utf8 "digest" 2
+if and call current_chat_git 2 call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation" and call same 2 call key 2 grantval call str 1 utf8 "state" call str 1 utf8 "active" call same 2 call key 2 grantval call str 1 utf8 "digest" call key 2 record call str 1 utf8 "digest" 2
 set discard call query 2 call str 1 utf8 "UPDATE git_mutations SET state='old' WHERE id=? AND project=?" call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "mutation" call key 2 stateval call str 1 utf8 "project"
 ret call git_apply 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"mutation\":\"$1\",\"grant\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 stateval call str 1 utf8 "project" call key 2 stateval call str 1 utf8 "mutation" call key 2 stateval call str 1 utf8 "grant"
 0

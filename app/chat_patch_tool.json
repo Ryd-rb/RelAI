@@ -1,6 +1,6 @@
 {
   "tool": "patch.propose",
-  "description": "Prepare one reviewable patch to this project's Git checkout. The user reviews the exact diff in the chat and must explicitly approve before any files change.",
+  "description": "Apply one exact, atomic UTF-8 patch to the open Git checkout as part of the current user request. The chat records the diff and the actual operation result.",
   "arguments": {
     "files": [
       {

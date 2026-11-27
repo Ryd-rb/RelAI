@@ -305,11 +305,7 @@ fn original_question_picks_survive_partial_wait_or_an_exact_repeated_ask() {
         );
         assert_eq!(
             c.sql()
-                .query_row(
-                    "SELECT count(*) FROM actions WHERE state='awaiting_acceptance'",
-                    [],
-                    |r| r.get::<_, i64>(0)
-                )
+                .query_row("SELECT count(*) FROM finals", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
             1
         );

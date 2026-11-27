@@ -212,6 +212,139 @@ fn prepare_is_read_only_and_status_reports_raw_bytes_without_filters() {
 
 #[cfg(windows)]
 #[test]
+fn direct_user_git_changes_preserve_native_scope_and_conflict_checks() {
+    let fixture = Repo::new();
+    fixture.stage("b.txt", b"unrelated staged b\n");
+    let mut app = fluxr_app_host::App::open(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"),
+        &fixture.private,
+    )
+    .unwrap();
+    let pid = app
+        .invoke("open_project", json!({"root":fixture.root}))
+        .unwrap()["id"]
+        .clone();
+    let artifact = app.invoke("capture", json!({"project":pid,"name":"a.txt","mime":"text/plain","base64":STANDARD.encode(b"direct staged a\n")})).unwrap()["id"].clone();
+    let before = fixture.status();
+    let stage = json!({"project":pid,"operation":"git.stage","expected_head":before["head"],"expected_index":before["index_digest"],"files":[{"path":"a.txt","artifact":artifact}]});
+    let mut invalid = stage.clone();
+    invalid["grant"] = json!("invented");
+    assert!(app.invoke("apply_git_change", invalid).is_err());
+    assert!(
+        app.invoke(
+            "apply_git_change",
+            json!({"project":pid,"operation":"git.reset"})
+        )
+        .is_err()
+    );
+    assert_eq!(fixture.status()["index_digest"], before["index_digest"]);
+    let result = app.invoke("apply_git_change", stage.clone()).unwrap();
+    assert_eq!(result["state"], "completed", "{result:#}");
+    assert!(app.invoke("apply_git_change", stage).is_err());
+    let status = fixture.status();
+    let index = fs::read(fixture.root.join(".git/index")).unwrap();
+    let result = app.invoke("apply_git_change", json!({"project":pid,"operation":"git.commit","expected_head":status["head"],"expected_index":status["index_digest"],"paths":["a.txt"],"message":"Direct selected a"})).unwrap();
+    assert_eq!(result["state"], "completed", "{result:#}");
+    assert_eq!(fs::read(fixture.root.join(".git/index")).unwrap(), index);
+    assert_eq!(fs::read(fixture.root.join("a.txt")).unwrap(), b"a-old\n");
+    assert_eq!(fs::read(fixture.root.join("b.txt")).unwrap(), b"b-old\n");
+    let head = fixture.status()["head"].clone();
+    let result = app.invoke("apply_git_change", json!({"project":pid,"operation":"git.branch","action":"create","name":"direct-branch","expected":null,"target":head})).unwrap();
+    assert_eq!(result["state"], "completed", "{result:#}");
+    assert!(app.invoke("apply_git_change", json!({"project":pid,"operation":"git.branch","action":"delete","name":"direct-branch","expected":before["head"]})).is_err());
+    let result = app.invoke("apply_git_change", json!({"project":pid,"operation":"git.branch","action":"delete","name":"direct-branch","expected":head})).unwrap();
+    assert_eq!(result["state"], "completed", "{result:#}");
+    assert!(app.invoke("apply_git_change", json!({"project":pid,"operation":"git.branch","action":"delete","name":"main","expected":head})).is_err());
+    assert_eq!(fixture.status()["head"], head);
+}
+
+#[cfg(windows)]
+#[test]
+fn foreground_chat_git_is_scoped_to_current_user_request_and_replays_one_receipt() {
+    let fixture = Repo::new();
+    let mut app = fluxr_app_host::App::open(
+        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"),
+        &fixture.private,
+    )
+    .unwrap();
+    let pid = app
+        .invoke("open_project", json!({"root":fixture.root}))
+        .unwrap()["id"]
+        .clone();
+    let artifact = app.invoke("capture", json!({"project":pid,"name":"a.txt","mime":"text/plain","base64":STANDARD.encode(b"chat staged a\n")})).unwrap()["id"].clone();
+    let before = fixture.status();
+    let arguments = json!({"expected_head":before["head"],"expected_index":before["index_digest"],"files":[{"path":"a.txt","artifact":artifact}]});
+    let db = rusqlite::Connection::open(fixture.private.join("state.sqlite3")).unwrap();
+    db.execute("INSERT INTO requests(id,project,intent) VALUES('chat-git-request',?,'Stage the selected a.txt')", [pid.as_str().unwrap()]).unwrap();
+    db.execute("INSERT INTO submissions VALUES('chat-git-submission',?,'chat-git-request','chat-git-key','hash','{}')", [pid.as_str().unwrap()]).unwrap();
+    db.execute("INSERT INTO jobs(id,project,request,revision,session,role,kind,input,state) SELECT 'chat-git-job',id,'chat-git-request',1,discriminator,'worker','tool',?,'executing' FROM projects WHERE id=?", rusqlite::params![json!({"arguments":{"tool":"git.stage","arguments":arguments}}).to_string(),pid.as_str().unwrap()]).unwrap();
+    let job = json!({"job":"chat-git-job"});
+    assert!(app.invoke("chat_git_mutate", job.clone()).is_err());
+    assert_eq!(fixture.status()["index_digest"], before["index_digest"]);
+    db.execute(
+        "UPDATE jobs SET role='discriminator',session='foreign' WHERE id='chat-git-job'",
+        [],
+    )
+    .unwrap();
+    assert!(app.invoke("chat_git_mutate", job.clone()).is_err());
+    db.execute("UPDATE jobs SET session=(SELECT discriminator FROM projects WHERE id=jobs.project),revision=0 WHERE id='chat-git-job'", []).unwrap();
+    assert!(app.invoke("chat_git_mutate", job.clone()).is_err());
+    db.execute("UPDATE jobs SET revision=1 WHERE id='chat-git-job'", [])
+        .unwrap();
+    let receipt = app.invoke("chat_git_mutate", job.clone()).unwrap();
+    assert_eq!(receipt["state"], "completed", "{receipt:#}");
+    assert_eq!(app.invoke("chat_git_mutate", job.clone()).unwrap(), receipt);
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM chat_git_mutations", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(fs::read(fixture.root.join("a.txt")).unwrap(), b"a-old\n");
+    let current = fixture.status();
+    let pending = app.invoke("git_propose", json!({"project":pid,"operation":"git.stage","expected_head":current["head"],"expected_index":current["index_digest"],"files":[{"path":"b.txt","artifact":artifact}]})).unwrap();
+    let grant = app
+        .invoke(
+            "git_authorize",
+            json!({"project":pid,"mutation":pending["mutation"],"digest":pending["digest"]}),
+        )
+        .unwrap();
+    db.execute("INSERT INTO jobs(id,project,request,revision,session,role,kind,input,state) SELECT 'chat-git-recovery',project,request,revision,session,role,kind,input,state FROM jobs WHERE id='chat-git-job'", []).unwrap();
+    db.execute(
+        "INSERT INTO chat_git_mutations VALUES(?,'chat-git-recovery','chat-git-request',1)",
+        [pending["mutation"].as_str().unwrap()],
+    )
+    .unwrap();
+    db.execute(
+        "UPDATE requests SET revision=2 WHERE id='chat-git-request'",
+        [],
+    )
+    .unwrap();
+    assert!(app.invoke("chat_git_mutate", job).is_err());
+    assert!(
+        app.invoke(
+            "git_apply",
+            json!({"project":pid,"mutation":pending["mutation"],"grant":grant["grant"]})
+        )
+        .is_err()
+    );
+    db.execute(
+        "UPDATE git_mutations SET state='executing' WHERE id=?",
+        [pending["mutation"].as_str().unwrap()],
+    )
+    .unwrap();
+    let recovered = app
+        .invoke(
+            "git_recover",
+            json!({"project":pid,"mutation":pending["mutation"]}),
+        )
+        .unwrap();
+    assert_eq!(recovered["state"], "held", "{recovered:#}");
+    assert_eq!(fixture.status()["index_digest"], current["index_digest"]);
+}
+
+#[cfg(windows)]
+#[test]
 fn checked_consent_and_selected_commit_preserve_unrelated_staging() {
     let fixture = Repo::new();
     fixture.stage("b.txt", b"unrelated staged b\n");

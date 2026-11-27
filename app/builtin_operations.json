@@ -78,22 +78,22 @@
   },
   {
     "id": "git.stage",
-    "description": "Propose staging exact artifact file versions and preserve unrelated index entries",
-    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "description": "Stage exact artifact file versions and preserve unrelated index entries",
+    "authority": "Current foreground request and exact repository state",
     "execution": "embedded gix; no executable helpers",
     "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
   },
   {
     "id": "git.commit",
-    "description": "Propose committing only selected index paths while preserving the complete index",
-    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "description": "Commit selected index paths while preserving the complete index",
+    "authority": "Current foreground request and exact repository state",
     "execution": "embedded gix; no executable helpers",
     "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
   },
   {
     "id": "git.branch",
-    "description": "Propose exact expected-old branch creation or deletion",
-    "authority": "Exact immutable proposal and typed user consent for mutation",
+    "description": "Create or delete a local branch at an exact expected tip",
+    "authority": "Current foreground request and exact repository state",
     "execution": "embedded gix; no executable helpers",
     "limits": "local born branch;4096 index entries;64 selected paths;8MiB raw bytes; advanced repository states fail closed"
   },

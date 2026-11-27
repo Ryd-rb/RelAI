@@ -345,6 +345,109 @@ fn restart_recovers_one_reserved_occurrence_under_the_same_identity() {
     );
 }
 #[test]
+fn one_shot_can_be_cancelled_after_reservation_and_finishes_after_a_read() {
+    let mut f = TestProject::new();
+    let args = json!({"due":0,"period":0,"action":{"tool":"project.info","arguments":{}}});
+    let cancelled = f.tool("schedule.create", args.clone()).unwrap();
+    let reserved = f.app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(reserved["state"]["id"], cancelled["id"]);
+    f.tool(
+        "schedule.cancel",
+        json!({"id":cancelled["id"],"revision":1}),
+    )
+    .unwrap();
+    assert!(
+        f.app
+            .invoke("scheduled_read", reserved["arguments"].clone())
+            .is_err()
+    );
+    assert!(f.app.invoke("poll", Value::Null).unwrap().is_null());
+
+    let completed = f.tool("schedule.create", args).unwrap();
+    let reserved = f.app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(reserved["state"]["id"], completed["id"]);
+    let result = f
+        .app
+        .invoke("scheduled_read", reserved["arguments"].clone())
+        .unwrap();
+    f.app
+        .invoke(
+            "scheduled_done",
+            json!({"state":reserved["state"],"result":result}),
+        )
+        .unwrap();
+    let schedules = f.tool("schedule.list", json!({})).unwrap();
+    let records = schedules.as_array().unwrap();
+    assert_eq!(
+        records
+            .iter()
+            .find(|row| row["id"] == cancelled["id"])
+            .unwrap()["state"],
+        "cancelled"
+    );
+    assert_eq!(
+        records
+            .iter()
+            .find(|row| row["id"] == completed["id"])
+            .unwrap()["state"],
+        "completed"
+    );
+}
+
+#[test]
+fn schedule_creation_checks_required_read_arguments_and_version() {
+    let mut f = TestProject::new();
+    for action in [
+        json!({"tool":"fs.search","arguments":{"path":"a.txt"}}),
+        json!({"tool":"fs.search","arguments":{"path":"a.txt","query":22}}),
+        json!({"tool":"project.info","arguments":{},"version":"old"}),
+    ] {
+        assert!(
+            f.tool(
+                "schedule.create",
+                json!({"due":0,"period":0,"action":action})
+            )
+            .is_err()
+        );
+    }
+    assert_eq!(f.tool("schedule.list", json!({})).unwrap(), json!([]));
+    let accepted = f.tool("schedule.create",json!({"due":0,"period":0,"action":{"tool":"fs.search","arguments":{"path":"a.txt","query":"word"},"version":null}})).unwrap();
+    assert!(accepted["id"].is_string());
+}
+
+#[test]
+fn a_late_monitor_outcome_cannot_replace_a_newer_observation() {
+    let mut f = TestProject::new();
+    let monitor = f
+        .tool(
+            "monitor.start",
+            json!({"due":0,"period":3600,"action":{"tool":"project.info","arguments":{}}}),
+        )
+        .unwrap();
+    let older = f.app.invoke("poll", Value::Null).unwrap();
+    let db = rusqlite::Connection::open(f.app.data.join("state.sqlite3")).unwrap();
+    db.execute(
+        "INSERT INTO occurrences(schedule,revision,instant,state) VALUES(?,1,1,'reserved')",
+        [monitor["id"].as_str().unwrap()],
+    )
+    .unwrap();
+    let mut newer = older["state"].clone();
+    newer["instant"] = json!(1);
+    for (state, name) in [(newer, "newer"), (older["state"].clone(), "older")] {
+        f.app
+            .invoke(
+                "scheduled_done",
+                json!({"state":state,"result":{"sample":name}}),
+            )
+            .unwrap();
+    }
+    let status = f
+        .tool("monitor.status", json!({"id":monitor["id"]}))
+        .unwrap();
+    assert_eq!(status["latest"]["sample"], "newer");
+}
+
+#[test]
 fn file_ranges_find_cursor_host_reads_and_monitor_cancellation() {
     let mut f = TestProject::new();
     fs::write(f.path.join("a.md"), "é\nsecond\n").unwrap();

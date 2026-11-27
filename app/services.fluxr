@@ -148,7 +148,7 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
     ret call query 2 call str 1 utf8 "SELECT revision,body AS \"plan:json\" FROM plans WHERE project=? AND request=?" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request"
   0
   if call same 2 toolname call str 1 utf8 "schedule.list" 1
-    ret call query 2 call str 1 utf8 "SELECT * FROM schedules WHERE project=? LIMIT 100" call append 2 call arr 0 pid
+    ret call query 2 call str 1 utf8 "SELECT s.id,s.project,s.revision,s.due,s.period,s.action,CASE WHEN s.state='dispatched' AND s.period=0 AND EXISTS(SELECT 1 FROM occurrences o WHERE o.schedule=s.id AND o.revision=s.revision AND o.state='finished') AND NOT EXISTS(SELECT 1 FROM occurrences o WHERE o.schedule=s.id AND o.revision=s.revision AND o.state!='finished') THEN 'completed' ELSE s.state END AS state FROM schedules s WHERE s.project=? LIMIT 100" call append 2 call arr 0 pid
   0
   if call same 2 toolname call str 1 utf8 "dictionary.get" 1
     ret call nth 2 call expand 2 pid call append 2 call arr 0 call key 2 args call str 1 utf8 "ref" 0

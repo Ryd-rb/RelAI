@@ -13,3 +13,28 @@
 - [ ] 039. Reach maximum or minimum zoom in Project graph. The corresponding Zoom button remains enabled and repeated presses silently do nothing. Reflect the bounds in the toolbar.
 - [ ] 040. Press Fit in Project graph. It sets zoom to 100 percent regardless of content or viewport. Label the action as a zoom reset and indicate the current scale.
 - [ ] 041. Start RelAI with a preconfigured CARGO_TARGET_DIR. The launcher builds into that directory but tries to launch target/release from the repository, which can start an old binary or fail. Launch the executable produced by that build.
+- [ ] 042. Mention the same term twice in a chat message. Two identical definition buttons appear below it. Offer one button per distinct pinned reference while preserving both original text spans.
+- [ ] 043. Inspect definition links using a screen reader. Their names consist only of the spelling and “definition”, without kind or owning dictionary. Make the type and source discoverable without modifying the message text.
+- [ ] 044. After replying to a question, its transcript caption changes to plain “RelAI”. Preserve a question label when reading history and distinguish answered from superseded or stopped questions.
+- [ ] 045. When Relay asks a question, its work description is present in the record but the chat shows only the question and choices. Make that context available without opening Activity.
+- [ ] 046. Submit a long technical answer for review. Hundreds of lines of raw structured text separate the conversation from its action buttons. Provide an expandable preview for long answers while preserving access to the exact full answer.
+- [ ] 047. Attach files before sending. The UI offers only “Remove <name>”, even though capture records the size. Show file size alongside its name before submission.
+- [ ] 048. Submit two identically named attachments with different contents. History retains only their names. Provide an on-demand view of the immutable attachment identity and size for each sent file.
+- [ ] 049. Select an unsupported binary attachment from the composer. Its extension defaults to text/plain and the failure says only “Invalid UTF-8”. Keep its filename in the error and explain which file types the composer accepts.
+- [ ] 050. Attach more than eight files at once. If earlier files were captured before a later failure, the user cannot tell how many were added from the error. Report partial success clearly and keep the successful captures.
+- [ ] 051. In two projects, switch back and forth while composing a new topic. The empty composer always says “Message RelAI…”. Identify the destination project in the new-topic placeholder when its name is available.
+- [ ] 052. Read an older history page, switch projects, then return. Project switching discards the old page cursor and opens the tail. Remember the last history page per project.
+- [ ] 053. Zoom a graph, switch to another project and inspect its graph. The zoom is held in one global state slot. Keep each project's scale independent.
+- [ ] 054. Inspect a directory in Project graph. Its children appear as raw data and cannot be selected directly from the directory inspector. Offer a bounded list of children that opens the selected snapshot path.
+- [ ] 055. Browse a deeply nested file in Project graph. Its path is text and the inspector offers no way to go up one directory. Add a parent action that stays in the same snapshot.
+- [ ] 056. To change a dictionary link, the form asks for a raw dictionary ID already present on the page. Offer a named selection showing ownership and current link state.
+- [ ] 057. Use the “Edit definition” form for an existing spelling. It sends neither the entry ID nor its revision and creates another entry. Clearly separate creating a definition from editing the selected entry.
+- [ ] 058. Review proposed definitions in Dictionary. The decision form requires manually transferring a proposal ID from a separate list response. Let the user select a pending proposal and inspect its proposed wording before deciding.
+- [ ] 059. The owner can rename a dictionary through its operation but has no Rename action in Dictionary management. Make renaming an owned dictionary available in that view.
+- [ ] 060. Remove an installed skill. The user must transcribe a version ID from a raw record. Offer a named installed-version selector and preserve the backend's exact-version check.
+- [ ] 061. Switch to Models overview when roles share a model but use different efforts. The selector labels show only role and model, so each row must be opened to compare. Show effective effort alongside each assignment.
+- [ ] 062. Edit a model assignment during active work. The form does not explain whether the current sealed turn will change. State when the saved configuration takes effect.
+- [ ] 063. Two requests ask the same question. The composer's question picker displays the identical prompt twice. Disambiguate these choices with their request topics and keep the exact question IDs for routing.
+- [ ] 064. Start a request with leading whitespace or embedded newlines. Its follow-up target can be blank-looking or span several lines because the label takes the first 64 original characters verbatim. Normalize the short label while preserving the original submission.
+- [ ] 065. Click Attach files after switching projects. The native chooser has no starting directory for the selected project. Start in the active project's existing folder.
+- [ ] 066. Two open projects have the same folder name. Sidebar entries fall back to full paths with long identical prefixes and the differing segments are clipped. Use the shortest distinguishing path suffix while preserving each exact project identity.

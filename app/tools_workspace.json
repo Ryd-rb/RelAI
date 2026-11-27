@@ -163,6 +163,36 @@
     },
     {
       "type": "fold",
+      "label": "Reproduce a candidate defect",
+      "foldKey": "tool-versions-reproduce",
+      "pane": "Versions",
+      "section": "tool-versions",
+      "items": [
+        {
+          "type": "form",
+          "label": "Prepare case for review",
+          "op": "tool_reproduction_plan",
+          "text": "Prepare a bounded case with arguments, empty inputs and an expected value. Review the full returned case and both version IDs before approving.",
+          "fields": [
+            {"name": "candidate", "label": "Deferred candidate ID", "type": "text", "required": true},
+            {"name": "case", "label": "Test case", "type": "json", "required": true}
+          ],
+          "showResult": true
+        },
+        {
+          "type": "form",
+          "label": "Approve and run reviewed case",
+          "op": "tool_reproduce",
+          "fields": [
+            {"name": "review", "label": "Review ID", "type": "text", "required": true},
+            {"name": "digest", "label": "Reviewed digest", "type": "text", "required": true}
+          ],
+          "showResult": true
+        }
+      ]
+    },
+    {
+      "type": "fold",
       "label": "Promote a version",
       "foldKey": "tool-versions-3",
       "pane": "Versions",

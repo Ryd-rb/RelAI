@@ -1,0 +1,111 @@
+fluxr 1
+
+fn reproduction_owner_operation 1 name uint bool do 0 1
+  ret or call same 2 name call str 1 utf8 "tool_reproduction_plan" call same 2 name call str 1 utf8 "tool_reproduce"
+
+fn reproduction_scope 2 pid uint cid uint uint do 4 pair uint baseline uint correction uint discard uint 8
+  set pair call nth 2 call query 2 call str 1 @text r#"SELECT v.baseline,v.version,c.operation FROM candidate_versions v JOIN candidates c ON c.id=v.candidate WHERE c.project=? AND c.id=? AND c.state='deferred'"# @build append 1 2 call arr 0 pid cid 0
+  set discard call require 2 not call same 2 pair 0u call str 1 utf8 "Select a deferred candidate in this project"
+  set baseline call tool_entry 2 pid call key 2 pair call str 1 utf8 "baseline"
+  set correction call tool_entry 2 pid call key 2 pair call str 1 utf8 "version"
+  set discard call require 2 not call same 2 call key 2 baseline call str 1 utf8 "version" call key 2 correction call str 1 utf8 "version" call str 1 utf8 "Select distinct exact versions"
+  set discard call require 2 and call same 2 call key 2 baseline call str 1 utf8 "name" call key 2 pair call str 1 utf8 "operation" and call same 2 call key 2 baseline call str 1 utf8 "name" call key 2 correction call str 1 utf8 "name" call same 2 call key 2 baseline call str 1 utf8 "contract" call key 2 correction call str 1 utf8 "contract" call str 1 utf8 "Versions must match the candidate operation and contract"
+  set discard call require 2 and call same 2 call key 2 baseline call str 1 utf8 "status" call str 1 utf8 "active" and call same 2 call key 2 correction call str 1 utf8 "status" call str 1 utf8 "active" and call nonblank 1 call key 2 baseline call str 1 utf8 "evidence" call nonblank 1 call key 2 correction call str 1 utf8 "evidence" call str 1 utf8 "Both exact versions must be active and independently qualified"
+  ret call shape 2 call str 1 @text r#"{"baseline":"$0","correction":"$1","fingerprint":"$2"}"# @build append 1 3 call arr 0 call key 2 baseline call str 1 utf8 "version" call key 2 correction call str 1 utf8 "version" call hash 1 call encode 1 @build append 1 4 call arr 0 pid cid baseline correction
+
+pub tool_reproduction_plan 1 arg uint uint do 7 pid uint cid uint case uint rid uint review uint digest uint discard uint 10
+  set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","additionalProperties":false,"required":["project","candidate","case"],"properties":{"project":{"type":"string"},"candidate":{"type":"string"},"case":{"type":"object","additionalProperties":false,"required":["arguments","inputs","expected"],"properties":{"arguments":{"type":"array"},"inputs":{"type":"array","maxItems":0},"expected":{"type":"object"}}}}}"# arg
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set cid call key 2 arg call str 1 utf8 "candidate"
+  set case call key 2 arg call str 1 utf8 "case"
+  set discard call require 2 le call size 1 call encode 1 case 131072 call str 1 utf8 "Test input exceeds bound"
+  set rid call uid 0
+  set review call shape 2 call str 1 @text r#"{"review":"$0","project":"$1","candidate":"$2","scope":"$3","case":"$4"}"# @build append 1 5 call arr 0 rid pid cid call reproduction_scope 2 pid cid case
+  set digest call hash 1 call encode 1 review
+  set discard call query 2 call str 1 utf8 "INSERT INTO reproduction_reviews(id,project,digest,review,state) VALUES(?,?,?,?,'planned')" @build append 1 4 call arr 0 rid pid digest call encode 1 review
+  ret call put 3 review call str 1 utf8 "digest" digest
+
+fn reproduction_row 3 pid uint rid uint digest uint uint do 3 row uint review uint discard uint 5
+  set row call nth 2 call query 2 call str 1 @text r#"SELECT state,phase,approved_at,review AS "review:json",baseline_receipt AS "baseline_receipt:json",receipt AS "receipt:json" FROM reproduction_reviews WHERE project=? AND id=? AND digest=?"# @build append 1 3 call arr 0 pid rid digest 0
+  set discard call require 2 not call same 2 row 0u call str 1 utf8 "Review ID and digest must match this project"
+  set review call key 2 row call str 1 utf8 "review"
+  set discard call require 2 call same 2 digest call hash 1 call encode 1 review call str 1 utf8 "Review content changed"
+  ret row
+
+fn reproduction_entry 2 review uint phase uint uint do 3 pid uint scope uint discard uint 4
+  set pid call key 2 review call str 1 utf8 "project"
+  set scope call key 2 review call str 1 utf8 "scope"
+  set discard call require 2 call same 2 scope call reproduction_scope 2 pid call key 2 review call str 1 utf8 "candidate" call str 1 utf8 "Reviewed candidate scope changed"
+  ret call tool_entry 2 pid call key 2 scope phase
+
+fn reproduction_start 3 review uint digest uint phase uint uint do 1 entry uint 2
+  set entry call reproduction_entry 2 review phase
+  ret call tool_defer 3 call tool_evaluation 2 entry call key 2 review call str 1 utf8 "case" call str 1 utf8 "reproduction_done" call shape 2 call str 1 @text r#"{"review":"$0","digest":"$1","phase":"$2","version":"$3"}"# @build append 1 4 call arr 0 review digest phase call key 2 entry call str 1 utf8 "version"
+
+pub tool_reproduce 1 arg uint uint do 6 pid uint rid uint digest uint row uint review uint discard uint 9
+  set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","additionalProperties":false,"required":["project","review","digest"],"properties":{"project":{"type":"string"},"review":{"type":"string"},"digest":{"type":"string"}}}"# arg
+  set pid call key 2 call project 1 arg call str 1 utf8 "id"
+  set rid call key 2 arg call str 1 utf8 "review"
+  set digest call key 2 arg call str 1 utf8 "digest"
+  set row call reproduction_row 3 pid rid digest
+  if call same 2 call key 2 row call str 1 utf8 "state" call str 1 utf8 "completed" 1
+    ret call key 2 row call str 1 utf8 "receipt"
+  0
+  set review call key 2 row call str 1 utf8 "review"
+  set discard call require 2 call same 2 call query 2 call str 1 utf8 "UPDATE reproduction_reviews SET state='running',phase='baseline',approved_at=unixepoch() WHERE id=? AND project=? AND digest=? AND state='planned'" @build append 1 3 call arr 0 rid pid digest call integer 1 1 call str 1 utf8 "This review is already running. Prepare a fresh review if the previous run was interrupted."
+  ret call reproduction_start 3 review digest call str 1 utf8 "baseline"
+
+fn reproduction_record 4 review uint entry uint resultval uint errorval uint uint do 8 pid uint case uint version uint tid uint observed uint outcome uint receipt uint discard uint 11
+  set pid call key 2 review call str 1 utf8 "project"
+  set case call key 2 review call str 1 utf8 "case"
+  set version call key 2 entry call str 1 utf8 "version"
+  set tid call uid 0
+  set observed call key 2 resultval call str 1 utf8 "value"
+  set outcome call str 1 utf8 "failed"
+  if and call same 2 errorval 0u call same 2 observed call key 2 case call str 1 utf8 "expected" 1
+    set outcome call str 1 utf8 "passed"
+  0
+  if not call same 2 errorval 0u 1
+    set outcome call str 1 utf8 "error"
+  0
+  set receipt call shape 2 call str 1 @text r#"{"id":"$0","version":"$1","case":"$2","observed":"$3","outcome":"$4","error":"$5","execution":"$6","provisional":true}"# @build append 1 7 call arr 0 tid version case observed outcome errorval resultval
+  set discard call query 2 call str 1 utf8 "INSERT INTO tool_tests(id,project,version,request,expected,observed,outcome,receipt) VALUES(?,?,?,?,?,?,?,?)" @build append 1 8 call arr 0 tid pid version call encode 1 case call encode 1 call key 2 case call str 1 utf8 "expected" observed outcome call encode 1 receipt
+  ret receipt
+
+fn reproduction_finish 4 review uint digest uint baseline uint correction uint uint do 8 pid uint rid uint discard uint receipt uint reproduced bool resultval uint oldid uint newid uint 10
+  set pid call key 2 review call str 1 utf8 "project"
+  set rid call key 2 review call str 1 utf8 "review"
+  set oldid call key 2 baseline call str 1 utf8 "id"
+  set newid call key 2 correction call str 1 utf8 "id"
+  set reproduced and call same 2 call key 2 baseline call str 1 utf8 "outcome" call str 1 utf8 "failed" call same 2 call key 2 correction call str 1 utf8 "outcome" call str 1 utf8 "passed"
+  set resultval call decode 1 call str 1 utf8 "false"
+  if reproduced 3
+    set discard call query 2 call str 1 @text r#"INSERT INTO owner_reproduction_evidence(review,project,candidate,baseline_test,correction_test) SELECT r.id,r.project,r.review->>'$.candidate',old.id,new.id FROM reproduction_reviews r JOIN tool_tests old ON old.id=?4 AND old.project=r.project JOIN tool_tests new ON new.id=?5 AND new.project=r.project WHERE r.id=?1 AND r.project=?2 AND r.digest=?3 AND r.state='running' AND r.phase='correction' AND r.approved_at IS NOT NULL AND old.id=r.baseline_receipt->>'$.id' AND old.version=r.review->>'$.scope.baseline' AND new.version=r.review->>'$.scope.correction' AND old.request=new.request AND old.request=?6 AND old.outcome='failed' AND new.outcome='passed'"# @build append 1 6 call arr 0 rid pid digest oldid newid call encode 1 call key 2 review call str 1 utf8 "case"
+    set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Reproduction proof pair is incomplete"
+    set resultval call decode 1 call str 1 utf8 "true"
+  0
+  set receipt call shape 2 call str 1 @text r#"{"review":"$0","digest":"$1","baseline_test":"$2","correction_test":"$3","reproduced":"$4","checks":"$5"}"# @build append 1 6 call arr 0 rid digest oldid newid resultval @build append 1 2 call arr 0 baseline correction
+  set discard call require 2 call same 2 call query 2 call str 1 utf8 "UPDATE reproduction_reviews SET state='completed',phase=NULL,receipt=? WHERE id=? AND project=? AND digest=? AND state='running' AND phase='correction' AND approved_at IS NOT NULL" @build append 1 4 call arr 0 call encode 1 receipt rid pid digest call integer 1 1 call str 1 utf8 "Review is not awaiting correction completion"
+  ret receipt
+
+pub reproduction_done 1 arg uint uint do 10 state uint review uint digest uint phase uint row uint entry uint resultval uint errorval uint receipt uint discard uint 15
+  set state call key 2 arg call str 1 utf8 "state"
+  set review call key 2 state call str 1 utf8 "review"
+  set digest call key 2 state call str 1 utf8 "digest"
+  set phase call key 2 state call str 1 utf8 "phase"
+  set row call reproduction_row 3 call key 2 review call str 1 utf8 "project" call key 2 review call str 1 utf8 "review" digest
+  set discard call require 2 and call same 2 call key 2 row call str 1 utf8 "state" call str 1 utf8 "running" and not call same 2 call key 2 row call str 1 utf8 "approved_at" 0u and call same 2 phase call key 2 row call str 1 utf8 "phase" call same 2 review call key 2 row call str 1 utf8 "review" call str 1 utf8 "Review approval, case or phase changed"
+  set entry call reproduction_entry 2 review phase
+  set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "version" call key 2 state call str 1 utf8 "version" call str 1 utf8 "Reviewed version changed"
+  set resultval call key 2 arg call str 1 utf8 "result"
+  set errorval call key 2 arg call str 1 utf8 "error"
+  if call same 2 errorval 0u 1
+    set discard call require 2 and call same 2 call key 2 resultval call str 1 utf8 "source_digest" call hash 1 call key 2 entry call str 1 utf8 "source" not call same 2 call key 2 resultval call str 1 utf8 "value" 0u call str 1 utf8 "Missing result for the reviewed source"
+  0
+  set receipt call reproduction_record 4 review entry resultval errorval
+  if call same 2 phase call str 1 utf8 "baseline" 2
+    set discard call require 2 call same 2 call query 2 call str 1 utf8 "UPDATE reproduction_reviews SET phase='correction',baseline_receipt=? WHERE id=? AND digest=? AND state='running' AND phase='baseline'" @build append 1 3 call arr 0 call encode 1 receipt call key 2 review call str 1 utf8 "review" digest call integer 1 1 call str 1 utf8 "Review is not awaiting baseline completion"
+    ret call reproduction_start 3 review digest call str 1 utf8 "correction"
+  0
+  set discard call require 2 not call same 2 call key 2 row call str 1 utf8 "baseline_receipt" 0u call str 1 utf8 "Review is missing its baseline result"
+  ret call reproduction_finish 4 review digest call key 2 row call str 1 utf8 "baseline_receipt" receipt

@@ -1,6 +1,9 @@
 fluxr 1
 
-fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 20
+fn allowed_tool 3 j uint name uint arguments uint uint do 5 role uint body uint refs uint aid uint sid uint 21
+  if call reproduction_owner_operation 1 name 1
+    ret call str 1 utf8 "Reproduction review and approval require the owner surface."
+  0
   set role call key 2 j call str 1 utf8 "role"
   set body call key 2 j call str 1 utf8 "body"
   if not call selected_source_ok 2 call key 2 j call str 1 utf8 "id" arguments 1 ret call str 1 utf8 "Select this live host file for the addressed request and session, or attach it." 0

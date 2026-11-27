@@ -12,6 +12,7 @@
     "chat_patches.fluxr",
     "graph.fluxr",
     "tools.fluxr",
+    "tool_reproduction.fluxr",
     "tool_jobs.fluxr",
     "knowledge.fluxr",
     "context.fluxr",
@@ -121,6 +122,8 @@
     "tool_run",
     "tool_propose",
     "tool_test",
+    "tool_reproduction_plan",
+    "tool_reproduce",
     "tool_qualify",
     "tool_promote",
     "tool_retire",
@@ -210,6 +213,12 @@
       "$evaluate": [
         "guest_tool_tested"
       ]
+    },
+    "tool_reproduce": {
+      "$evaluate": ["reproduction_done"]
+    },
+    "reproduction_done": {
+      "$evaluate": ["reproduction_done"]
     },
     "guest_tool_tested": {
       "$evaluate": [

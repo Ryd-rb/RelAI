@@ -1,6 +1,9 @@
 fluxr 1
 
-fn publish_candidate 2 pid uint args uint uint do 10 cid uint rid uint version uint old uint candidate uint proof uint receipt uint prior uint discard uint pubid uint 17
+fn publication_owner_proof 4 pid uint cid uint baseline uint correction uint uint do 0 1
+  ret call nth 2 call query 2 call str 1 @text r#"SELECT r.id AS review,r.digest,old.request AS "fixture:json",old.id AS failed,new.id AS passed FROM owner_reproduction_evidence e JOIN reproduction_reviews r ON r.id=e.review AND r.project=e.project JOIN tool_tests old ON old.id=e.baseline_test AND old.project=e.project JOIN tool_tests new ON new.id=e.correction_test AND new.project=e.project WHERE e.project=?1 AND e.candidate=?2 AND r.state='completed' AND r.approved_at IS NOT NULL AND r.review->>'$.review'=r.id AND r.review->>'$.project'=e.project AND r.review->>'$.candidate'=e.candidate AND old.version=?3 AND new.version=?4 AND old.version=r.review->>'$.scope.baseline' AND new.version=r.review->>'$.scope.correction' AND old.request=new.request AND json(old.request)=json(r.review->'$.case') AND old.outcome='failed' AND new.outcome='passed' AND old.observed IS NOT NULL AND new.observed IS NOT NULL AND r.receipt->>'$.reproduced'=1 AND r.receipt->>'$.baseline_test'=old.id AND r.receipt->>'$.correction_test'=new.id ORDER BY r.id LIMIT 1"# @build append 1 4 call arr 0 pid cid baseline correction 0
+
+fn publish_candidate 2 pid uint args uint uint do 11 cid uint rid uint version uint old uint candidate uint proof uint receipt uint prior uint discard uint pubid uint proof_kind uint 20
   set cid call key 2 args call str 1 utf8 "candidate"
   set rid call key 2 args call str 1 utf8 "request"
   set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT r.id FROM requests r JOIN improvements i ON i.request=r.id WHERE r.id=? AND r.project=? AND r.state='completed'" call append 2 call append 2 call arr 0 rid pid 0 0u call str 1 utf8 "Publication requires its completed request"
@@ -13,9 +16,15 @@ fn publish_candidate 2 pid uint args uint uint do 10 cid uint rid uint version u
   set old call tool_entry 2 pid call key 2 candidate call str 1 utf8 "baseline"
   set discard call require 2 and call same 2 call key 2 candidate call str 1 utf8 "operation" call key 2 version call str 1 utf8 "name" and call same 2 call key 2 old call str 1 utf8 "name" call key 2 version call str 1 utf8 "name" and call same 2 call key 2 old call str 1 utf8 "contract" call key 2 version call str 1 utf8 "contract" and call same 2 call key 2 version call str 1 utf8 "status" call str 1 utf8 "active" not call same 2 call key 2 version call str 1 utf8 "evidence" 0u call str 1 utf8 "Candidate needs independent qualification for the baseline contract"
   set proof call nth 2 call query 2 call str 1 utf8 "SELECT old.id AS failed,new.id AS passed,old.request AS \"fixture:json\" FROM tool_tests old JOIN verified_checks vc ON vc.test=old.id JOIN tool_tests new ON new.request=old.request AND new.project=old.project JOIN verified_checks nc ON nc.test=new.id WHERE old.project=? AND old.version=? AND new.version=? AND old.outcome='failed' AND new.outcome='passed' ORDER BY old.id,new.id LIMIT 1" call append 2 call append 2 call append 2 call arr 0 pid call key 2 old call str 1 utf8 "version" call key 2 version call str 1 utf8 "version" 0
-  set discard call require 2 not call same 2 proof 0u call str 1 utf8 "A trusted fixture must reproduce the defect and verify the correction"
+  set proof_kind call str 1 utf8 "independent_check"
+  if call same 2 proof 0u 2
+    set proof call publication_owner_proof 4 pid cid call key 2 old call str 1 utf8 "version" call key 2 version call str 1 utf8 "version"
+    set proof_kind call str 1 utf8 "owner_reproduction"
+  0
+  set discard call require 2 not call same 2 proof 0u call str 1 utf8 "An independent fixture or approved reproduction for this candidate must verify the correction"
   set pubid call uid 0
-  set receipt call shape 2 call str 1 utf8 "{\"publication\":\"$0\",\"candidate\":\"$1\",\"request\":\"$2\",\"version\":\"$3\",\"baseline\":\"$4\",\"independent_check\":\"$5\",\"qualification\":\"$6\",\"reason\":\"reproduced_defect\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pubid cid rid call key 2 version call str 1 utf8 "version" call key 2 old call str 1 utf8 "version" proof call key 2 version call str 1 utf8 "evidence"
+  set receipt call shape 2 call str 1 utf8 "{\"publication\":\"$0\",\"candidate\":\"$1\",\"request\":\"$2\",\"version\":\"$3\",\"baseline\":\"$4\",\"qualification\":\"$5\",\"reason\":\"reproduced_defect\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pubid cid rid call key 2 version call str 1 utf8 "version" call key 2 old call str 1 utf8 "version" call key 2 version call str 1 utf8 "evidence"
+  set receipt call put 3 receipt proof_kind proof
   set discard call query 2 call str 1 utf8 "INSERT INTO publications VALUES(?,?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pubid pid rid cid receipt
   set discard call query 2 call str 1 utf8 "UPDATE candidates SET state='published' WHERE id=?" call append 2 call arr 0 cid
   set discard call audit 3 pid call str 1 utf8 "Workflow published" receipt

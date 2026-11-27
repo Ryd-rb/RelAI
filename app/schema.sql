@@ -67,6 +67,22 @@ CREATE TABLE IF NOT EXISTS proposals(id TEXT PRIMARY KEY,project TEXT NOT NULL,e
 CREATE TABLE IF NOT EXISTS proposal_terms(proposal TEXT PRIMARY KEY REFERENCES proposals,dictionary TEXT NOT NULL REFERENCES dictionaries,name TEXT NOT NULL,kind TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS candidate_versions(candidate TEXT PRIMARY KEY REFERENCES candidates,version TEXT NOT NULL,baseline TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS verified_checks(test TEXT PRIMARY KEY REFERENCES tool_tests,version TEXT NOT NULL,project TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS reproduction_reviews(
+ id TEXT PRIMARY KEY, project TEXT NOT NULL REFERENCES projects,
+ digest TEXT NOT NULL, review TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('planned','running','completed')),
+ phase TEXT CHECK(phase IN ('baseline','correction')),
+ approved_at INTEGER, baseline_receipt TEXT, receipt TEXT
+);
+CREATE TABLE IF NOT EXISTS owner_reproduction_evidence(
+ review TEXT PRIMARY KEY REFERENCES reproduction_reviews(id),
+ project TEXT NOT NULL REFERENCES projects(id),
+ candidate TEXT NOT NULL REFERENCES candidates(id),
+ baseline_test TEXT NOT NULL UNIQUE REFERENCES tool_tests(id),
+ correction_test TEXT NOT NULL UNIQUE REFERENCES tool_tests(id),
+ CHECK(baseline_test<>correction_test)
+);
+CREATE INDEX IF NOT EXISTS owner_reproduction_candidate ON owner_reproduction_evidence(project,candidate);
 CREATE TABLE IF NOT EXISTS publications(id TEXT PRIMARY KEY,project TEXT NOT NULL,request TEXT NOT NULL,candidate TEXT NOT NULL UNIQUE REFERENCES candidates,receipt TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS plans(project TEXT NOT NULL,request TEXT NOT NULL,revision INTEGER NOT NULL,body TEXT NOT NULL,PRIMARY KEY(project,request));
 CREATE TABLE IF NOT EXISTS candidates(id TEXT PRIMARY KEY,project TEXT NOT NULL,operation TEXT NOT NULL,description TEXT NOT NULL,evidence TEXT NOT NULL,checks TEXT NOT NULL,state TEXT NOT NULL);

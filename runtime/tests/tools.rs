@@ -148,6 +148,145 @@ fn publication_requires_a_reproduced_defect_and_preserves_the_same_receipt() {
 }
 
 #[test]
+fn owner_reproduction_is_approved_and_scoped_to_one_candidate() {
+    let mut f = Fixture::new();
+    let baseline = f.propose(
+        "increment",
+        "fluxr 1\npub run 1 x int int do 0 2\nif eq x 42 1\nret 42\n0\nret add x 1",
+        "integer.increment",
+    )["version"]
+        .clone();
+    let source = "fluxr 1\npub run 1 x int int ret add x 1";
+    let correction = f.propose("increment", source, "integer.increment")["version"].clone();
+    let case = json!({"arguments":[{"i64":42}],"inputs":[],"expected":{"i64":43}});
+    for (version, passes) in [(&baseline, false), (&correction, true)] {
+        let author = f
+            .call("tool_test", json!({"version":version,"case":case}))
+            .unwrap();
+        assert_eq!(author["provisional"], true);
+        assert_eq!(author["passed"], passes);
+        assert_eq!(
+            f.call("tool_qualify", json!({"version":version})).unwrap()["active"],
+            true
+        );
+    }
+    let candidate = f.run("workflow.propose", json!({
+        "operation":"increment","contract":"integer.increment","source":source,
+        "description":"Correct the result at 42","checks":["regression"],"evidence":["author case"],
+        "version":correction,"baseline":baseline
+    }))["value"]["candidate"].clone();
+    let db = rusqlite::Connection::open(f.data.join("state.sqlite3")).unwrap();
+    db.execute("INSERT INTO requests(id,project,state,intent) VALUES('repro-closed',?,'completed','increment')", [f.project.as_str().unwrap()]).unwrap();
+    db.execute(
+        "INSERT INTO improvements VALUES('repro-closed','repro-session','repro-job')",
+        [],
+    )
+    .unwrap();
+    db.execute("INSERT INTO candidates SELECT 'other-candidate',project,operation,description,evidence,checks,state FROM candidates WHERE id=?", [candidate.as_str().unwrap()]).unwrap();
+    db.execute("INSERT INTO candidate_versions SELECT 'other-candidate',version,baseline FROM candidate_versions WHERE candidate=?", [candidate.as_str().unwrap()]).unwrap();
+    let publish = |id: &Value| json!({"tool":"workflow.publish","arguments":{"candidate":id,"request":"repro-closed"}});
+    let verified = || {
+        let mut stmt = db
+            .prepare("SELECT test,version,project FROM verified_checks ORDER BY test")
+            .unwrap();
+        stmt.query_map([], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })
+        .unwrap()
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .unwrap()
+    };
+    let count = |sql| db.query_row(sql, [], |r| r.get::<_, i64>(0)).unwrap();
+    let before = verified();
+    let plan = json!({"candidate":candidate,"case":case});
+    assert!(f.call("tool_run", publish(&candidate)).is_err());
+    assert!(
+        f.call(
+            "tool_run",
+            json!({"tool":"tool_reproduction_plan","arguments":plan})
+        )
+        .is_err()
+    );
+    let review = f.call("tool_reproduction_plan", plan).unwrap();
+    assert_eq!(review["case"], case);
+    assert_eq!(review["scope"]["baseline"], baseline);
+    assert_eq!(review["scope"]["correction"], correction);
+    let approval = json!({"review":review["review"],"digest":review["digest"]});
+    let tests_before = count("SELECT count(*) FROM tool_tests");
+    for bad in [
+        json!({"review":review["review"]}),
+        json!({"review":review["review"],"digest":"wrong"}),
+        json!({"review":review["review"],"digest":review["digest"],"case":case}),
+    ] {
+        assert!(f.call("tool_reproduce", bad).is_err());
+    }
+    assert!(
+        f.call(
+            "tool_run",
+            json!({"tool":"tool_reproduce","arguments":approval})
+        )
+        .is_err()
+    );
+    assert_eq!(count("SELECT count(*) FROM tool_tests"), tests_before);
+    assert_eq!(
+        count("SELECT count(*) FROM reproduction_reviews WHERE approved_at IS NOT NULL"),
+        0
+    );
+    assert!(f.call("tool_run", publish(&candidate)).is_err());
+    let mut negative_case = case.clone();
+    negative_case["expected"] = json!({"i64":44});
+    let negative = f
+        .call(
+            "tool_reproduction_plan",
+            json!({"candidate":candidate,"case":negative_case}),
+        )
+        .unwrap();
+    let negative = f
+        .call(
+            "tool_reproduce",
+            json!({"review":negative["review"],"digest":negative["digest"]}),
+        )
+        .unwrap();
+    assert_eq!(negative["reproduced"], false);
+    assert_eq!(count("SELECT count(*) FROM owner_reproduction_evidence"), 0);
+    assert!(f.call("tool_run", publish(&candidate)).is_err());
+    let proof = f.call("tool_reproduce", approval.clone()).unwrap();
+    assert_eq!(proof["reproduced"], true);
+    assert_eq!(proof["checks"][0]["observed"], json!({"i64":42}));
+    assert_eq!(proof["checks"][1]["observed"], json!({"i64":43}));
+    assert_eq!(
+        count(
+            "SELECT count(*) FROM owner_reproduction_evidence e JOIN reproduction_reviews r ON r.id=e.review AND r.project=e.project WHERE r.state='completed' AND r.approved_at IS NOT NULL"
+        ),
+        1
+    );
+    assert!(
+        f.call("tool_run", publish(&json!("other-candidate")))
+            .is_err()
+    );
+    let published = f.call("tool_run", publish(&candidate)).unwrap()["value"].clone();
+    assert!(published.get("independent_check").is_none());
+    assert_eq!(
+        published["owner_reproduction"],
+        json!({
+            "review":review["review"],"digest":review["digest"],"fixture":case,
+            "failed":proof["baseline_test"],"passed":proof["correction_test"]
+        })
+    );
+    assert_eq!(
+        f.call("tool_run", publish(&candidate)).unwrap()["value"],
+        published
+    );
+    assert_eq!(f.call("tool_reproduce", approval).unwrap(), proof);
+    assert_eq!(verified(), before);
+    assert_eq!(count("SELECT count(*) FROM owner_reproduction_evidence"), 1);
+}
+
+#[test]
 fn active_exact_versions_defaults_and_retirement_use_checked_registry() {
     let mut f = Fixture::new();
     let first = f.propose(

@@ -1,14 +1,15 @@
 fluxr 1
 
-fn index_graph 2 pid uint sid uint uint do 11 rowsval uint row uint tree uint bytes uint lang uint source uint done uint countval uint discard uint examined int i int 12
+fn index_graph 2 pid uint sid uint uint do 11 rowsval uint row uint tree uint bytes uint lang uint source uint done uint countval uint discard uint examined int i int 13
   set done call nth 2 call query 2 call str 1 utf8 "SELECT indexed,total FROM graph_indexes WHERE snapshot=?" call append 2 call arr 0 sid 0
-  if and not call same 2 done 0u not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 FROM graph_index_versions WHERE snapshot=? AND version=2" call append 2 call arr 0 sid 0 0u 1
+  if and not call same 2 done 0u not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 FROM graph_index_versions WHERE snapshot=? AND version=3" call append 2 call arr 0 sid 0 0u 1
     ret done
   0
   set discard call query 2 call str 1 utf8 "DELETE FROM graph_symbols WHERE snapshot=?" call append 2 call arr 0 sid
   set discard call query 2 call str 1 utf8 "DELETE FROM graph_indexes WHERE snapshot=?" call append 2 call arr 0 sid
   set examined 0
   set rowsval call query 2 call str 1 utf8 "SELECT path,digest,CASE WHEN path GLOB '*.rs' THEN 'rust' ELSE 'fluxr' END AS lang FROM inventory WHERE snapshot=? AND kind='file' AND (path GLOB '*.rs' OR path GLOB '*.fluxr') AND bytes<=65536 ORDER BY path LIMIT 128" call append 2 call arr 0 sid
+  set discard call retained_graph_metadata 3 pid sid rowsval
   set i 0
   while lt i call size 1 rowsval 6
     set row call nth 2 rowsval i
@@ -24,7 +25,7 @@ fn index_graph 2 pid uint sid uint uint do 11 rowsval uint row uint tree uint by
     next i
   set countval call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT count(*) AS n FROM inventory WHERE snapshot=? AND kind='file' AND (path GLOB '*.rs' OR path GLOB '*.fluxr')" call append 2 call arr 0 sid 0 call str 1 utf8 "n"
   set discard call query 2 call str 1 utf8 "INSERT INTO graph_indexes VALUES(?,?,?)" call append 2 call append 2 call append 2 call arr 0 sid call integer 1 examined countval
-  set discard call query 2 call str 1 utf8 "INSERT INTO graph_index_versions VALUES(?,2) ON CONFLICT(snapshot) DO UPDATE SET version=2" call append 2 call arr 0 sid
+  set discard call query 2 call str 1 utf8 "INSERT INTO graph_index_versions VALUES(?,3) ON CONFLICT(snapshot) DO UPDATE SET version=3" call append 2 call arr 0 sid
   ret call nth 2 call query 2 call str 1 utf8 "SELECT indexed,total FROM graph_indexes WHERE snapshot=?" call append 2 call arr 0 sid 0
 
 pub graph_layers 1 arg uint uint do 7 pid uint sid uint path uint state uint out uint before uint discard uint 11

@@ -597,3 +597,58 @@ fn graph_edges_reference_snapshot_bytes_and_stale_evidence_survives_comparison()
         result["edges"]
     );
 }
+
+#[test]
+fn retained_cargo_roots_and_path_attributes_resolve_exact_module_targets() {
+    let (temp, mut app) = fixture();
+    let root = temp.path().join("graph");
+    let project = open(&mut app, &root);
+    fs::create_dir_all(root.join("src")).unwrap();
+    fs::create_dir_all(root.join("cli")).unwrap();
+    fs::write(root.join("Cargo.toml"), "[package]\nname=\"example\"\nversion=\"0.1.0\"\n[lib]\npath=\"src/entry.rs\"\n[[bin]]\nname=\"example-bin\"\npath=\"cli/launch.rs\"\n").unwrap();
+    fs::write(
+        root.join("src/entry.rs"),
+        "#[path = \"actual.rs\"] mod child;\nmod ordinary;\n",
+    )
+    .unwrap();
+    fs::write(root.join("cli/launch.rs"), "mod helper;").unwrap();
+    for file in [
+        "src/actual.rs",
+        "src/child.rs",
+        "src/ordinary.rs",
+        "cli/helper.rs",
+    ] {
+        fs::write(root.join(file), "").unwrap();
+    }
+    let captured = app
+        .invoke("capture_graph", json!({"project":project}))
+        .unwrap();
+    let snapshot = captured["snapshot"].clone();
+    fs::remove_file(root.join("Cargo.toml")).unwrap();
+    fs::write(root.join("src/entry.rs"), "// edited after capture").unwrap();
+    let graph = app
+        .invoke(
+            "graph_layers",
+            json!({"project":project,"snapshot":snapshot}),
+        )
+        .unwrap();
+    let edges = graph["edges"].as_array().unwrap();
+    assert!(edges.iter().any(|e| e["source"] == "src/entry.rs"
+        && e["target"] == "src/actual.rs"
+        && e["name"] == "child"));
+    assert!(
+        !edges
+            .iter()
+            .any(|e| e["source"] == "src/entry.rs" && e["target"] == "src/child.rs")
+    );
+    assert!(
+        edges
+            .iter()
+            .any(|e| e["source"] == "src/entry.rs" && e["target"] == "src/ordinary.rs")
+    );
+    assert!(
+        edges
+            .iter()
+            .any(|e| e["source"] == "cli/launch.rs" && e["target"] == "cli/helper.rs")
+    );
+}

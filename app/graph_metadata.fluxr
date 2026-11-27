@@ -1,0 +1,16 @@
+fluxr 1
+
+fn retained_graph_metadata 3 pid uint sid uint rust_rows uint uint do 7 manifests uint rowsval uint row uint source uint body uint discard uint i int 6
+  set discard call query 2 call str 1 utf8 "DELETE FROM graph_file_metadata WHERE snapshot=?" call append 2 call arr 0 sid
+  set manifests call query 2 call str 1 utf8 "SELECT path,digest FROM inventory WHERE snapshot=? AND kind='file' AND (path='Cargo.toml' OR path GLOB '*/Cargo.toml') AND bytes<=65536 ORDER BY path LIMIT 128" call append 2 call arr 0 sid
+  set rowsval call query 2 call str 1 utf8 "SELECT value AS \"entry:json\" FROM json_each(?1) WHERE value->>'$.lang'='rust' UNION ALL SELECT value FROM json_each(?2)" @build append 1 2 call arr 0 rust_rows manifests
+  set i 0
+  while lt i call size 1 rowsval 5
+    set row call key 2 call nth 2 rowsval i call str 1 utf8 "entry"
+    set body call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT content FROM blobs WHERE project=? AND digest=?" @build append 1 2 call arr 0 pid call key 2 row call str 1 utf8 "digest" 0 call str 1 utf8 "content"
+    set source call key 2 call baseinfo 1 body call str 1 utf8 "text"
+    if not call same 2 source 0u 1
+      set discard call query 2 call str 1 utf8 "INSERT INTO graph_file_metadata(snapshot,path,digest,metadata) VALUES(?,?,?,?)" @build append 1 4 call arr 0 sid call key 2 row call str 1 utf8 "path" call key 2 row call str 1 utf8 "digest" host graph_file_metadata uint 2 uint call key 2 row call str 1 utf8 "path" uint source
+    0
+    next i
+  ret 0u

@@ -29,6 +29,7 @@
     "files.fluxr",
     "monitoring.fluxr",
     "graph_layers.fluxr",
+    "graph_metadata.fluxr",
     "git-operations.fluxr",
     "publication.fluxr",
     "service-entries.fluxr",

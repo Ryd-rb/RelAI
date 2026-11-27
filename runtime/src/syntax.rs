@@ -59,6 +59,88 @@ pub fn index(language: &str, source: &str) -> Result<Value> {
         json!({"symbols":declarations,"references":references,"diagnostics":diagnostics,"source_digest":crate::hex(source.as_bytes())}),
     )
 }
+// Resolve only project-relative paths in the retained inventory's slash namespace.
+fn retained_relative(source: &str, hint: &str) -> Option<String> {
+    if hint.is_empty()
+        || hint.starts_with('/')
+        || hint.ends_with('/')
+        || hint.contains(['\\', ':', '\0'])
+    {
+        return None;
+    }
+    let mut parts: Vec<_> = source
+        .rsplit_once('/')
+        .map_or_else(Vec::new, |(parent, _)| parent.split('/').collect());
+    for part in hint.split('/') {
+        match part {
+            "" | "." => (),
+            ".." => {
+                parts.pop()?;
+            }
+            _ => parts.push(part),
+        }
+    }
+    (!parts.is_empty()).then(|| parts.join("/"))
+}
+
+pub(crate) fn graph_file_metadata(path: &str, source: &str) -> Value {
+    let mut roots = std::collections::BTreeSet::new();
+    let mut modules = Vec::new();
+    if source.len() > 65536 {
+        return json!({"roots": [], "modules": []});
+    }
+    if path.rsplit('/').next() == Some("Cargo.toml") {
+        if let Ok(manifest) = toml::from_str::<toml::Table>(source) {
+            let lib = manifest.get("lib").into_iter();
+            let bins = manifest
+                .get("bin")
+                .and_then(toml::Value::as_array)
+                .into_iter()
+                .flatten();
+            for target in lib.chain(bins) {
+                if let Some(root) = target
+                    .get("path")
+                    .and_then(toml::Value::as_str)
+                    .and_then(|hint| retained_relative(path, hint))
+                {
+                    roots.insert(root);
+                }
+            }
+        }
+    } else if path.ends_with(".rs")
+        && let Ok(file) = syn::parse_file(source)
+    {
+        for item in file.items {
+            let syn::Item::Mod(module) = item else {
+                continue;
+            };
+            if module.content.is_some() || module.attrs.len() != 1 {
+                continue;
+            }
+            let attr = &module.attrs[0];
+            if !attr.path().is_ident("path") {
+                continue;
+            }
+            let syn::Meta::NameValue(meta) = &attr.meta else {
+                continue;
+            };
+            let syn::Expr::Lit(expr) = &meta.value else {
+                continue;
+            };
+            let syn::Lit::Str(literal) = &expr.lit else {
+                continue;
+            };
+            let hint = literal.value();
+            let Some(target) = retained_relative(path, &hint) else {
+                continue;
+            };
+            let span = module.ident.span().byte_range();
+            modules.push(json!({"name":module.ident.to_string(),"hint":hint,"target":target,"start":span.start,"end":span.end}));
+        }
+    }
+    json!({"roots":roots,"modules":modules})
+}
+
 fn tokens(s: &str) -> Vec<(usize, &str)> {
     let b = s.as_bytes();
     let mut i = 0;

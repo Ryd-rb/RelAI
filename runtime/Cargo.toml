@@ -20,6 +20,7 @@ gix = { version = "0.77", default-features = false, features = ["basic","revisio
 syn = { version = "2", features = ["full","visit"] }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 serde_yaml = "0.9"
+toml = { version = "=0.9.8", default-features = false, features = ["std", "parse", "serde"] }
 unicode-normalization = "0.1"
 caseless = "=0.2.2"
 unicode-segmentation = "1"

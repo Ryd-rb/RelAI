@@ -852,6 +852,7 @@ impl Bindings<'_> {
                 Value::Null
             }
             "syntax" => syntax::index(text(get(0)?)?, text(get(1)?)?)?,
+            "graph_file_metadata" => syntax::graph_file_metadata(text(get(0)?)?, text(get(1)?)?),
             "canonical" => {
                 let p = Path::new(text(get(0)?)?).canonicalize()?;
                 ensure!(

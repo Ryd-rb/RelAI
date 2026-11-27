@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS graph_symbols(snapshot TEXT NOT NULL,path TEXT NOT NU
 CREATE INDEX IF NOT EXISTS graph_symbol_lookup ON graph_symbols(snapshot,language,role,name);
 CREATE TABLE IF NOT EXISTS graph_indexes(snapshot TEXT PRIMARY KEY,indexed INTEGER NOT NULL,total INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS graph_index_versions(snapshot TEXT PRIMARY KEY REFERENCES graph_indexes(snapshot) ON DELETE CASCADE,version INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS graph_file_metadata(snapshot TEXT NOT NULL REFERENCES snapshots(id) ON DELETE CASCADE,path TEXT NOT NULL,digest TEXT NOT NULL,metadata JSON NOT NULL CHECK(json_valid(metadata)),PRIMARY KEY(snapshot,path));
 CREATE TABLE IF NOT EXISTS graph_cursors(snapshot TEXT PRIMARY KEY,cursor INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS file_effects(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,operation TEXT NOT NULL,request TEXT NOT NULL,digest TEXT NOT NULL,state TEXT NOT NULL,grant_id TEXT,result TEXT,error TEXT);
 CREATE TABLE IF NOT EXISTS file_grants(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,effect TEXT NOT NULL REFERENCES file_effects,digest TEXT NOT NULL,destructive INTEGER NOT NULL,state TEXT NOT NULL);

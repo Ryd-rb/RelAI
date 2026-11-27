@@ -62,6 +62,7 @@
     "chat_patch_controls.sql",
     "chat_patch_tool.json",
     "chat_progress.sql",
+    "chat_delivery_controls.sql",
     "chat_references.sql",
     "chat_target.sql",
     "dictionary_workspace.json",

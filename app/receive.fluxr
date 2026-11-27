@@ -66,6 +66,11 @@ pub receive 1 arg uint uint do 13 j uint replyval uint actions uint a uint fan u
     next i
   ret call review_ready 1 call key 2 j call str 1 utf8 "request"
 
+fn check_delivery_budget 2 jid uint retrying bool uint do 2 limits uint discard uint 3
+  set limits call nth 2 call query 2 call str 1 utf8 "SELECT job_exhausted,request_exhausted FROM model_delivery_limits WHERE job=?" call append 2 call arr 0 jid 0
+  set discard call require 2 not call same 2 call key 2 limits call str 1 utf8 "request_exhausted" call integer 1 1 call str 1 utf8 "Request call limit reached. Start a new topic to send another request."
+  ret call require 2 not and retrying call same 2 call key 2 limits call str 1 utf8 "job_exhausted" call integer 1 1 call str 1 utf8 "Attempt limit reached for this job. Start a fresh attempt instead."
+
 pub control 1 arg uint uint do 10 p uint cmd uint jid uint aid uint j uint r uint discard uint requestid uint state uint row uint 9
   set p call key 2 call project 1 arg call str 1 utf8 "id"
   set cmd call key 2 arg call str 1 utf8 "op"
@@ -92,14 +97,18 @@ pub control 1 arg uint uint do 10 p uint cmd uint jid uint aid uint j uint r uin
     set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='cancelled' WHERE request=? AND state NOT IN ('accepted','superseded')" call append 2 call arr 0 r
     ret call audit 3 p call str 1 utf8 "Request stopped" call shape 2 call str 1 utf8 "{\"request\":\"$0\"}" call append 2 call arr 0 r
   0
-  if call same 2 cmd call str 1 utf8 "retry" 3
+  if call same 2 cmd call str 1 utf8 "retry" 6
+    set row call nth 2 call query 2 call str 1 utf8 "SELECT id FROM jobs WHERE id=? AND project=? AND state IN ('held','uncertain') AND revision=(SELECT revision FROM requests WHERE id=jobs.request)" call append 2 call append 2 call arr 0 jid p 0
+    set discard call require 2 not call same 2 row 0u call str 1 utf8 "Job is no longer retryable"
+    set discard call check_delivery_budget 2 jid true
     set discard call query 2 call str 1 utf8 "UPDATE jobs SET state=CASE WHEN seal IS NULL THEN 'queued' ELSE 'sealed' END,reason=NULL WHERE id=? AND project=? AND state IN ('held','uncertain') AND revision=(SELECT revision FROM requests WHERE id=jobs.request)" call append 2 call append 2 call arr 0 jid p
     set discard call require 2 call same 2 discard call integer 1 1 call str 1 utf8 "Job is no longer retryable"
     ret call audit 3 p call str 1 utf8 "Retry queued" call shape 2 call str 1 utf8 "{\"job\":\"$0\"}" call append 2 call arr 0 jid
   0
-  if call same 2 cmd call str 1 utf8 "replace" 4
+  if call same 2 cmd call str 1 utf8 "replace" 5
     set j call nth 2 call query 2 call str 1 utf8 "SELECT j.*,j.input AS \"body:json\" FROM jobs j JOIN requests r ON r.id=j.request AND r.revision=j.revision WHERE j.id=? AND j.project=? AND j.state IN ('running','held','uncertain','sealed')" call append 2 call append 2 call arr 0 jid p 0
     set discard call require 2 not call same 2 j 0u call str 1 utf8 "Job cannot be replaced"
+    set discard call check_delivery_budget 2 jid false
     set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='superseded' WHERE id=?" call append 2 call arr 0 jid
     ret call job 6 p call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call key 2 j call str 1 utf8 "kind" call key 2 j call str 1 utf8 "body"
   0

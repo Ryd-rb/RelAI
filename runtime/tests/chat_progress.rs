@@ -27,6 +27,94 @@ fn status(app: &mut App, project: &Value) -> Option<String> {
 }
 
 #[test]
+fn delivery_controls_enforce_model_budgets_without_blocking_local_tools() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("project");
+    fs::create_dir(&root).unwrap();
+    let data = temp.path().join("state");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let project = app.invoke("open_project", json!({"root":root})).unwrap()["id"].clone();
+    app.invoke(
+        "submit",
+        json!({"project":project,"key":"budget","text":"Request","attachments":[]}),
+    )
+    .unwrap();
+    let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+    let job: String = sql
+        .query_row("SELECT id FROM jobs", [], |row| row.get(0))
+        .unwrap();
+    sql.execute("UPDATE jobs SET state='held' WHERE id=?", [&job])
+        .unwrap();
+    for index in 0..3 {
+        sql.execute(
+            "INSERT INTO attempts(id,job,state) VALUES(?,?,'rejected')",
+            (format!("attempt-{index}"), &job),
+        )
+        .unwrap();
+    }
+    let control = |app: &mut App, op: &str, job: &str| {
+        app.invoke("control", json!({"project":project,"op":op,"job":job}))
+    };
+    let controls = |app: &mut App| {
+        let view = app.invoke("dashboard", json!({"project":project})).unwrap();
+        app.invoke("desktop_frame", json!({"view":view,"state":{}}))
+            .unwrap()["controls"]
+            .as_array()
+            .unwrap()
+            .clone()
+    };
+    let current = controls(&mut app);
+    assert!(!current.iter().any(|c| c["label"] == "Retry delivery"));
+    assert!(
+        current
+            .iter()
+            .any(|c| c["label"] == "Start a fresh attempt")
+    );
+    assert!(control(&mut app, "retry", &job).is_err());
+    let replacement = control(&mut app, "replace", &job).unwrap();
+    let replacement = replacement.as_str().unwrap();
+    for index in 3..64 {
+        sql.execute(
+            "INSERT INTO attempts(id,job,state) VALUES(?,?,'rejected')",
+            (format!("attempt-{index}"), &job),
+        )
+        .unwrap();
+    }
+    sql.execute("UPDATE requests SET revision=2", []).unwrap();
+    sql.execute(
+        "UPDATE jobs SET revision=2,state='held' WHERE id=?",
+        [replacement],
+    )
+    .unwrap();
+    assert!(control(&mut app, "retry", replacement).is_err());
+    assert!(control(&mut app, "replace", replacement).is_err());
+    let exhausted = controls(&mut app);
+    assert!(
+        !exhausted
+            .iter()
+            .any(|c| c["label"] == "Retry delivery" || c["label"] == "Start a fresh attempt")
+    );
+    assert!(
+        exhausted
+            .iter()
+            .any(|c| c["label"] == "New topic" && c["event"]["patch"]["fresh"] == true)
+    );
+    let fresh = app
+        .invoke(
+            "submit",
+            json!({"project":project,"key":"new-budget","text":"Another topic","attachments":[]}),
+        )
+        .unwrap();
+    let next = app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(next["local"], "seal");
+    assert_ne!(fresh["request"], Value::Null);
+    assert_ne!(next["job"], replacement);
+    sql.execute("UPDATE jobs SET kind='tool' WHERE id=?", [replacement])
+        .unwrap();
+    control(&mut app, "retry", replacement).unwrap();
+}
+
+#[test]
 fn chat_describes_real_model_preparation_and_a_pending_file_read() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("project");
@@ -143,7 +231,9 @@ fn chat_uses_safe_operation_and_failure_copy_without_echoing_private_details() {
     .unwrap();
     assert_eq!(
         status(&mut app, &project).as_deref(),
-        Some("The model response could not be completed. Retry delivery to continue.")
+        Some(
+            "The model request could not be prepared. No model request was sent for this job. Retry delivery to continue."
+        )
     );
     sql.execute(
         "INSERT INTO attempts(id,job,state) SELECT 'interrupted-attempt',id,'uncertain' FROM jobs",

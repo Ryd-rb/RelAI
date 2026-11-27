@@ -142,9 +142,12 @@ fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft 
 fn chat_request_options 4 state uint pid uint base uint reqid uint uint do 8 keyval uint groupval uint jobsval uint expanded uint progress uint item uint discard uint i int 12
   set keyval call cat 2 call cat 2 call cat 2 pid call str 1 utf8 "/chat/requests/" reqid call str 1 utf8 "/manage"
   set jobsval call query 2 call str 1 @text r#"
-    SELECT id,CASE WHEN EXISTS(SELECT 1 FROM attempts a WHERE a.id=jobs.attempt AND a.state='uncertain')
-      THEN 'uncertain' ELSE state END AS state FROM jobs WHERE request=?
-      AND revision=(SELECT revision FROM requests WHERE id=jobs.request) AND state IN ('held','uncertain') ORDER BY rowid
+    SELECT j.id,CASE WHEN EXISTS(SELECT 1 FROM attempts a WHERE a.id=j.attempt AND a.state='uncertain')
+      THEN 'uncertain' ELSE j.state END AS state, l.job_exhausted,l.request_exhausted,
+      row_number() OVER (PARTITION BY l.request_exhausted ORDER BY j.rowid) AS budget_row
+      FROM jobs j JOIN model_delivery_limits l ON l.job=j.id WHERE j.request=?
+      AND j.revision=(SELECT revision FROM requests WHERE id=j.request AND state='open')
+      AND j.state IN ('held','uncertain') ORDER BY j.rowid
   "# call append 2 call arr 0 reqid
   set groupval call obj 0
   if lt 0 call size 1 jobsval 1
@@ -167,16 +170,13 @@ fn chat_request_options 4 state uint pid uint base uint reqid uint uint do 8 key
     next i
   ret 0u
 
-fn chat_delivery_options 4 base uint groupval uint item uint expanded uint uint do 3 idval uint keyval uint discard uint 6
-  set idval call key 2 item call str 1 utf8 "id"
-  set keyval call cat 2 call cat 2 base call str 1 utf8 "/" idval
-  if call same 2 call key 2 item call str 1 utf8 "state" call str 1 utf8 "uncertain" 1
-    set discard call ui_emit 1 call ui_merge 2 groupval call shape 2 call str 1 @text r#"{"id":"$0","kind":"label","role":"muted","label":"Delivery could not be confirmed. Retrying may send the message again.","value":"Delivery could not be confirmed. Retrying may send the message again."}"# call append 2 call arr 0 call cat 2 keyval call str 1 utf8 "/uncertain"
-  0
-  set discard call ui_emit 1 call ui_merge 2 groupval call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Retry delivery","role":"quiet","width":130,"row":"$1","event":{"action":"command","spec":{"type":"button","label":"Retry delivery","op":"control","fixed":{"op":"retry","job":"$2"}}}}"# @build append 1 3 call arr 0 call cat 2 keyval call str 1 utf8 "/retry" keyval idval
-  if call same 2 expanded call decode 1 call str 1 utf8 "true" 1
-    set discard call ui_emit 1 call ui_merge 2 groupval call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Start a fresh attempt","role":"quiet","row":"$1","event":{"action":"command","spec":{"type":"button","label":"Start a fresh attempt","op":"control","fixed":{"op":"replace","job":"$2"}}}}"# @build append 1 3 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/replace/" idval keyval idval
-  0
+fn chat_delivery_options 4 base uint groupval uint item uint expanded uint uint do 4 rows uint entry uint discard uint i int 4
+  set rows call query 2 call asset 1 call str 1 utf8 "chat_delivery_controls.sql" @build append 1 3 call arr 0 base item expanded
+  set i 0
+  while lt i call size 1 rows 3
+    set entry call key 2 call nth 2 rows i call str 1 utf8 "control"
+    set discard call ui_emit 1 call ui_merge 2 groupval entry
+    next i
   ret 0u
 
 fn chat_definitions 5 state uint pid uint base uint groupval uint parts uint uint do 7 refs uint refval uint keyval uint item uint expanded uint discard uint i int 10

@@ -19,6 +19,12 @@ SELECT
            (a.state='awaiting_acceptance' OR (a.state='evidence' AND EXISTS (SELECT 1 FROM branches b WHERE b.report=a.id AND b.accepted IS NULL)
              AND NOT EXISTS (SELECT 1 FROM questions q WHERE q.session=j.session AND q.revision=r.revision AND q.state!='answered'))))
           THEN NULL
+         WHEN EXISTS (SELECT 1 FROM current_jobs j JOIN model_delivery_limits l ON l.job=j.id
+                       WHERE j.state IN ('held','uncertain') AND l.request_exhausted=1)
+          THEN 'This topic reached its model call limit. Start a new topic to send another request.'
+         WHEN EXISTS (SELECT 1 FROM current_jobs j JOIN model_delivery_limits l ON l.job=j.id
+                       WHERE j.state IN ('held','uncertain') AND l.job_exhausted=1)
+          THEN 'This job reached its attempt limit. Start a fresh attempt to try again.'
          WHEN EXISTS (SELECT 1 FROM current_jobs j WHERE state='held' AND EXISTS(SELECT 1 FROM attempts a WHERE a.id=j.attempt AND a.state='rejected'))
           THEN 'The model response was received but rejected. Retry delivery to request another response.'
          WHEN EXISTS (SELECT 1 FROM current_jobs j WHERE state='uncertain'
@@ -30,6 +36,8 @@ SELECT
           THEN 'A project operation was interrupted. Retry delivery to continue.'
          WHEN EXISTS (SELECT 1 FROM current_jobs WHERE state='held' AND kind='tool')
           THEN 'A project operation stopped. Retry delivery to continue.'
+         WHEN EXISTS (SELECT 1 FROM current_jobs WHERE state='held' AND attempt IS NULL)
+          THEN 'The model request could not be prepared. No model request was sent for this job. Retry delivery to continue.'
          WHEN EXISTS (SELECT 1 FROM current_jobs WHERE state='held')
           THEN 'The model response could not be completed. Retry delivery to continue.'
          WHEN EXISTS (SELECT 1 FROM actions a JOIN current_jobs j ON j.id=a.job WHERE a.state='held')

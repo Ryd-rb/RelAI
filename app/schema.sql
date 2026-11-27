@@ -18,6 +18,13 @@ CREATE TABLE IF NOT EXISTS files(path TEXT PRIMARY KEY,content TEXT NOT NULL,dig
 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,project TEXT NOT NULL REFERENCES projects,request TEXT NOT NULL REFERENCES requests,revision INTEGER NOT NULL,session TEXT NOT NULL,role TEXT NOT NULL,kind TEXT NOT NULL,input TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'queued',seal TEXT,attempt TEXT,receipt TEXT,reason TEXT);
 CREATE INDEX IF NOT EXISTS queue ON jobs(state,role,session);
 CREATE TABLE IF NOT EXISTS attempts(id TEXT PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs,started INTEGER NOT NULL DEFAULT(unixepoch()),ended INTEGER,state TEXT NOT NULL);
+CREATE INDEX IF NOT EXISTS jobs_by_request ON jobs(request);
+CREATE INDEX IF NOT EXISTS attempts_by_job ON attempts(job);
+CREATE VIEW IF NOT EXISTS model_delivery_limits AS
+ SELECT j.id AS job,
+   j.kind<>'tool' AND (SELECT count(*) FROM attempts a WHERE a.job=j.id)>=3 AS job_exhausted,
+   j.kind<>'tool' AND (SELECT count(*) FROM attempts a JOIN jobs owner ON owner.id=a.job WHERE owner.request=j.request)>=64 AS request_exhausted
+ FROM jobs j;
 CREATE TABLE IF NOT EXISTS actions(id TEXT PRIMARY KEY,job TEXT NOT NULL REFERENCES jobs,kind TEXT NOT NULL,payload TEXT NOT NULL,state TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS branches(id TEXT PRIMARY KEY,request TEXT NOT NULL REFERENCES requests,revision INTEGER NOT NULL,fan TEXT NOT NULL,parent TEXT,role TEXT NOT NULL,task TEXT NOT NULL,report TEXT,accepted TEXT);
 CREATE TABLE IF NOT EXISTS reviews(id TEXT PRIMARY KEY,request TEXT NOT NULL REFERENCES requests,revision INTEGER NOT NULL,fan TEXT NOT NULL,signature TEXT NOT NULL,job TEXT NOT NULL,UNIQUE(fan,revision,signature));

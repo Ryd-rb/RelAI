@@ -4,7 +4,7 @@ use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use serde_json::{Value, json};
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     io::{Cursor, Read, Write},
 };
 
@@ -106,6 +106,7 @@ pub fn encode(format: &str, input: &Value) -> Result<Vec<u8>> {
         "json" => serde_json::to_vec_pretty(input)?,
         "csv" => {
             let rows = input["rows"].as_array().context("Expected CSV rows")?;
+            ensure!(rows.len() <= ITEMS, "CSV row limit");
             let mut writer = csv::WriterBuilder::new()
                 .flexible(true)
                 .from_writer(Vec::new());
@@ -172,19 +173,53 @@ fn safe_entry(name: &str) -> Result<()> {
     }
     Ok(())
 }
+#[derive(Default)]
+struct ArchivePaths {
+    entries: BTreeSet<String>,
+    components: BTreeMap<String, (String, bool)>,
+}
+
+impl ArchivePaths {
+    fn insert(&mut self, name: &str, directory: bool) -> Result<()> {
+        let path = name.strip_suffix('/').unwrap_or(name);
+        ensure!(
+            self.entries.insert(path.to_lowercase()),
+            "Duplicate or aliased ZIP entry: {name}"
+        );
+        for end in path
+            .match_indices('/')
+            .map(|(end, _)| end)
+            .chain([path.len()])
+        {
+            let prefix = &path[..end];
+            let is_dir = end != path.len() || directory;
+            let (spelling, existing_dir) = self
+                .components
+                .entry(prefix.to_lowercase())
+                .or_insert_with(|| (prefix.to_owned(), is_dir));
+            ensure!(
+                spelling.as_str() == prefix,
+                "Inconsistent case for ZIP path component: {prefix}"
+            );
+            ensure!(
+                *existing_dir == is_dir,
+                "ZIP file/directory conflict: {prefix}"
+            );
+        }
+        Ok(())
+    }
+}
+
 fn archive(bytes: &[u8]) -> Result<zip::ZipArchive<Cursor<&[u8]>>> {
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes))?;
     ensure!(archive.len() <= ITEMS, "ZIP entry limit");
     let mut total = 0u64;
     let mut actual = 0usize;
-    let mut names = BTreeSet::new();
+    let mut paths = ArchivePaths::default();
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
         safe_entry(file.name())?;
-        ensure!(
-            names.insert(file.name().trim_end_matches('/').to_lowercase()),
-            "Duplicate or aliased ZIP entry"
-        );
+        paths.insert(file.name(), file.is_dir())?;
         ensure!(
             file.unix_mode()
                 .is_none_or(|mode| mode & 0o170000 != 0o120000),
@@ -253,17 +288,14 @@ fn write_zip(input: &Value) -> Result<Vec<u8>> {
         .as_array()
         .context("Expected archive entries")?;
     ensure!(entries.len() <= ITEMS, "ZIP entry limit");
-    let mut names = BTreeSet::new();
+    let mut paths = ArchivePaths::default();
     let mut total = 0;
     let mut prepared = Vec::new();
     for entry in entries {
         let name = text(&entry["path"])?;
         safe_entry(name)?;
         ensure!(!name.ends_with('/'), "Create accepts regular file entries");
-        ensure!(
-            names.insert(name.to_lowercase()),
-            "Duplicate archive destination"
-        );
+        paths.insert(name, false)?;
         let data = decoded(&entry["base64"])?;
         total += data.len();
         ensure!(total <= EXPANDED, "Archive input limit");
@@ -280,7 +312,12 @@ fn write_zip(input: &Value) -> Result<Vec<u8>> {
         )?;
         zip.write_all(&data)?;
     }
-    Ok(zip.finish()?.into_inner())
+    let bytes = zip.finish()?.into_inner();
+    ensure!(
+        bytes.len() <= INPUT,
+        "Encoded ZIP exceeds the 2 MiB archive input limit"
+    );
+    Ok(bytes)
 }
 
 fn read_docx(bytes: &[u8]) -> Result<Value> {
@@ -429,6 +466,44 @@ fn read_xlsx(bytes: &[u8]) -> Result<Value> {
     }
     Ok(json!({"sheets":output}))
 }
+fn formula_cache(value: &Value) -> Result<Option<String>> {
+    match value {
+        Value::Null => Ok(None),
+        Value::Bool(value) => Ok(Some(if *value { "TRUE" } else { "FALSE" }.to_owned())),
+        Value::Number(value) => {
+            let number = value
+                .as_f64()
+                .context("Invalid numeric XLSX formula cache")?;
+            let integer = value
+                .as_i64()
+                .map(i128::from)
+                .or_else(|| value.as_u64().map(i128::from));
+            ensure!(
+                number.is_finite() && integer.is_none_or(|n| number as i128 == n),
+                "XLSX formula cache cannot preserve the supplied number"
+            );
+            Ok(Some(number.to_string()))
+        }
+        Value::String(value) => {
+            let token = value.trim();
+            ensure!(
+                !token.is_empty()
+                    && token.parse::<f64>().is_err()
+                    && !token.eq_ignore_ascii_case("true")
+                    && !token.eq_ignore_ascii_case("false")
+                    && !token.starts_with('#')
+                    && !value.contains('\r')
+                    && !value.contains("_x")
+                    && value.encode_utf16().count() <= 32767
+                    && value.chars().all(|c| matches!(c, '\t' | '\n' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}' | '\u{10000}'..='\u{10ffff}')),
+                "XLSX formula cache text cannot be preserved unambiguously"
+            );
+            Ok(Some(value.clone()))
+        }
+        _ => bail!("XLSX formula cache must be a scalar or null"),
+    }
+}
+
 fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
     let sheets = input["sheets"].as_array().context("Expected worksheets")?;
     ensure!(
@@ -444,6 +519,8 @@ fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
             .as_array()
             .context("Expected worksheet cells")?;
         let mut coordinates = BTreeSet::new();
+        let (mut min_row, mut max_row) = (u32::MAX, 0);
+        let (mut min_column, mut max_column) = (u16::MAX, 0);
         for cell in cells {
             count += 1;
             ensure!(count <= ITEMS, "Cell limit");
@@ -455,8 +532,13 @@ fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
                 .as_u64()
                 .filter(|n| *n < 16384)
                 .context("Invalid XLSX column")? as u16;
+            min_row = min_row.min(row);
+            max_row = max_row.max(row);
+            min_column = min_column.min(column);
+            max_column = max_column.max(column);
             ensure!(
-                (row as u64 + 1) * (column as u64 + 1) <= 65536,
+                (u64::from(max_row - min_row) + 1) * (u64::from(max_column - min_column) + 1)
+                    <= 65536,
                 "Worksheet grid limit"
             );
             ensure!(
@@ -465,7 +547,13 @@ fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
                 text(&sheet["name"])?
             );
             if let Some(formula) = cell.get("formula").filter(|v| !v.is_null()) {
-                worksheet.write_formula(row, column, text(formula)?)?;
+                let mut formula = rust_xlsxwriter::Formula::new(text(formula)?);
+                if let Some(cache) = formula_cache(&cell["value"]).with_context(|| {
+                    format!("Invalid formula cache at row {row}, column {column}")
+                })? {
+                    formula = formula.set_result(cache.as_str());
+                }
+                worksheet.write_formula(row, column, formula)?;
             } else {
                 match &cell["value"] {
                     Value::Null => {}
@@ -496,6 +584,14 @@ fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
 }
 fn validate_notebook(value: &Value) -> Result<()> {
     ensure!(value["nbformat"] == 4, "Only notebook v4 is supported");
+    ensure!(
+        value["metadata"].is_object(),
+        "Notebook metadata must be an object"
+    );
+    ensure!(
+        value["nbformat_minor"].as_u64().is_some(),
+        "Notebook nbformat_minor must be a nonnegative integer"
+    );
     let cells = value["cells"]
         .as_array()
         .context("Missing notebook cells")?;
@@ -515,6 +611,21 @@ fn validate_notebook(value: &Value) -> Result<()> {
                     .is_some_and(|items| items.iter().all(Value::is_string)),
             "Invalid notebook source"
         );
+        ensure!(
+            cell["metadata"].is_object(),
+            "Notebook cell metadata must be an object"
+        );
+        if cell["cell_type"] == "code" {
+            ensure!(
+                cell["outputs"].is_array(),
+                "Code cell outputs must be an array"
+            );
+            ensure!(
+                cell.get("execution_count")
+                    .is_some_and(|count| count.is_null() || count.as_u64().is_some()),
+                "Code cell execution_count must be present and null or a nonnegative integer"
+            );
+        }
     }
     Ok(())
 }
@@ -554,4 +665,46 @@ fn read_pdf(bytes: &[u8]) -> Result<Value> {
         output.push_str(&text);
     }
     Ok(json!({"text":output,"pages":pages.len()}))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn csv_writer_and_reader_share_the_same_row_limit() {
+        let rows = (0..ITEMS).map(|_| json!([])).collect::<Vec<_>>();
+        let encoded = encode("csv", &json!({"rows":rows})).unwrap();
+        let decoded = decode("csv", &encoded).unwrap();
+        assert_eq!(decoded["rows"].as_array().unwrap().len(), ITEMS);
+        let rows = (0..=ITEMS).map(|_| json!([])).collect::<Vec<_>>();
+        let error = encode("csv", &json!({"rows":rows}))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("CSV row limit"), "{error}");
+    }
+
+    #[test]
+    fn zip_writer_rejects_archives_beyond_the_decoder_size_limit() {
+        let mut state = 1u32;
+        let content: Vec<_> = (0..INPUT + 4096)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 17;
+                state ^= state << 5;
+                state as u8
+            })
+            .collect();
+        let (first, second) = content.split_at(INPUT / 2);
+        let error = encode(
+            "zip",
+            &json!({"entries":[
+                {"path":"first.bin","base64":STANDARD.encode(first)},
+                {"path":"second.bin","base64":STANDARD.encode(second)}
+            ]}),
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(error.contains("Encoded ZIP exceeds"), "{error}");
+    }
 }

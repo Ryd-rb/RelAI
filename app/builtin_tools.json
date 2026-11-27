@@ -150,7 +150,7 @@
   },
   {
     "id": "document.read",
-    "description": "Read Markdown, DOCX or PDF text from exact file or artifact",
+    "description": "Read Markdown, DOCX or PDF text from exact file or artifact. Each DOCX paragraph contributes one newline, including the last.",
     "input": {
       "path": "project-relative file path; omit when using artifact",
       "artifact": "exact project artifact ID; use instead of path",
@@ -164,7 +164,7 @@
   },
   {
     "id": "document.write",
-    "description": "Create immutable Markdown or DOCX artifact",
+    "description": "Create immutable Markdown or DOCX artifact. On readback, each DOCX paragraph contributes one newline, including the last.",
     "input": {
       "format": "markdown|docx",
       "text": "text",
@@ -193,9 +193,9 @@
   },
   {
     "id": "sheet.write",
-    "description": "Create immutable XLSX cells; formula:null means no formula; duplicate coordinates and lossy integers are rejected",
+    "description": "Create immutable XLSX cells. A missing or null formula means no formula; null value without a formula omits the cell. With a formula, missing or null value uses the writer's default cached result (0). Unrepresentable explicit caches, duplicate coordinates and lossy integers are rejected.",
     "input": {
-      "sheets": "[{name,cells:[{row,column,value|formula}]}]; coordinates are zero-based; preserve inexact integers as text"
+      "sheets": "[{name,cells:[{row,column,value?,formula?}]}]; coordinates are zero-based; a scalar value alongside a formula is its prepared cache; preserve inexact integers as text in cells without formulas"
     },
     "output": "artifact metadata",
     "route": "portable",
@@ -236,7 +236,7 @@
   },
   {
     "id": "archive.create",
-    "description": "Create immutable ZIP artifact",
+    "description": "Create immutable ZIP artifact no larger than 2 MiB encoded; reject conflicting file/directory paths and inconsistent case in ancestor paths",
     "input": {
       "entries": "[{path,base64}]"
     },

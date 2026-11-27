@@ -222,6 +222,111 @@ fn sparse_formula_coordinates_survive_without_cached_values() {
 }
 
 #[test]
+fn sparse_sheet_writes_exact_representable_formula_caches() {
+    let mut f = Fixture::new();
+    let artifact = f
+        .tool(
+            "sheet.write",
+            json!({"sheets":[{"name":"Sparse","cells":[
+                {"row":99999,"column":0,"formula":"=21*2","value":42},
+                {"row":99999,"column":1,"formula":"=1=1","value":true},
+                {"row":99999,"column":2,"formula":"=\"Result\"","value":"Result"}
+            ]}]}),
+        )
+        .unwrap();
+    let read = f
+        .tool("sheet.read", json!({"artifact":artifact["id"]}))
+        .unwrap();
+    let cells = read["sheets"][0]["cells"].as_array().unwrap();
+    assert_eq!(cells.len(), 3);
+    assert_eq!(cells[0]["row"], 99999);
+    assert_eq!(cells[0]["value"].as_f64(), Some(42.0));
+    assert_eq!(cells[1]["value"], true);
+    assert_eq!(cells[2]["value"], "Result");
+    let error = f
+        .tool(
+            "sheet.write",
+            json!({"sheets":[{"name":"Data","cells":[
+                {"row":0,"column":0,"formula":"=\"42\"","value":"42"}
+            ]}]}),
+        )
+        .unwrap_err();
+    assert!(format!("{error:#}").contains("formula cache"));
+    assert!(
+        f.tool(
+            "sheet.write",
+            json!({"sheets":[{"name":"Data","cells":[
+                {"row":0,"column":0,"value":1},
+                {"row":99999,"column":0,"value":2}
+            ]}]})
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("Worksheet grid limit")
+    );
+}
+
+#[test]
+fn notebook_rejects_missing_required_metadata_and_code_fields() {
+    let mut f = Fixture::new();
+    let valid = json!({"nbformat":4,"nbformat_minor":2,"metadata":{},"cells":[
+        {"cell_type":"code","metadata":{},"source":"pass","outputs":[],"execution_count":null}
+    ]});
+    for field in ["metadata", "nbformat_minor", "outputs", "execution_count"] {
+        let mut malformed = valid.clone();
+        if matches!(field, "outputs" | "execution_count") {
+            malformed["cells"][0].as_object_mut().unwrap().remove(field);
+        } else {
+            malformed.as_object_mut().unwrap().remove(field);
+        }
+        fs::write(f.root.join("input.ipynb"), malformed.to_string()).unwrap();
+        assert!(
+            f.tool("notebook.edit", json!({"path":"input.ipynb","edits":[]}))
+                .is_err(),
+            "{field}"
+        );
+    }
+    fs::write(f.root.join("input.ipynb"), valid.to_string()).unwrap();
+    f.tool("notebook.edit", json!({"path":"input.ipynb","edits":[]}))
+        .unwrap();
+}
+
+#[test]
+fn archive_path_validation_rejects_conflicts_in_both_orders() {
+    let mut f = Fixture::new();
+    for (a, b, expected) in [
+        ("notes", "notes/index.txt", "file/directory conflict"),
+        ("Notes/a.txt", "notes/b.txt", "Inconsistent case"),
+    ] {
+        for (first, second) in [(a, b), (b, a)] {
+            let error = f
+                .tool(
+                    "archive.create",
+                    json!({"entries":[
+                        {"path":first,"base64":"YQ=="},
+                        {"path":second,"base64":"Yg=="}
+                    ]}),
+                )
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains(expected), "{error}");
+        }
+    }
+    let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    let options = zip::write::SimpleFileOptions::default();
+    zip.add_directory("notes/", options).unwrap();
+    zip.start_file("notes/index.txt", options).unwrap();
+    zip.write_all(b"index").unwrap();
+    fs::write(
+        f.root.join("explicit-directory.zip"),
+        zip.finish().unwrap().into_inner(),
+    )
+    .unwrap();
+    f.tool("archive.list", json!({"path":"explicit-directory.zip"}))
+        .unwrap();
+}
+
+#[test]
 fn docx_empty_paragraph_cdata_and_real_tabs() {
     let mut f = Fixture::new();
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));

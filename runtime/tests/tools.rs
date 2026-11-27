@@ -568,7 +568,7 @@ fn malformed_formats_and_expansion_limits_fail_without_publishing_artifacts() {
         )
         .is_err()
     );
-    assert!(f.call("tool_run",json!({"tool":"sheet.write","arguments":{"sheets":[{"name":"Large","cells":[{"row":65536,"column":1,"value":1}]}]}})).is_err());
+    assert!(f.call("tool_run",json!({"tool":"sheet.write","arguments":{"sheets":[{"name":"Large","cells":[{"row":0,"column":1,"value":1},{"row":65536,"column":1,"value":2}]}]}})).is_err());
     fs::write(
         f.root.join("invalid.ipynb"),
         b"{\"nbformat\":3,\"cells\":[]}",

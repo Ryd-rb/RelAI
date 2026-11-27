@@ -10,18 +10,20 @@ pub hold 1 arg uint uint do 2 j uint discard uint 6
   set discard call audit 3 call key 2 j call str 1 utf8 "project" call str 1 utf8 "Job held" call put 3 arg call str 1 utf8 "request" call key 2 j call str 1 utf8 "request"
   ret 0u
 
-pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint count uint discard uint finalrow uint i int 24
+pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint count uint discard uint finalrow uint i int 23
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='queued',reason=NULL WHERE state='waiting' AND revision=(SELECT revision FROM requests r WHERE r.id=jobs.request AND r.state='open') AND NOT EXISTS(SELECT 1 FROM current_prerequisites c WHERE c.job=jobs.id AND c.satisfied=0)" call arr 0
-  set files call query 2 call str 1 utf8 "SELECT path,content FROM files WHERE verified=0 LIMIT 32" call arr 0
+  set files call query 2 call str 1 @text r#"
+    SELECT f.path,f.content,f.digest FROM files f
+    WHERE f.verified=0 AND NOT EXISTS (
+      SELECT 1 FROM publication_failures p WHERE p.path=f.path AND p.digest=f.digest
+        AND p.retry_at>unixepoch())
+    ORDER BY f.rowid LIMIT 32
+  "# call arr 0
   set i 0
-  while lt i call size 1 files 4
+  while lt i call size 1 files 3
     set f call nth 2 files i
-    set discard call publish 2 call key 2 f call str 1 utf8 "path" call key 2 f call str 1 utf8 "content"
-    set discard call query 2 call str 1 utf8 "UPDATE files SET verified=1 WHERE path=?" call append 2 call arr 0 call key 2 f call str 1 utf8 "path"
+    set discard call save_retained 3 call key 2 f call str 1 utf8 "path" call key 2 f call str 1 utf8 "content" call key 2 f call str 1 utf8 "digest"
     next i
-  if eq call size 1 files 32 1
-    ret 0u
-  0
   set finalrow call nth 2 call query 2 call str 1 utf8 "SELECT f.request,r.project,a.payload AS \"result:json\",i.job FROM finals f JOIN files d ON d.path=f.path AND d.verified=1 JOIN requests r ON r.id=f.request JOIN actions a ON a.id=f.action JOIN improvements i ON i.request=r.id WHERE f.released=0 LIMIT 1" call arr 0 0
   if not call same 2 finalrow 0u 3
     set discard call audit 3 call key 2 finalrow call str 1 utf8 "project" call str 1 utf8 "Final result" finalrow
@@ -51,7 +53,9 @@ pub poll 1 arg uint uint do 9 files uint f uint j uint jid uint attempt uint cou
     ret call hold 1 call shape 2 call str 1 utf8 "{\"job\":\"$0\",\"error\":\"Request call limit reached\"}" call append 2 call arr 0 jid
   0
   if not call seal_current 1 j 1 ret call hold 1 call shape 2 call str 1 utf8 "{\"job\":\"$0\",\"error\":\"Sealed input access changed. Replace this turn.\"}" call append 2 call arr 0 jid 0
-  set discard call verify_delivery 1 j
+  if not call verify_delivery 1 j 1
+    ret call hold 1 call shape 2 call str 1 utf8 "{\"job\":\"$0\",\"error\":\"Required retained document could not be saved\"}" call append 2 call arr 0 jid
+  0
   set attempt call uid 0
   set discard call query 2 call str 1 utf8 "INSERT INTO attempts(id,job,state) VALUES(?,?,'sending')" call append 2 call append 2 call arr 0 attempt jid
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='running',attempt=? WHERE id=?" call append 2 call append 2 call arr 0 attempt jid

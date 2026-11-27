@@ -134,6 +134,92 @@ fn submission_recovery_retries_and_single_improvement() {
 }
 
 #[test]
+fn obstructed_retained_documents_hold_only_their_delivery_and_can_recover() {
+    let temp = tempfile::tempdir().unwrap();
+    let data = temp.path().join("state");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let submit = |app: &mut App, name: &str| {
+        let root = temp.path().join(name);
+        fs::create_dir(&root).unwrap();
+        let project = app.invoke("open_project", json!({"root":root})).unwrap()["id"].clone();
+        let sub = app
+            .invoke("submit", json!({"project":project,"key":name,"text":name}))
+            .unwrap();
+        (project, sub)
+    };
+    let (project, sub) = submit(&mut app, "blocked");
+    let sealing = app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(sealing["local"], "seal");
+    let job = sealing["job"].as_str().unwrap();
+    app.invoke("seal", sealing.clone()).unwrap();
+    let parent = data.join("turns");
+    fs::create_dir_all(&parent).unwrap();
+    let obstruction = parent.join(job);
+    fs::write(&obstruction, "obstruction").unwrap();
+    let (_, other) = submit(&mut app, "healthy");
+    assert!(app.invoke("poll", Value::Null).unwrap().is_null());
+    let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+    let state: (String, i64) = sql.query_row(
+        "SELECT state,(SELECT count(*) FROM attempts a WHERE a.job=j.id) FROM jobs j WHERE id=?",
+        [job],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    ).unwrap();
+    assert_eq!(state, ("held".into(), 0));
+    let path = format!("turns/{job}/input.json");
+    let failed = || {
+        sql.query_row(
+        "SELECT f.verified,f.content,p.failures FROM files f JOIN publication_failures p USING(path,digest) WHERE f.path=?",
+        [&path],
+        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?)),
+    ).unwrap()
+    };
+    let before = failed();
+    assert_eq!(before.0, 0);
+    let healthy = next(&mut app);
+    assert_ne!(healthy["job"], sealing["job"]);
+    let healthy_request: String = sql
+        .query_row(
+            "SELECT request FROM jobs WHERE id=?",
+            [healthy["job"].as_str().unwrap()],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(other["request"], healthy_request);
+    assert_eq!(failed(), before);
+    assert_eq!(fs::read(&obstruction).unwrap(), b"obstruction");
+    fs::remove_file(obstruction).unwrap();
+    app.invoke("control", json!({"project":project,"op":"retry","job":job}))
+        .unwrap();
+    let retried = next(&mut app);
+    assert_eq!(retried["job"], sealing["job"]);
+    assert_eq!(
+        sql.query_row("SELECT verified FROM files WHERE path=?", [&path], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+    assert_eq!(
+        sql.query_row(
+            "SELECT count(*) FROM publication_failures WHERE path=?",
+            [&path],
+            |r| r.get::<_, i64>(0)
+        )
+        .unwrap(),
+        0
+    );
+    assert_eq!(fs::read_to_string(data.join(path)).unwrap(), before.1);
+    assert_eq!(
+        fs::read_to_string(
+            data.join("submissions")
+                .join(sub["id"].as_str().unwrap())
+                .join("PROMPT.txt")
+        )
+        .unwrap(),
+        "blocked"
+    );
+}
+
+#[test]
 fn updating_a_request_while_reading_the_project_can_reach_acceptance() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("project");

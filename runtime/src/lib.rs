@@ -161,6 +161,34 @@ fn join(root: &Path, name: &str) -> Result<PathBuf> {
     }
     Ok(path)
 }
+fn publish_file(path: &Path, data: &[u8]) -> Result<String> {
+    ensure!(
+        data.len() <= LIMIT,
+        "Retained file exceeds publication limit"
+    );
+    let parent = path.parent().context("Invalid path")?;
+    fs::create_dir_all(parent)?;
+    let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+    tmp.write_all(data)?;
+    tmp.as_file().sync_all()?;
+    tmp.persist(path)?;
+    ensure!(read(path)? == data, "File verification failed");
+    Ok(hex(data))
+}
+
+fn publish_checked(root: &Path, name: &str, data: &[u8], digest: &str) -> Result<()> {
+    ensure!(hex(data) == digest, "Retained content digest mismatch");
+    let path = join(root, name)?;
+    if read(&path).is_ok_and(|bytes| bytes == data) {
+        return Ok(());
+    }
+    ensure!(
+        publish_file(&path, data)? == digest,
+        "Publication digest mismatch"
+    );
+    Ok(())
+}
+
 pub fn fill(value: &Value, args: &[Value]) -> Result<Value> {
     Ok(match value {
         Value::String(s) if s.starts_with('$') && s[1..].parse::<usize>().is_ok() => args
@@ -968,15 +996,18 @@ impl Bindings<'_> {
             }
             "publish" => {
                 let p = join(self.data, text(get(0)?)?)?;
-                let data = text(get(1)?)?.as_bytes();
-                let parent = p.parent().context("Invalid path")?;
-                fs::create_dir_all(parent)?;
-                let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
-                tmp.write_all(data)?;
-                tmp.as_file().sync_all()?;
-                tmp.persist(&p)?;
-                ensure!(read(&p)? == data, "File verification failed");
-                json!(hex(data))
+                json!(publish_file(&p, text(get(1)?)?.as_bytes())?)
+            }
+            "publish_checked" => {
+                match publish_checked(
+                    self.data,
+                    text(get(0)?)?,
+                    text(get(1)?)?.as_bytes(),
+                    text(get(2)?)?,
+                ) {
+                    Ok(()) => Value::Null,
+                    Err(error) => json!(format!("{error:#}").chars().take(512).collect::<String>()),
+                }
             }
             "base64_info" => {
                 let encoded = text(get(0)?)?;

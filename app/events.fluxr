@@ -20,23 +20,44 @@ pub job_details 1 arg uint uint do 3 pid uint row uint discard uint 4
   set discard call require 2 not call same 2 row 0u call str 1 utf8 "Unknown job"
   ret call put 3 row call str 1 utf8 "next_preset" call preset 2 pid call key 2 row call str 1 utf8 "role"
 
-fn verify_doc 1 path uint uint do 2 row uint discard uint 4
-  set row call nth 2 call query 2 call str 1 utf8 "SELECT content,digest FROM files WHERE path=?" call append 2 call arr 0 path 0
-  set discard call require 2 not call same 2 row 0u call str 1 utf8 "Required publication no longer available"
-  if not host file_valid bool 2 uint path uint call key 2 row call str 1 utf8 "digest" 1
-    set discard call publish 2 path call key 2 row call str 1 utf8 "content"
+fn save_retained 3 path uint content uint digest uint uint do 2 error uint discard uint 5
+  set error host publish_checked uint 3 uint path uint content uint digest
+  if call same 2 error 0u 3
+    set discard call query 2 call str 1 utf8 "UPDATE files SET verified=1 WHERE path=? AND digest=?" call append 2 call append 2 call arr 0 path digest
+    set discard call query 2 call str 1 utf8 "DELETE FROM publication_failures WHERE path=? AND digest=?" call append 2 call append 2 call arr 0 path digest
+    ret 0u
   0
-  ret 0u
+  set discard call query 2 call str 1 utf8 "UPDATE files SET verified=0 WHERE path=? AND digest=?" call append 2 call append 2 call arr 0 path digest
+  set discard call query 2 call str 1 @text r#"
+    INSERT INTO publication_failures VALUES(?1,?2,?3,1,unixepoch(),unixepoch(),unixepoch()+5)
+    ON CONFLICT(path,digest) DO UPDATE SET error=excluded.error,
+      failures=publication_failures.failures+1,last_failed=excluded.last_failed,
+      retry_at=unixepoch()+min(300,5*(1 << min(publication_failures.failures,6)))
+  "# @build append 1 3 call arr 0 path digest error
+  ret error
 
-fn verify_delivery 1 j uint uint do 4 root uint data uint sid uint discard uint 7
+fn verify_doc 1 path uint bool do 1 row uint 3
+  set row call nth 2 call query 2 call str 1 utf8 "SELECT content,digest FROM files WHERE path=?" call append 2 call arr 0 path 0
+  if call same 2 row 0u 1
+    ret false
+  0
+  ret call same 2 call save_retained 3 path call key 2 row call str 1 utf8 "content" call key 2 row call str 1 utf8 "digest" 0u
+
+fn verify_delivery 1 j uint bool do 4 root uint data uint sid uint ready bool 7
   set root call cat 2 call str 1 utf8 "turns/" call key 2 j call str 1 utf8 "id"
-  set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/SYSTEM.txt"
-  set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/input.json"
+  set ready call verify_doc 1 call cat 2 root call str 1 utf8 "/SYSTEM.txt"
+  if not call verify_doc 1 call cat 2 root call str 1 utf8 "/input.json" 1
+    set ready false
+  0
   set data call key 2 call key 2 call key 2 j call str 1 utf8 "sealed" call str 1 utf8 "selection" call str 1 utf8 "delivery"
   set sid call key 2 data call str 1 utf8 "submission"
   if not call same 2 sid 0u 3
     set root call cat 2 call str 1 utf8 "submissions/" sid
-    set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/PROMPT.txt"
-    set discard call verify_doc 1 call cat 2 root call str 1 utf8 "/attachments.json"
+    if not call verify_doc 1 call cat 2 root call str 1 utf8 "/PROMPT.txt" 1
+      set ready false
+    0
+    if not call verify_doc 1 call cat 2 root call str 1 utf8 "/attachments.json" 1
+      set ready false
+    0
   0
-  ret 0u
+  ret ready

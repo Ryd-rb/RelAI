@@ -36,6 +36,8 @@ SELECT
           THEN 'A project operation was interrupted. Retry delivery to continue.'
          WHEN EXISTS (SELECT 1 FROM current_jobs WHERE state='held' AND kind='tool')
           THEN 'A project operation stopped. Retry delivery to continue.'
+         WHEN EXISTS (SELECT 1 FROM current_jobs WHERE state='held' AND reason='Required retained document could not be saved')
+          THEN 'RelAI could not save a file required for this request. Check local storage and retry.'
          WHEN EXISTS (SELECT 1 FROM current_jobs WHERE state='held' AND attempt IS NULL)
           THEN 'The model request could not be prepared. No model request was sent for this job. Retry delivery to continue.'
          WHEN EXISTS (SELECT 1 FROM current_jobs WHERE state='held')

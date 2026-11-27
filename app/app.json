@@ -9,6 +9,7 @@
     "receive.fluxr",
     "ui.fluxr",
     "chat.fluxr",
+    "chat_patches.fluxr",
     "graph.fluxr",
     "tools.fluxr",
     "tool_jobs.fluxr",
@@ -58,6 +59,8 @@
     "builtin_tools.json",
     "chat_history.sql",
     "chat_preview.sql",
+    "chat_patch_controls.sql",
+    "chat_patch_tool.json",
     "chat_progress.sql",
     "chat_references.sql",
     "chat_target.sql",
@@ -135,6 +138,7 @@
     "patch_preview",
     "patch_stage",
     "patch_apply",
+    "chat_patch_apply",
     "suggest_terms",
     "graph_layers",
     "git_propose",
@@ -221,6 +225,11 @@
       ]
     },
     "patch_apply": {
+      "$filesystem": [
+        "guest_effect_finished"
+      ]
+    },
+    "chat_patch_apply": {
       "$filesystem": [
         "guest_effect_finished"
       ]

@@ -9,6 +9,10 @@ WITH visible AS NOT MATERIALIZED (
         OR (e.kind='Final result' AND NOT EXISTS (
             SELECT 1 FROM finals f JOIN events proposed ON proposed.project=e.project AND proposed.kind='RESULT'
             AND proposed.payload->>'$.action'=f.action WHERE f.request=r.id)))
+    UNION ALL
+    SELECT e.cursor,e.kind,e.payload,r.id,r.state,r.revision
+    FROM events e JOIN requests r ON r.id=e.payload->>'$.request' AND r.project=e.project
+    WHERE e.project=?1 AND e.kind='Patch proposed'
 ), older AS (
     SELECT * FROM visible WHERE ?3 IS NULL AND cursor<coalesce(?2,9223372036854775807)
     ORDER BY cursor DESC LIMIT 24
@@ -16,6 +20,7 @@ WITH visible AS NOT MATERIALIZED (
     SELECT * FROM visible WHERE ?3 IS NOT NULL AND cursor>?3 ORDER BY cursor LIMIT 24
 ), page AS (SELECT * FROM older UNION ALL SELECT * FROM newer)
 SELECT p.cursor, p.kind, p.request, p.state, CASE WHEN p.kind='Final result' THEN f.action ELSE p.payload->>'$.action' END AS action,
+    CASE WHEN p.kind='Patch proposed' THEN p.payload->>'$.effect' END AS effect,
     CASE WHEN p.kind='ASK' THEN CASE WHEN p.state='stopped' THEN 'Stopped question' WHEN q.revision<p.revision THEN 'Superseded question' WHEN q.state='answered' THEN 'Answered question' WHEN q.state='answer_queued' THEN 'Question · reply queued' ELSE 'Question' END END AS question_status,
     CASE WHEN p.kind='ASK' THEN p.payload->>'$.payload.work' END AS work,
     CASE WHEN p.kind='Submission' THEN coalesce(p.payload->'$.attachments','[]') ELSE '[]' END AS "sent_files:json",

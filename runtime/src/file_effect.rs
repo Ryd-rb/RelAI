@@ -11,11 +11,40 @@ use std::{
 };
 
 const LIMIT: usize = 8 * 1024 * 1024;
+#[cfg(windows)]
+const PATCH_LIMIT: usize = 256 * 1024;
 fn text(value: &Value) -> Result<&str> {
     value.as_str().context("Expected text")
 }
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
+}
+
+#[cfg(windows)]
+fn text_edits(before: &str, edits: &Value) -> Result<String> {
+    let edits = edits.as_array().context("Expected a list of exact edits")?;
+    ensure!((1..=64).contains(&edits.len()), "Use 1–64 edits per file");
+    let mut after = before.to_owned();
+    for edit in edits {
+        let old = text(&edit["old"])?;
+        let new = text(&edit["new"])?;
+        ensure!(old != new, "An edit must change the text");
+        if old.is_empty() {
+            ensure!(after.is_empty(), "An empty match requires an empty file");
+            after.push_str(new);
+        } else {
+            let start = after.find(old).context("The old text was not found")?;
+            let next = start + old.chars().next().expect("nonempty match").len_utf8();
+            ensure!(
+                !after[next..].contains(old),
+                "The old text matches more than once"
+            );
+            after.replace_range(start..start + old.len(), new);
+        }
+        ensure!(after.len() <= LIMIT, "Patched text exceeds the file limit");
+    }
+    ensure!(after != before, "The edits leave the file unchanged");
+    Ok(after)
 }
 
 pub fn patch(request: &Value) -> Result<Value> {
@@ -72,6 +101,11 @@ pub fn execute(_request: &Value, _private: &Path) -> Result<Value> {
     Ok(json!({"state":"unsupported","error":"Protected file effects require Windows TxF"}))
 }
 
+#[cfg(not(windows))]
+pub fn prepare_chat_patch(_root: &Path, _files: &Value, _private: &Path) -> Result<Value> {
+    bail!("Protected patches require Windows TxF")
+}
+
 #[cfg(windows)]
 mod windows {
     use super::*;
@@ -113,6 +147,12 @@ mod windows {
             );
         }
         Ok(info)
+    }
+    fn file_identity(info: &BY_HANDLE_FILE_INFORMATION) -> String {
+        format!(
+            "{:08x}:{:08x}{:08x}",
+            info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow
+        )
     }
     struct Guarded {
         path: PathBuf,
@@ -204,10 +244,7 @@ mod windows {
             return Ok(json!({"kind":"absent"}));
         };
         let identity = info(file)?;
-        let id = format!(
-            "{:08x}:{:08x}{:08x}",
-            identity.dwVolumeSerialNumber, identity.nFileIndexHigh, identity.nFileIndexLow
-        );
+        let id = file_identity(&identity);
         if identity.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY != 0 {
             return Ok(
                 json!({"kind":"directory","empty":fs::read_dir(path)?.next().is_none(),"file_id":id}),
@@ -217,11 +254,102 @@ mod windows {
             file.metadata()?.len() <= LIMIT as u64,
             "File exceeds effect byte limit"
         );
+        let bytes = read_bytes(file)?;
+        Ok(json!({"kind":"file","digest":digest(&bytes),"bytes":bytes.len(),"file_id":id}))
+    }
+
+    fn read_bytes(file: &mut File) -> Result<Vec<u8>> {
         file.seek(SeekFrom::Start(0))?;
         let mut bytes = Vec::new();
         file.take(LIMIT as u64 + 1).read_to_end(&mut bytes)?;
         ensure!(bytes.len() <= LIMIT, "File exceeds effect byte limit");
-        Ok(json!({"kind":"file","digest":digest(&bytes),"bytes":bytes.len(),"file_id":id}))
+        Ok(bytes)
+    }
+
+    pub(super) fn prepare_chat_patch(root: &Path, files: &Value, private: &Path) -> Result<Value> {
+        let files = files.as_array().context("Expected a files array")?;
+        ensure!((1..=16).contains(&files.len()), "Choose 1–16 patch files");
+        ensure!(
+            serde_json::to_vec(files)?.len() <= PATCH_LIMIT,
+            "Patch input exceeds 256 KiB"
+        );
+        let head = read_protected_head(root, private)?;
+        let root = root.canonicalize()?;
+        let mut paths = std::collections::BTreeSet::new();
+        let mut identities = std::collections::BTreeSet::new();
+        let mut operations = Vec::new();
+        let mut reviews = Vec::new();
+        let mut write_bytes = 0usize;
+        let mut preview_bytes = 0usize;
+        for entry in files {
+            let name = text(&entry["path"])?;
+            let relative = Path::new(name);
+            ensure!(
+                !name.is_empty()
+                    && !name.contains(['\\', ':', '\0'])
+                    && relative
+                        .components()
+                        .all(|part| matches!(part, Component::Normal(_)))
+                    && name.split('/').all(|part| !matches!(part, "" | "." | "..")
+                        && !part.eq_ignore_ascii_case(".git")),
+                "Use a project-relative path with forward slashes outside .git"
+            );
+            let expected_digest = entry
+                .get("digest")
+                .context("Include the file digest or null for an absent file")?;
+            let target = guarded(&root.join(relative), private)?;
+            let canonical_relative = target.path.strip_prefix(&root)?;
+            ensure!(
+                canonical_relative
+                    .components()
+                    .all(|part| !part.as_os_str().eq_ignore_ascii_case(".git"))
+                    && checkout(&target.path).as_ref() == Some(&root),
+                "Patch destination must be in the open checkout"
+            );
+            ensure!(
+                paths.insert(target.path.to_string_lossy().to_lowercase()),
+                "Repeated patch destination"
+            );
+            let mut file = plain_open(&target.path)?;
+            let observed = state(&target.path, file.as_mut())?;
+            let old = if let Some(file) = file.as_mut() {
+                ensure!(
+                    observed["kind"] == "file" && observed.get("digest") == Some(expected_digest),
+                    "{name} changed or is not a regular file. Read it again before proposing an edit."
+                );
+                ensure!(
+                    identities.insert(text(&observed["file_id"])?.to_owned()),
+                    "Repeated patch file identity"
+                );
+                String::from_utf8(read_bytes(file)?).context("Patch targets must be UTF-8 text")?
+            } else {
+                ensure!(expected_digest.is_null(), "{name} is absent");
+                String::new()
+            };
+            ensure!(!old.contains('\0'), "Patch targets cannot contain NUL");
+            let updated = text_edits(&old, &entry["edits"])?;
+            ensure!(!updated.contains('\0'), "Patched text cannot contain NUL");
+            write_bytes += updated.len();
+            ensure!(write_bytes <= LIMIT, "Aggregate patch write limit");
+            let diff = diffy::create_patch(&old, &updated).to_string();
+            preview_bytes += diff.len();
+            ensure!(
+                preview_bytes <= PATCH_LIMIT,
+                "Patch preview exceeds 256 KiB"
+            );
+            operations.push(json!({
+                "operation":"write","path":target.path,"expected":observed,
+                "intended":{"kind":"file","digest":digest(updated.as_bytes())},
+                "base64":STANDARD.encode(updated.as_bytes()),
+            }));
+            reviews.push(json!({"path":name,"diff":diff,"created":file.is_none()}));
+        }
+        Ok(json!({
+            "request":{"operation":"batch","operations":operations,
+                "checkout":{"root":root,"revision":head.revision,"reference":head.reference,
+                    "root_identity":head.root_identity},"destructive":true},
+            "files":reviews,
+        }))
     }
     pub(super) fn inspect(request: &Value, private: &Path) -> Result<Value> {
         let mut output = Vec::new();
@@ -324,12 +452,34 @@ mod windows {
         if checkout.is_null() {
             return Ok(Vec::new());
         }
-        let root = Path::new(text(&checkout["root"])?).canonicalize()?;
+        let root = Path::new(text(&checkout["root"])?);
         let revision = text(&checkout["revision"])?;
         ensure!(
             matches!(revision.len(), 40 | 64) && revision.bytes().all(|b| b.is_ascii_hexdigit()),
             "Invalid expected Git revision"
         );
+        let head = read_protected_head(root, private)?;
+        ensure!(
+            head.revision.eq_ignore_ascii_case(revision)
+                && checkout
+                    .get("reference")
+                    .is_none_or(|value| *value == json!(head.reference))
+                && checkout
+                    .get("root_identity")
+                    .is_none_or(|value| *value == head.root_identity),
+            "conflict: Git checkout, branch or revision changed"
+        );
+        Ok(head.held)
+    }
+
+    struct ProtectedHead {
+        revision: String,
+        reference: Option<String>,
+        root_identity: String,
+        held: Vec<File>,
+    }
+
+    fn read_protected_head(root: &Path, private: &Path) -> Result<ProtectedHead> {
         ensure!(
             root.join(".git").is_dir(),
             "unsupported: protected patches require a .git directory"
@@ -338,8 +488,10 @@ mod windows {
             !root.join(".git/commondir").exists(),
             "unsupported: linked Git metadata needs additional protected guards"
         );
-        let mut held = Vec::new();
         let head = guarded(&root.join(".git/HEAD"), private)?;
+        let root_handle = plain_open(root)?.context("Missing Git checkout")?;
+        let root_identity = file_identity(&info(&root_handle)?);
+        let mut held = vec![root_handle];
         let mut file = plain_open(&head.path)?.context("Missing Git HEAD")?;
         info(&file)?;
         let mut value = String::new();
@@ -347,7 +499,8 @@ mod windows {
         ensure!(value.len() <= 1024, "Git HEAD exceeds bound");
         held.push(file);
         held.extend(head._parents);
-        let actual = if let Some(reference) = value.trim().strip_prefix("ref: ") {
+        let reference = value.trim().strip_prefix("ref: ").map(str::to_owned);
+        let actual = if let Some(reference) = reference.as_deref() {
             ensure!(
                 reference.starts_with("refs/")
                     && Path::new(reference)
@@ -368,11 +521,17 @@ mod windows {
         } else {
             value
         };
+        let revision = actual.trim();
         ensure!(
-            actual.trim().eq_ignore_ascii_case(revision),
-            "conflict: Git revision changed"
+            matches!(revision.len(), 40 | 64) && revision.bytes().all(|b| b.is_ascii_hexdigit()),
+            "Invalid checkout HEAD"
         );
-        Ok(held)
+        Ok(ProtectedHead {
+            revision: revision.to_owned(),
+            reference,
+            root_identity,
+            held,
+        })
     }
     fn dispose(file: &File) -> Result<()> {
         let value = FILE_DISPOSITION_INFO { DeleteFile: true };
@@ -647,4 +806,9 @@ pub fn inspect(request: &Value, private: &Path) -> Result<Value> {
 #[cfg(windows)]
 pub fn execute(request: &Value, private: &Path) -> Result<Value> {
     windows::execute(request, private)
+}
+
+#[cfg(windows)]
+pub fn prepare_chat_patch(root: &Path, files: &Value, private: &Path) -> Result<Value> {
+    windows::prepare_chat_patch(root, files, private)
 }

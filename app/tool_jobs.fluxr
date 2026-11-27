@@ -25,7 +25,7 @@ fn schedule_tool 3 j uint aid uint a uint uint do 6 kind uint op uint args uint 
   set discard call job 6 p call key 2 j call str 1 utf8 "request" call key 2 j call str 1 utf8 "session" call key 2 j call str 1 utf8 "role" call str 1 utf8 "tool" body
   ret 0u
 
-fn claim_tool 1 j uint uint do 4 args uint jid uint discard uint token uint 7
+fn claim_tool 1 j uint uint do 4 args uint jid uint discard uint token uint 8
   set jid call key 2 j call str 1 utf8 "id"
   set args call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT input AS \"value:json\" FROM jobs WHERE id=?" call append 2 call arr 0 jid 0 call str 1 utf8 "value"
   if not call selected_source_ok 2 jid call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" 2
@@ -34,6 +34,9 @@ fn claim_tool 1 j uint uint do 4 args uint jid uint discard uint token uint 7
   0
   set token call uid 0
   set discard call query 2 call str 1 utf8 "UPDATE jobs SET state='executing',attempt=? WHERE id=?" call append 2 call append 2 call arr 0 token jid
+  if call same 2 call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "tool" call str 1 utf8 "patch.propose" 1
+    ret call shape 2 call str 1 @text r#"{"local":"chat_patch_propose","job":"$0","arguments":{"job":"$0"},"then":"tool_done","state":"$1"}"# @build append 1 2 call arr 0 jid token
+  0
   if not call same 2 call key 2 call key 2 call key 2 args call str 1 utf8 "arguments" call str 1 utf8 "arguments" call str 1 utf8 "host_path" 0u 1 ret call shape 2 call str 1 utf8 "{\"local\":\"read_selected_file\",\"job\":\"$0\",\"arguments\":{\"job\":\"$0\"},\"then\":\"tool_done\",\"state\":\"$1\"}" call append 2 call append 2 call arr 0 jid token 0
   ret call shape 2 call str 1 utf8 "{\"local\":\"$0\",\"job\":\"$1\",\"arguments\":\"$2\",\"then\":\"tool_done\",\"state\":\"$3\"}" call append 2 call append 2 call append 2 call append 2 call arr 0 call key 2 args call str 1 utf8 "operation" jid call key 2 args call str 1 utf8 "arguments" token
 

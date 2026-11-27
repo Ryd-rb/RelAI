@@ -620,6 +620,9 @@ impl Bindings<'_> {
             }
             "effect_inspect" => file_effect::inspect(get(0)?, self.data)?,
             "patch_transform" => file_effect::patch(get(0)?)?,
+            "prepare_chat_patch" => {
+                file_effect::prepare_chat_patch(Path::new(text(get(0)?)?), get(1)?, self.data)?
+            }
             "decode_format" => formats::decode(text(get(0)?)?, &STANDARD.decode(text(get(1)?)?)?)?,
             "encode_format" => {
                 let format = text(get(0)?)?;

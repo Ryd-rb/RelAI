@@ -134,7 +134,10 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
         .find(|entry| entry["tool"] == "tool.find")
         .unwrap();
     assert!(lookup["arguments"]["query"].is_string());
-    assert_eq!(project_tools.len(), 4);
+    let (patch_tool, read_tools) = project_tools.split_last().unwrap();
+    assert_eq!(patch_tool["tool"], "patch.propose");
+    assert!(patch_tool["arguments"]["files"].is_array());
+    assert_eq!(read_tools.len(), 4);
     assert!(!intake["transport"].to_string().contains(unselected));
     assert_eq!(intake_details["role"], "discriminator");
     assert_eq!(intake_details["session"], discriminator);
@@ -178,7 +181,7 @@ fn permanent_relay_script_finishes_once_and_recovers_the_same_improver() {
         let worker = next_model(&mut app);
         let worker_details = details(&mut app, &project, &worker);
         let input = frame(&data, &worker);
-        assert_eq!(input["project_tools"].as_array().unwrap(), project_tools);
+        assert_eq!(input["project_tools"].as_array().unwrap(), read_tools);
         assert_ne!(worker_details["session"], discriminator);
         assert_eq!(input["delivery"]["attachments"], json!([attachment["id"]]));
         assert_eq!(

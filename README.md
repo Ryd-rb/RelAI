@@ -18,6 +18,8 @@ A direct answer offers **Accept answer** and **Request changes**. When the lates
 
 When you ask about the open project, RelAI can list its folders, read a text file or search that file for a phrase. Each read appears in Activity. When a turn requests independent project reads or checks the status of several proposed changes together, RelAI collects their receipts and resumes the conversation once. You can ask about a README or build configuration without attaching it. When you answer a question, the session that asked receives your reply alongside the original request and the exact question. If it asked several questions in one turn, it can wait for the remaining replies and combine the answers.
 
+Ask RelAI to edit a supported Git checkout to receive a patch in the conversation. Select **Review patch** to inspect each file's diff. **Approve and apply patch** authorizes that exact proposal and applies it as a single Windows filesystem transaction. The card reports the outcome. When the Git revision or an affected file has changed, ask for a fresh proposal.
+
 The launcher starts a capability-token-protected Codex App Server on loopback and checks for a ChatGPT sign-in before each subscription turn. Codex owns the credentials. Each attempt opens a fresh ephemeral thread with its sealed input, model, reasoning effort, and output schema.
 
 The sidebar groups Relay, Activity, Project graph and Tools under **Workspace**. Models and Dictionary are under **Settings**. Each project remembers the tab you selected on each page while the app is open. Relaunching opens the project you last selected. Existing installations without a saved selection reopen the project of your latest message.

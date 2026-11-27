@@ -48,6 +48,8 @@ SELECT
                THEN CASE state WHEN 'queued' THEN 'Preparing a project lookup…' ELSE 'Looking up project information…' END
              WHEN tool IN ('verify.format','verify.lint','verify.build','verify.test','verify.benchmark')
                THEN CASE state WHEN 'queued' THEN 'Preparing project checks…' ELSE 'Checking the project…' END
+             WHEN tool='patch.propose'
+               THEN CASE state WHEN 'queued' THEN 'Preparing a patch for review…' ELSE 'Checking the patch against the current files…' END
              WHEN operation IN ('tool_test','tool_qualify') THEN 'Checking a project tool…'
              WHEN operation='tool_propose' THEN 'Preparing a project tool…'
              ELSE CASE state WHEN 'queued' THEN 'Preparing the next project step…' ELSE 'Running the next project step…' END

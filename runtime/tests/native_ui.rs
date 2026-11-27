@@ -138,6 +138,109 @@ impl Desktop {
 }
 
 #[test]
+#[cfg(windows)]
+fn chat_patch_requires_review_and_an_exact_grant_before_changing_files() {
+    let mut ui = Desktop::empty();
+    let topic = "Correct the README and add a second file.";
+    let path = ui.root.join("README.md");
+    let new_path = ui.root.join("guide.md");
+    fs::write(&path, "wrong\n").unwrap();
+    for args in [
+        vec!["init", "--quiet"],
+        vec!["add", "README.md"],
+        vec![
+            "-c",
+            "user.email=relai@example.invalid",
+            "-c",
+            "user.name=RelAI",
+            "commit",
+            "--quiet",
+            "-m",
+            "base",
+        ],
+    ] {
+        assert!(
+            std::process::Command::new("git")
+                .args(args)
+                .current_dir(&ui.root)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    ui.click("Enter folder path");
+    ui.change("Existing project folder", "input", json!({"value":ui.root}));
+    ui.click("Open project");
+    let file = ui.invoke(
+        "tool_run",
+        json!({"tool":"fs.read","arguments":{"path":"README.md"}}),
+    );
+    let arguments = json!({"files":[
+        {"path":"README.md","digest":file["value"]["digest"],"edits":[{"old":"wrong","new":"correct"}]},
+        {"path":"guide.md","digest":null,"edits":[{"old":"","new":"Guide\n"}]}
+    ]});
+    ui.type_message(topic);
+    ui.click("Send");
+    ui.receive_intake(topic, json!([{"type":"RUN_TOOL","summary":"Prepare the change.","tool":"patch.propose","arguments_json":arguments.to_string()}]), "wait_for");
+    let job = ui.app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(job["local"], "chat_patch_propose");
+    let proposed = ui
+        .app
+        .invoke("chat_patch_propose", job["arguments"].clone())
+        .unwrap();
+    let replay = ui
+        .app
+        .invoke("chat_patch_propose", job["arguments"].clone())
+        .unwrap();
+    assert_eq!(proposed["effect"], replay["effect"]);
+    assert_eq!(proposed["state"], "planned");
+    ui.app
+        .invoke(
+            "tool_done",
+            json!({"job":job["job"],"state":job["state"],"result":proposed}),
+        )
+        .unwrap();
+    ui.render(true);
+    assert_eq!(fs::read_to_string(&path).unwrap(), "wrong\n");
+    assert!(!new_path.exists());
+    ui.control("Patch ready for review", "heading");
+    assert!(
+        ui.controls()
+            .iter()
+            .all(|c| c["label"] != "Approve and apply patch")
+    );
+    assert!(
+        ui.app
+            .invoke(
+                "chat_patch_apply",
+                json!({"project":ui.view["project"],"effect":proposed["effect"],"digest":"wrong"})
+            )
+            .is_err()
+    );
+    ui.click("Review patch");
+    let preview = ui.control("README.md", "detail");
+    assert!(
+        preview["value"]
+            .as_str()
+            .unwrap()
+            .contains("-wrong\n+correct\n")
+    );
+    ui.control("guide.md · New file", "detail");
+    ui.type_message("Draft to preserve");
+    ui.click("Approve and apply patch");
+    ui.control("Patch applied", "heading");
+    assert_eq!(ui.control("Review patch", "button")["expanded"], false);
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "Draft to preserve"
+    );
+    assert_eq!(fs::read_to_string(&path).unwrap(), "correct\n");
+    assert_eq!(fs::read_to_string(&new_path).unwrap(), "Guide\n");
+    let replay = ui.app.invoke("chat_patch_apply", json!({"project":ui.view["project"],"effect":proposed["effect"],"digest":proposed["digest"]})).unwrap();
+    assert_eq!(replay["state"], "completed");
+}
+
+#[test]
 fn starter_prompts_focus_an_editable_draft_without_sending_or_overwriting() {
     let mut ui = Desktop::open();
     ui.control("Start a conversation", "heading");

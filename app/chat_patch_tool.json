@@ -1,0 +1,14 @@
+{
+  "tool": "patch.propose",
+  "description": "Prepare one reviewable patch to this project's Git checkout. The user reviews the exact diff in the chat and must explicitly approve before any files change.",
+  "arguments": {
+    "files": [
+      {
+        "path": "Project-relative UTF-8 file path with forward slashes",
+        "digest": "Full-file SHA-256 from fs.read, or null only to create a file in an existing directory",
+        "edits": [{"old": "Exact unique text to match, including newlines", "new": "Replacement text"}]
+      }
+    ]
+  },
+  "limits": "1–16 files, 1–64 sequential edits per file, 256 KiB proposal and preview. An empty old match requires an empty or new file."
+}

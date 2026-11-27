@@ -51,9 +51,16 @@ fn chat_destination 3 pid uint draft uint suggested uint uint do 3 frozen uint b
 fn activity_panel 0 uint do 0  1
   ret call decode 1 call str 1 @text r#"{"type":"journal","section":"activity"}"#
 
-fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft uint uint do 12 groupval uint selected bool choices uint interaction uint speaker uint roleval uint body uint meta uint action uint reqid uint discard uint i int 30
+fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft uint uint do 12 groupval uint selected bool choices uint interaction uint speaker uint roleval uint body uint meta uint action uint reqid uint discard uint i int 31
   set interaction call key 2 row call str 1 utf8 "interaction"
   set reqid call key 2 row call str 1 utf8 "request"
+  if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Patch proposed" 3
+    set discard call chat_patch_card 3 state pid call key 2 row call str 1 utf8 "effect"
+    if call same 2 call key 2 row call str 1 utf8 "request_tail" call integer 1 1 1
+      set discard call chat_request_options 4 state pid base reqid
+    0
+    ret 0u
+  0
   set action call key 2 row call str 1 utf8 "action"
   set body call ui_default 2 call key 2 row call str 1 utf8 "body" call str 1 utf8 ""
   set speaker call str 1 utf8 "RelAI"

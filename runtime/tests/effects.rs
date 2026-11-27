@@ -239,6 +239,50 @@ impl Fixture {
 
 #[cfg(windows)]
 #[test]
+fn chat_patch_preparation_rejects_ambiguous_stale_and_unscoped_edits() {
+    let f = Fixture::new();
+    fs::create_dir_all(f.root.join(".git/refs/heads")).unwrap();
+    let head = f.root.join(".git/HEAD");
+    fs::write(&head, "ref: refs/heads/one\n").unwrap();
+    for branch in ["one", "two"] {
+        fs::write(f.root.join(".git/refs/heads").join(branch), "1".repeat(40)).unwrap();
+    }
+    let target = f.root.join("notes.txt");
+    fs::write(&target, "aaa").unwrap();
+    let files = |path: &str, digest: &str, old: &str| json!([{"path":path,"digest":digest,"edits":[{"old":old,"new":"B"}]}]);
+    let digest = hash(b"aaa");
+    for invalid in [
+        files("notes.txt", &digest, "aa"),
+        files("notes.txt", &hash(b"stale"), "aaa"),
+        files("../notes.txt", &digest, "aaa"),
+        files(".git/HEAD", &digest, "aaa"),
+        json!([{"path":"notes.txt","digest":digest,"edits":[{"old":"aaa","new":"aaa\0hidden"}]}]),
+    ] {
+        assert!(native::prepare_chat_patch(&f.root, &invalid, &f.data).is_err());
+    }
+    let valid =
+        native::prepare_chat_patch(&f.root, &files("notes.txt", &digest, "aaa"), &f.data).unwrap();
+    let proposal = &valid["request"];
+    assert_eq!(fs::read(&target).unwrap(), b"aaa");
+    assert_eq!(proposal["checkout"]["revision"], "1".repeat(40));
+    assert_eq!(proposal["checkout"]["reference"], "refs/heads/one");
+    fs::write(&head, "ref: refs/heads/two\n").unwrap();
+    assert_eq!(
+        native::execute(proposal, &f.data).unwrap()["state"],
+        "conflict"
+    );
+    assert_eq!(fs::read(&target).unwrap(), b"aaa");
+    fs::write(&head, "ref: refs/heads/one\n").unwrap();
+    fs::write(&target, "external edit").unwrap();
+    assert_eq!(
+        native::execute(proposal, &f.data).unwrap()["state"],
+        "conflict"
+    );
+    assert_eq!(fs::read(&target).unwrap(), b"external edit");
+}
+
+#[cfg(windows)]
+#[test]
 fn checked_effect_requires_exact_user_grant_and_persists_idempotent_receipt() {
     let mut f = Fixture::new();
     let path = f.root.join("target.txt");

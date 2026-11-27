@@ -128,3 +128,4 @@ fn scoped_path 3 root uint path uint absolute uint uint ret host source_path uin
 fn file_range 2 encoded uint spec uint uint ret host byte_range uint 2 uint encoded uint spec
 fn patch_transform 1 arg uint uint ret host patch_transform uint 1 uint arg
 fn effect_inspect 1 arg uint uint ret host effect_inspect uint 1 uint arg
+fn prepare_chat_patch 2 root uint files uint uint ret host prepare_chat_patch uint 2 uint root uint files

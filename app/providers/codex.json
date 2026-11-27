@@ -102,35 +102,7 @@
           "environments": []
         }
       },
-      "wait": {
-        "pointer": "/id",
-        "equals": 4
-      }
-    },
-    {
-      "wait": {
-        "pointer": "/params/item/type",
-        "equals": "agentMessage",
-        "method": "item/completed"
-      },
-      "save": "message",
-      "until": {
-        "pointer": "/method",
-        "equals": "turn/completed",
-        "error": "Codex completed the turn without an answer"
-      }
-    },
-    {
-      "wait": {
-        "pointer": "/method",
-        "equals": "turn/completed"
-      },
-      "require": {
-        "pointer": "/params/turn/status",
-        "equals": "completed",
-        "error": "Codex turn did not complete."
-      },
-      "save": "completion"
+      "collect_codex_turn": true
     }
   ]
 }

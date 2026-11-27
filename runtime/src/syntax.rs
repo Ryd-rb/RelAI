@@ -69,7 +69,9 @@ fn tokens(s: &str) -> Vec<(usize, &str)> {
             continue;
         }
         let start = i;
-        if b[i] == b'"' {
+        if let Some(end) = raw_literal_end(b, i) {
+            i = end;
+        } else if b[i] == b'"' {
             i += 1;
             while i < b.len() {
                 let c = b[i];
@@ -89,6 +91,29 @@ fn tokens(s: &str) -> Vec<(usize, &str)> {
     }
     out
 }
+// Keep a raw literal opaque to the secondary scanner, including its delimiters.
+fn raw_literal_end(bytes: &[u8], start: usize) -> Option<usize> {
+    if bytes[start] != b'r' {
+        return None;
+    }
+    let mut quote = start + 1;
+    while bytes.get(quote) == Some(&b'#') {
+        quote += 1;
+    }
+    if bytes.get(quote) != Some(&b'"') {
+        return None;
+    }
+    let hashes = &bytes[start + 1..quote];
+    let mut i = quote + 1;
+    while i < bytes.len() {
+        if bytes[i] == b'"' && bytes[i + 1..].starts_with(hashes) {
+            return Some(i + 1 + hashes.len());
+        }
+        i += 1;
+    }
+    Some(bytes.len())
+}
+
 struct RustIndex<'a> {
     declarations: &'a mut Vec<Value>,
     references: &'a mut Vec<Value>,
@@ -122,6 +147,11 @@ impl<'ast> Visit<'ast> for RustIndex<'_> {
     fn visit_impl_item_fn(&mut self, item: &'ast syn::ImplItemFn) {
         self.declare(&item.sig.ident, "method");
         syn::visit::visit_impl_item_fn(self, item)
+    }
+    fn visit_expr_method_call(&mut self, expr: &'ast syn::ExprMethodCall) {
+        let span = expr.method.span().byte_range();
+        self.references.push(json!({"name":expr.method.to_string(),"kind":"method_call","start":span.start,"end":span.end}));
+        syn::visit::visit_expr_method_call(self, expr);
     }
     fn visit_path(&mut self, path: &'ast syn::Path) {
         if let Some(last) = path.segments.last() {

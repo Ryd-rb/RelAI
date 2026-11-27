@@ -5,7 +5,7 @@ use axum::{
     Json, Router,
     extract::{DefaultBodyLimit, Path, State},
     http::{HeaderMap, StatusCode},
-    routing::post,
+    routing::{get, post},
 };
 use fluxr_app_host::{App, transport};
 use serde_json::{Value, json};
@@ -206,6 +206,9 @@ async fn main() -> Result<()> {
     println!("Open {origin}/#{}", state.token);
     tokio::spawn(work(app, None));
     let app = Router::new()
+        .route("/", get(|| async {
+            "RelAI local API\n\nSend POST /api/{operation} with a JSON body and Content-Type: application/json.\nSet Authorization: Bearer <session token>. Use the token after # in the startup URL.\n"
+        }))
         .route("/api/{name}", post(command))
         .layer(DefaultBodyLimit::max(18 * 1024 * 1024))
         .with_state(state);

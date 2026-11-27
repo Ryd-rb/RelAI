@@ -36,7 +36,18 @@ async fn loopback_api_checks_credentials_origin_and_host_before_project_access()
         .split_once("/#")
         .unwrap();
     let c = reqwest::Client::new();
-    for path in ["/", "/assets/client.js", "/assets/style.css"] {
+    let landing = c
+        .get(origin)
+        .send()
+        .await
+        .unwrap()
+        .error_for_status()
+        .unwrap();
+    let text = landing.text().await.unwrap();
+    assert!(text.contains("POST /api/{operation}"));
+    assert!(text.contains("Authorization: Bearer"));
+    assert!(!text.contains(token));
+    for path in ["/assets/client.js", "/assets/style.css"] {
         assert_eq!(
             c.get(format!("{origin}{path}"))
                 .send()

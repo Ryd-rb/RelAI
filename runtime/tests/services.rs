@@ -274,6 +274,48 @@ fn a_hard_link_cannot_expose_private_state_as_project_content() {
 }
 
 #[test]
+fn source_references_index_dot_calls_and_ignore_fluxr_raw_prose() {
+    let mut f = TestProject::new();
+    let rust = "struct Tool; impl Tool { fn call(&self) {} } fn run() { Tool.call(); }";
+    fs::write(f.path.join("lib.rs"), rust).unwrap();
+    let refs = f
+        .tool(
+            "code.references",
+            json!({"path":"lib.rs","language":"rust","symbol":"call"}),
+        )
+        .unwrap();
+    let references = refs["candidates"].as_array().unwrap();
+    assert_eq!(references.len(), 1);
+    assert_eq!(references[0]["kind"], "method_call");
+    assert_eq!(references[0]["start"], rust.find(".call").unwrap() + 1);
+
+    let fluxr = r###"fluxr 1
+fn helper 0 int ret 5
+pub run 0 int do 2 note list uint quoted list uint 3
+  set note @text r"Words that call helper inside raw prose"
+  set quoted @text r##"Read "quoted" text: call helper now"##
+  ret call helper 0
+"###;
+    fs::write(f.path.join("source.fluxr"), fluxr).unwrap();
+    let diagnostics = f
+        .tool(
+            "code.diagnostics",
+            json!({"path":"source.fluxr","language":"fluxr"}),
+        )
+        .unwrap();
+    assert_eq!(diagnostics["diagnostics"], json!([]));
+    let refs = f
+        .tool(
+            "code.references",
+            json!({"path":"source.fluxr","language":"fluxr","symbol":"helper"}),
+        )
+        .unwrap();
+    let references = refs["candidates"].as_array().unwrap();
+    assert_eq!(references.len(), 1);
+    assert_eq!(references[0]["start"], fluxr.rfind("helper 0").unwrap());
+}
+
+#[test]
 fn restart_recovers_one_reserved_occurrence_under_the_same_identity() {
     let mut f = TestProject::new();
     f.app.invoke("schedule",json!({"project":f.p,"op":"create","due":0,"period":0,"action":{"tool":"project.info","arguments":{}}})).unwrap();
@@ -319,8 +361,9 @@ fn file_ranges_find_cursor_host_reads_and_monitor_cancellation() {
         .unwrap();
     assert_eq!(next["entries"][0]["path"], "b.md");
     assert!(next["cursor"].is_null());
-    let range=f.tool("fs.read",json!({"path":"a.md","snapshot":page["snapshot"],"range":{"unit":"lines","start":1,"end":2}})).unwrap();
+    let range=f.tool("fs.read",json!({"path":"a.md","snapshot":page["snapshot"],"range":{"unit":"lines","start":1,"end":20}})).unwrap();
     assert_eq!(range["text"], "second\n");
+    assert_eq!(range["end"], 2);
     assert_eq!(
         f.tool("fs.read", json!({"path":"a.md"})).unwrap()["text"],
         "é\nsecond\n"
@@ -340,6 +383,14 @@ fn file_ranges_find_cursor_host_reads_and_monitor_cancellation() {
     assert_eq!(bytes["encoding"], "binary");
     let outside = f._temp.path().join("outside");
     fs::write(&outside, "one").unwrap();
+    let ambiguous = f
+        .tool("fs.read", json!({"path":"a.md","host_path":outside}))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        ambiguous.contains("Choose either path or host_path"),
+        "{ambiguous}"
+    );
     assert_eq!(
         f.tool("fs.read", json!({"host_path":outside})).unwrap()["text"],
         "one"

@@ -8,6 +8,9 @@ fn text_ready 1 value uint uint do 0 1
 
 fn nonblank 1 value uint bool ret call same 2 call text_ready 1 value call decode 1 call str 1 utf8 "true"
 
+fn check_attachment_pressure 2 project uint items uint uint ret host check_attachment_pressure uint 2 uint project uint items
+fn directory_available 1 root uint bool ret host directory_available bool 1 uint root
+
 fn decode 1 x0 uint uint do 0  1
   ret host parse uint 1 uint x0
 

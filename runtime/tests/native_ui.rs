@@ -490,6 +490,60 @@ fn project_selection_restores_its_previous_page_and_preserves_manual_path_recove
 }
 
 #[test]
+fn unavailable_saved_project_keeps_its_identity_history_and_draft() {
+    let mut ui = Desktop::open();
+    let project = ui.view["project"].clone();
+    ui.invoke(
+        "submit",
+        json!({"key":"history","text":"Retained history","attachments":[]}),
+    );
+    ui.render(true);
+    ui.type_message("Unsent draft");
+    let draft = ui.state["drafts"].clone();
+    let moved = ui.root.with_file_name("moved-project");
+    fs::rename(&ui.root, &moved).unwrap();
+    ui.render(true);
+    ui.control("Saved project folder unavailable", "heading");
+    assert_eq!(ui.view["project"], project);
+    assert_eq!(ui.state["drafts"], draft);
+    assert!(
+        ui.controls()
+            .iter()
+            .any(|c| c["value"] == "Retained history")
+    );
+    fs::rename(&moved, &ui.root).unwrap();
+    ui.click("Retry");
+    assert_eq!(ui.view["project"], project);
+    assert_eq!(ui.state["drafts"], draft);
+    assert_eq!(ui.control("Message", "multiline")["value"], "Unsent draft");
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["label"] == "Saved project folder unavailable")
+    );
+
+    let Desktop {
+        app, root, _temp, ..
+    } = ui;
+    drop(app);
+    fs::rename(root, moved).unwrap();
+    let mut reopened = App::open(
+        &Path::new(env!("CARGO_MANIFEST_DIR")).join("../app"),
+        &_temp.path().join("state"),
+    )
+    .unwrap();
+    let view = reopened.invoke("dashboard", Value::Null).unwrap();
+    assert_eq!(view["project"], project);
+    assert!(
+        view["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["label"] == "Saved project folder unavailable")
+    );
+}
+
+#[test]
 fn cancelling_first_run_project_selection_keeps_welcome_and_the_manual_path() {
     let mut ui = Desktop::empty();
     assert!(!ui.controls().iter().any(|c| c["label"] == "Back"));

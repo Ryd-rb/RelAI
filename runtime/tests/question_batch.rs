@@ -133,6 +133,60 @@ fn asks() -> Value {
 }
 
 #[test]
+fn a_blank_excerpt_without_an_attachment_cannot_answer_an_addressed_question() {
+    for blank in ["", " \t", "\u{a0}\u{3000}"] {
+        let mut c = Chat::new();
+        c.submit("request", "Improve the interface", None);
+        let first = c.next();
+        c.respond(&first, asks(), "wait_for").unwrap();
+        let question = c.questions()[0].0.clone();
+        c.submit(
+            "answer",
+            &format!("Buttons.{blank} private unrelated text"),
+            Some(&question),
+        );
+        let intake = c.next();
+        let sql = c.sql();
+        let recipient: String = sql
+            .query_row(
+                "SELECT session FROM questions WHERE id=?",
+                [&question],
+                |r| r.get(0),
+            )
+            .unwrap();
+        c.respond(
+            &intake,
+            json!([{"type":"MESSAGE","summary":"Route selected answer.","destination":recipient,
+            "question":question,"payload":blank,"revision":1,"attachments":[]}]),
+            "wait_for",
+        )
+        .unwrap();
+        let state: String = sql
+            .query_row("SELECT state FROM questions WHERE id=?", [&question], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(state, "open");
+        let delivered: i64 = sql
+            .query_row(
+                "SELECT count(*) FROM jobs WHERE kind='message' AND input->>'$.answer_to'=?",
+                [&question],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(delivered, 0);
+        let held: i64 = sql
+            .query_row(
+                "SELECT count(*) FROM actions WHERE kind='MESSAGE' AND state='held' AND job=?",
+                [intake["job"].as_str().unwrap()],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(held, 1);
+    }
+}
+
+#[test]
 fn original_question_picks_survive_partial_wait_or_an_exact_repeated_ask() {
     for (first_index, repeat) in [(0, false), (1, true)] {
         let mut c = Chat::new();

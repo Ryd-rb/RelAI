@@ -7,7 +7,15 @@ pub save_term 1 arg uint uint do 2 p uint discard uint 5
   set discard call dictionary 1 call put 3 call put 3 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" call str 1 utf8 "op" call str 1 utf8 "save"
   ret call query 2 call str 1 utf8 "INSERT INTO terms VALUES(?,?,?,?,1,'knowledge') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,revision=terms.revision+1" call append 2 call append 2 call append 2 call append 2 call arr 0 call hash 1 call encode 1 call append 2 call append 2 call arr 0 p call key 2 arg call str 1 utf8 "name" p call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "definition"
 
-pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uint components uint tabs uint row uint viewname uint i int 15
+fn root_availability 4 components uint root uint pid uint nav uint uint do 0 4
+  if call directory_available 1 root 1
+    ret components
+  0
+  set components call append 2 components call shape 2 call str 1 @text r#"{"type":"empty","label":"Saved project folder unavailable","text":"$0"}"# call append 2 call arr 0 call ui_display_path 1 root
+  set components call append 2 components call shape 2 call str 1 @text r#"{"type":"button","label":"Retry","navigate":"$0"}"# call append 2 call arr 0 call ui_merge 2 call ui_default 2 nav call obj 0 call shape 2 call str 1 @text r#"{"project":"$0"}"# call append 2 call arr 0 pid
+  ret call append 2 components call decode 1 call str 1 @text r#"{"type":"button","label":"Choose another folder","navigate":{"view":"open"}}"#
+
+pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uint components uint tabs uint row uint viewname uint i int 16
   set projects call query 2 call asset 1 call str 1 utf8 "project_labels.sql" call arr 0
   set pid call key 2 arg call str 1 utf8 "project"
   if call same 2 pid 0u 1
@@ -56,6 +64,7 @@ pub dashboard 1 arg uint uint do 9 projectname uint projects uint p uint pid uin
     ret call shape 2 call str 1 utf8 "{\"title\":\"RelAI\",\"subtitle\":\"Project relay\",\"components\":\"$0\"}" call append 2 call arr 0 components
   0
   set p call project 1 call shape 2 call str 1 utf8 "{\"project\":\"$0\"}" call append 2 call arr 0 pid
+  set components call root_availability 4 components call key 2 p call str 1 utf8 "root" pid arg
   set components call append 2 components call shape 2 call str 1 @text r#"{
   "type": "nav",
   "label": "Workspace",

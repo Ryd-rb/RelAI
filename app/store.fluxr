@@ -83,7 +83,7 @@ pub capture 1 arg uint uint do 7 p uint info uint meta uint aid uint mime uint n
   set discard call query 2 call str 1 utf8 "INSERT INTO artifacts VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 aid p meta call key 2 arg call str 1 utf8 "base64"
   ret meta
 
-pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyval uint finger uint prior uint rid uint sid uint prompt uint items uint files uint file uint body uint summary uint discard uint reply uint steer uint i int 39
+pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyval uint finger uint prior uint rid uint sid uint prompt uint items uint files uint file uint body uint summary uint discard uint reply uint steer uint i int 40
   set p call project 1 arg
   set pid call key 2 p call str 1 utf8 "id"
   set keyval call key 2 arg call str 1 utf8 "key"
@@ -107,6 +107,9 @@ pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyva
     next i
   if and lt 0 call size 1 files not call same 2 call key 2 call preset 2 pid call str 1 utf8 "discriminator" call str 1 utf8 "provider" call str 1 utf8 "anthropic" 1
     set discard call require 2 call same 2 call nth 2 call query 2 call str 1 @text r#"SELECT 1 AS pdf FROM json_each(?) WHERE value->>'$.media_type'='application/pdf' LIMIT 1"# call append 2 call arr 0 files 0 0u call str 1 utf8 "The selected provider does not support PDF attachments. Remove the PDF or select Anthropic before sending."
+  0
+  if lt 0 call size 1 files 1
+    set discard call check_attachment_pressure 2 pid call query 2 call str 1 @text r#"SELECT value->>'$.id' AS id, CASE WHEN json_extract(?2,'$.' || json_quote(value->>'$.media_type'))='text' THEN 'true' ELSE 'false' END AS "text:json" FROM json_each(?1) ORDER BY CAST(key AS INTEGER)"# call append 2 call append 2 call arr 0 files call asset 1 call str 1 utf8 "media.json"
   0
   set reply call key 2 arg call str 1 utf8 "reply"
   set steer call key 2 arg call str 1 utf8 "steer"

@@ -12,7 +12,13 @@ SELECT sibling.id AS question_id,sibling.body->>'$.question' AS question,sibling
         AND intake.project=?2 AND intake.request=?3 AND intake.revision=?4
         AND intake.kind='intake' AND intake.role='discriminator' AND intake.state='accepted'
         AND intake.input->>'$.reply'=sibling.id
-        AND instr(submission.content->>'$.text',answer.payload->>'$.payload')>0
+        AND (length(trim(answer.payload->>'$.payload',char(9,10,11,12,13,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288)))>0
+             OR (json_array_length(answer.payload,'$.attachments')>0
+                 AND NOT EXISTS (SELECT 1 FROM json_each(answer.payload,'$.attachments') picked
+                     WHERE NOT EXISTS (SELECT 1 FROM json_each(submission.content,'$.attachments') available
+                         WHERE available.value->>'$.id'=picked.value))))
+        AND (answer.payload->>'$.payload'=''
+             OR instr(submission.content->>'$.text',answer.payload->>'$.payload')>0)
         AND sibling.state IN ('answer_queued','answered')
       ORDER BY answer.rowid DESC LIMIT 1) AS answer
 FROM questions addressed JOIN actions original ON original.id=addressed.id AND original.kind='ASK'

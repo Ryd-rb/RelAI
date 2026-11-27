@@ -102,13 +102,21 @@ fn admit 4 j uint aid uint fan uint a uint uint do 15 p uint r uint role uint ki
   0
     set task call nth 2 call query 2 call str 1 utf8 "SELECT role,task AS \"details:json\" FROM branches WHERE id=? AND request=? AND revision=?" call append 2 call append 2 call append 2 call arr 0 destination r rev 0
     set body a
-    if not call same 2 q 0u 6
+    if not call same 2 q 0u 7
     if not and call same 2 role call str 1 utf8 "discriminator" call same 2 q call key 2 payloadval call str 1 utf8 "reply" 1
     ret call str 1 utf8 "Reply does not match the user-selected question."
   0
-    if not call contains 2 call key 2 payloadval call str 1 utf8 "text" call key 2 a call str 1 utf8 "payload" 1
-    ret call str 1 utf8 "Reply must use the exact answer text."
+    if and not call nonblank 1 call key 2 a call str 1 utf8 "payload" eq 0 call size 1 call key 2 a call str 1 utf8 "attachments" 1
+    ret call str 1 utf8 "Reply needs nonblank answer text or a selected attachment."
   0
+    if lt 0 call size 1 call key 2 a call str 1 utf8 "payload" 2
+      if call same 2 call key 2 payloadval call str 1 utf8 "text" 0u 1
+        ret call str 1 utf8 "Reply must use the exact answer text."
+      0
+      if not call contains 2 call key 2 payloadval call str 1 utf8 "text" call key 2 a call str 1 utf8 "payload" 1
+        ret call str 1 utf8 "Reply must use the exact answer text."
+      0
+    0
     set role call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT role FROM questions WHERE id=? AND request=? AND revision=? AND session=? AND state='open'" call append 2 call append 2 call append 2 call append 2 call arr 0 q r rev destination 0 call str 1 utf8 "role"
     if call same 2 role 0u 1
     ret call str 1 utf8 "Question unavailable."

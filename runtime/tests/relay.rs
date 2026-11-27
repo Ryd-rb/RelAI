@@ -220,6 +220,55 @@ fn obstructed_retained_documents_hold_only_their_delivery_and_can_recover() {
 }
 
 #[test]
+fn aggregate_attachment_pressure_is_checked_before_submission() {
+    use base64::{Engine, engine::general_purpose::STANDARD};
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("project");
+    fs::create_dir(&root).unwrap();
+    let data = temp.path().join("state");
+    let mut app = App::open(&bundle(), &data).unwrap();
+    let project = app.invoke("open_project", json!({"root":root})).unwrap()["id"].clone();
+    let capture = |app: &mut App, byte: u8, mib: usize| {
+        let encoded = STANDARD.encode(vec![byte; mib * 1024 * 1024]);
+        app.invoke("capture", json!({"project":project,"name":format!("file-{byte}.txt"),"mime":"text/plain","base64":encoded})).unwrap()["id"].clone()
+    };
+    let mut large = Vec::new();
+    for byte in b'a'..b'i' {
+        large.push(capture(&mut app, byte, 4));
+    }
+    let escaped = capture(&mut app, 1, 1);
+    for (key, attachments) in [("heavy", json!(large)), ("escaped", json!([escaped]))] {
+        let error = app
+            .invoke(
+                "submit",
+                json!({"project":project,"key":key,"text":"Message","attachments":attachments}),
+            )
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("combined model delivery budget"),
+            "{error:#}"
+        );
+    }
+    let sql = rusqlite::Connection::open(data.join("state.sqlite3")).unwrap();
+    let writes: i64 = sql.query_row("SELECT (SELECT count(*) FROM submissions)+(SELECT count(*) FROM requests)+(SELECT count(*) FROM jobs)", [], |r| r.get(0)).unwrap();
+    assert_eq!(writes, 0);
+    let ordinary = capture(&mut app, b'z', 2);
+    app.invoke(
+        "submit",
+        json!({"project":project,"key":"ordinary","text":"Message","attachments":[ordinary]}),
+    )
+    .unwrap();
+    let seal = app.invoke("poll", Value::Null).unwrap();
+    assert_eq!(seal["local"], "seal");
+    app.invoke("seal", seal).unwrap();
+    assert_eq!(
+        sql.query_row("SELECT count(*) FROM attempts", [], |r| r.get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+}
+
+#[test]
 fn updating_a_request_while_reading_the_project_can_reach_acceptance() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("project");

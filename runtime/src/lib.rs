@@ -604,6 +604,28 @@ impl HostServices for Bindings<'_> {
         }
     }
 }
+fn json_string_bytes(text: &str) -> usize {
+    2 + text
+        .bytes()
+        .map(|byte| match byte {
+            b'"' | b'\\' | 8 | 9 | 10 | 12 | 13 => 2,
+            0..=31 => 6,
+            _ => 1,
+        })
+        .sum::<usize>()
+}
+
+fn seal_pressure(encoded: &str, is_text: bool, weight: usize) -> Result<usize> {
+    let bytes = STANDARD.decode(encoded)?;
+    let escaped = std::str::from_utf8(&bytes).map_or(0, json_string_bytes);
+    let base = encoded.len();
+    Ok(if is_text {
+        4 * base + (18 + weight) * escaped
+    } else {
+        (20 + weight) * base + 2 * escaped
+    })
+}
+
 impl Bindings<'_> {
     fn apply(&self, name: &str, args: &[Vm]) -> Result<Vm> {
         let mut arena = self.arena.lock().unwrap();
@@ -897,6 +919,39 @@ impl Bindings<'_> {
             }
             "syntax" => syntax::index(text(get(0)?)?, text(get(1)?)?)?,
             "graph_file_metadata" => syntax::graph_file_metadata(text(get(0)?)?, text(get(1)?)?),
+            "directory_available" => {
+                let path = Path::new(text(get(0)?)?);
+                let available = path.canonicalize().is_ok_and(|actual| {
+                    actual == path
+                        && !actual.starts_with(self.data)
+                        && !self.data.starts_with(&actual)
+                        && fs::read_dir(&actual).is_ok_and(|mut entries| {
+                            entries.next().is_none_or(|entry| entry.is_ok())
+                        })
+                });
+                return Ok(Vm::Bool(available));
+            }
+            "check_attachment_pressure" => {
+                let project = text(get(0)?)?;
+                let files = get(1)?.as_array().context("Expected attachments")?;
+                let conn = self.db.lock().unwrap();
+                let mut statement =
+                    conn.prepare("SELECT encoded FROM artifacts WHERE project=? AND id=?")?;
+                let mut total = 0usize;
+                for (index, file) in files.iter().enumerate() {
+                    let mut rows = statement.query([project, text(&file["id"])?])?;
+                    let row = rows.next()?.context("Unavailable attachment")?;
+                    let encoded = row.get_ref(0)?.as_str()?;
+                    total += seal_pressure(encoded, file["text"] == true, files.len() - index)?;
+                    // Leave 32 MiB of the call arena for other request data. This
+                    // estimates attachment pressure, not total sealing cost.
+                    ensure!(
+                        total <= 64 * 1024 * 1024,
+                        "Attachments exceed the combined model delivery budget. Remove one or more files and try again."
+                    );
+                }
+                Value::Null
+            }
             "canonical" => {
                 let p = Path::new(text(get(0)?)?).canonicalize()?;
                 ensure!(

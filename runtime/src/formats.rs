@@ -299,6 +299,14 @@ fn read_docx(bytes: &[u8]) -> Result<Value> {
                 paragraphs += 1;
                 ensure!(paragraphs <= ITEMS, "DOCX paragraph limit");
             }
+            quick_xml::events::Event::Empty(e) if e.local_name().as_ref() == b"p" => {
+                output.push('\n');
+                paragraphs += 1;
+                ensure!(paragraphs <= ITEMS, "DOCX paragraph limit");
+            }
+            quick_xml::events::Event::CData(e) if in_text => {
+                output.push_str(&e.decode()?);
+            }
             quick_xml::events::Event::Empty(e) if e.local_name().as_ref() == b"tab" => {
                 output.push('\t')
             }
@@ -329,7 +337,10 @@ fn write_docx(text: &str) -> Result<Vec<u8>> {
         .map(|line| {
             format!(
                 "<w:p><w:r><w:t xml:space=\"preserve\">{}</w:t></w:r></w:p>",
-                quick_xml::escape::escape(line)
+                line.split('\t')
+                    .map(|part| quick_xml::escape::escape(part).into_owned())
+                    .collect::<Vec<_>>()
+                    .join("</w:t><w:tab/><w:t xml:space=\"preserve\">")
             )
         })
         .collect::<Vec<_>>();
@@ -381,22 +392,35 @@ fn read_xlsx(bytes: &[u8]) -> Result<Value> {
             rows.saturating_mul(columns) <= 65536,
             "Worksheet grid limit"
         );
+        let mut coordinates = BTreeSet::new();
         let start = values.start().unwrap_or((0, 0));
-        let mut cells = Vec::new();
         for (row, column, value) in values.cells() {
-            let row = row as u32 + start.0;
-            let column = column as u32 + start.1;
-            let formula = formulas.get_value((row, column)).filter(|s| !s.is_empty());
-            let value = match value {
-                Data::Empty => Value::Null,
-                Data::Bool(v) => json!(v),
-                Data::Int(v) => json!(v),
-                Data::Float(v) => json!(v),
-                _ => json!(value.to_string()),
-            };
-            if value.is_null() && formula.is_none() {
-                continue;
+            if !matches!(value, Data::Empty) {
+                ensure!(coordinates.len() < ITEMS, "Cell limit");
+                coordinates.insert((row as u32 + start.0, column as u32 + start.1));
             }
+        }
+        let start = formulas.start().unwrap_or((0, 0));
+        for (row, column, formula) in formulas.cells() {
+            if !formula.is_empty() {
+                let coordinate = (row as u32 + start.0, column as u32 + start.1);
+                ensure!(
+                    coordinates.contains(&coordinate) || coordinates.len() < ITEMS,
+                    "Cell limit"
+                );
+                coordinates.insert(coordinate);
+            }
+        }
+        let mut cells = Vec::new();
+        for (row, column) in coordinates {
+            let formula = formulas.get_value((row, column)).filter(|s| !s.is_empty());
+            let value = match values.get_value((row, column)) {
+                None | Some(Data::Empty) => Value::Null,
+                Some(Data::Bool(v)) => json!(v),
+                Some(Data::Int(v)) => json!(v),
+                Some(Data::Float(v)) => json!(v),
+                Some(value) => json!(value.to_string()),
+            };
             count += 1;
             ensure!(count <= ITEMS, "Cell limit");
             cells.push(json!({"row":row,"column":column,"value":value,"formula":formula}));
@@ -419,6 +443,7 @@ fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
         let cells = sheet["cells"]
             .as_array()
             .context("Expected worksheet cells")?;
+        let mut coordinates = BTreeSet::new();
         for cell in cells {
             count += 1;
             ensure!(count <= ITEMS, "Cell limit");
@@ -434,7 +459,12 @@ fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
                 (row as u64 + 1) * (column as u64 + 1) <= 65536,
                 "Worksheet grid limit"
             );
-            if let Some(formula) = cell.get("formula") {
+            ensure!(
+                coordinates.insert((row, column)),
+                "Duplicate cell in sheet {} at row {row}, column {column} (zero-based)",
+                text(&sheet["name"])?
+            );
+            if let Some(formula) = cell.get("formula").filter(|v| !v.is_null()) {
                 worksheet.write_formula(row, column, text(formula)?)?;
             } else {
                 match &cell["value"] {
@@ -443,11 +473,16 @@ fn write_xlsx(input: &Value) -> Result<Vec<u8>> {
                         worksheet.write_boolean(row, column, *v)?;
                     }
                     Value::Number(v) => {
-                        worksheet.write_number(
-                            row,
-                            column,
-                            v.as_f64().context("Invalid numeric cell")?,
-                        )?;
+                        let number = v.as_f64().context("Invalid numeric cell")?;
+                        let integer = v
+                            .as_i64()
+                            .map(i128::from)
+                            .or_else(|| v.as_u64().map(i128::from));
+                        ensure!(
+                            integer.is_none_or(|n| number as i128 == n),
+                            "Integer {v} at row {row}, column {column} cannot round-trip as an XLSX number; preserve it as text"
+                        );
+                        worksheet.write_number(row, column, number)?;
                     }
                     Value::String(v) => {
                         worksheet.write_string(row, column, v)?;

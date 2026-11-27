@@ -221,7 +221,8 @@ fn tool_count 2 textval uint rule uint uint do 7 bytes list uint i int bytepos u
 
   ret call integer 1 countval
 
-fn tool_summary 1 values uint uint do 8 discard uint out uint meanval uint i int total int lowval int highval int n int 9
+fn tool_summary 1 values uint uint do 8 discard uint out uint meanval uint i int total int lowval int highval int n int 10
+  set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"array\",\"maxItems\":4096,\"items\":{\"type\":\"integer\"}}" values
   set discard call require 2 le call size 1 values 4096 call str 1 utf8 "Numeric list exceeds 4096 values"
   set i 0
   set total 0
@@ -253,8 +254,11 @@ fn tool_summary 1 values uint uint do 8 discard uint out uint meanval uint i int
 
   ret out
 
-fn tool_transform 1 arg uint uint do 9 rows uint fields uint filterval uint out uint item uint projected uint discard uint i int k int 8
+fn tool_transform 1 arg uint uint do 10 rows uint fields uint filterval uint out uint item uint projected uint discard uint invalid uint i int k int 11
   set rows call key 2 arg call str 1 utf8 "rows"
+  set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"array\",\"maxItems\":4096}" rows
+  set invalid call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT 'rows['||key||'] must be an object' AS error FROM json_each(?) WHERE type<>'object' ORDER BY CAST(key AS INTEGER) LIMIT 1" call append 2 call arr 0 rows 0 call str 1 utf8 "error"
+  set discard call require 2 call same 2 invalid 0u call ui_default 2 invalid call str 1 utf8 "Invalid object row"
   set fields call key 2 arg call str 1 utf8 "fields"
   set filterval call key 2 arg call str 1 utf8 "filter"
   set out call arr 0
@@ -262,7 +266,7 @@ fn tool_transform 1 arg uint uint do 9 rows uint fields uint filterval uint out 
   set discard call require 2 le call size 1 rows 4096 call str 1 utf8 "Row count exceeds bound"
   while lt i call size 1 rows 3
   set item call nth 2 rows i
-  if or call same 2 filterval 0u call same 2 call key 2 item call key 2 filterval call str 1 utf8 "field" call key 2 filterval call str 1 utf8 "value" 2
+  if or call same 2 filterval 0u and not call same 2 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 AS present FROM json_each(?1) WHERE key=?2 LIMIT 1" @build append 1 2 call arr 0 item call key 2 filterval call str 1 utf8 "field" 0 call str 1 utf8 "present" 0u call same 2 call key 2 item call key 2 filterval call str 1 utf8 "field" call key 2 filterval call str 1 utf8 "value" 2
   if not call same 2 fields 0u 4
   set projected call obj 0
   set k 0
@@ -336,6 +340,13 @@ fn tool_format_mime 1 formatval uint uint do 1 mime uint 3
   0
 
   ret mime
+
+fn tool_notebook_source 1 sourceval uint uint do 3 encoded uint normalized uint discard uint 5
+  set encoded call encode 1 sourceval
+  set discard call require 2 le call size 1 encoded 8388608 call str 1 utf8 "Notebook source exceeds normalization limit"
+  set normalized call nth 2 call query 2 call asset 1 call str 1 utf8 "notebook_source.sql" call append 2 call arr 0 encoded 0
+  set discard call require 2 not call same 2 call key 2 normalized call str 1 utf8 "text" 0u call str 1 utf8 "Notebook source must be text or an array of text lines"
+  ret normalized
 
 fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root uint path uint textval uint discard uint entries uint out uint queryval uint formatval uint nameval uint doc uint cells uint item uint edit uint packed uint meta uint i int 18
   if call same 2 toolname call str 1 utf8 "fs.search" 1 ret call search_file 2 pid arguments 0
@@ -423,7 +434,7 @@ fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root u
   0
 
   set nameval call key 2 arguments call str 1 utf8 "name"
-  if call same 2 nameval 0u 1
+  if not call nonblank 1 nameval 1
   set nameval call cat 2 call str 1 utf8 "output." formatval
   0
 
@@ -435,14 +446,21 @@ fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root u
   set cells call key 2 doc call str 1 utf8 "cells"
   set entries call key 2 arguments call str 1 utf8 "edits"
   set i 0
-  set discard call require 2 le call size 1 entries 4096 call str 1 utf8 "Notebook edit limit"
-  while lt i call size 1 entries 10
+  set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"array\",\"maxItems\":4096,\"items\":{\"type\":\"object\",\"required\":[\"index\",\"source\"],\"properties\":{\"index\":{\"type\":\"integer\"}}}}" entries
+  while lt i call size 1 entries 11
   set edit call nth 2 entries i
   set item call nth 2 cells call number 1 call key 2 edit call str 1 utf8 "index"
   set discard call require 2 not call same 2 item 0u call str 1 utf8 "Notebook cell index out of bounds"
-  set item call put 3 item call str 1 utf8 "source" call append 2 call arr 0  call key 2 edit call str 1 utf8 "source"
-  if call same 2 call key 2 item call str 1 utf8 "cell_type" call str 1 utf8 "code" 1
-  set item call put 3 call put 3 item call str 1 utf8 "outputs" call arr 0  call str 1 utf8 "execution_count" 0u
+  set packed call tool_notebook_source 1 call key 2 edit call str 1 utf8 "source"
+  set meta call tool_notebook_source 1 call key 2 item call str 1 utf8 "source"
+  if not call same 2 call key 2 packed call str 1 utf8 "text" call key 2 meta call str 1 utf8 "text" 3
+    set item call put 3 item call str 1 utf8 "source" call key 2 edit call str 1 utf8 "source"
+    if call same 2 call key 2 packed call str 1 utf8 "kind" call str 1 utf8 "text" 1
+      set item call put 3 item call str 1 utf8 "source" call append 2 call arr 0 call key 2 edit call str 1 utf8 "source"
+    0
+    if call same 2 call key 2 item call str 1 utf8 "cell_type" call str 1 utf8 "code" 1
+      set item call put 3 call put 3 item call str 1 utf8 "outputs" call arr 0 call str 1 utf8 "execution_count" 0u
+    0
   0
 
   set out call arr 0

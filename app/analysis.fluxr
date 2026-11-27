@@ -37,19 +37,26 @@ fn semantic_find 2 pid uint args uint uint do 4 snapshot uint terms uint queryte
   set snapshot call key 2 args call str 1 utf8 "snapshot"
   set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE project=? AND id=?" call append 2 call append 2 call arr 0 pid snapshot 0 0u call str 1 utf8 "Unknown snapshot"
   set querytext call key 2 args call str 1 utf8 "query"
-  set discard call require 2 and lt 0 call size 1 querytext le call size 1 querytext 256 call str 1 utf8 "Invalid search query"
+  set discard call require 2 and call nonblank 1 querytext le call size 1 querytext 256 call str 1 utf8 "Invalid search query"
   set terms call matches 2 querytext call vocab 1 pid
   ret call put 3 call shape 2 call str 1 utf8 "{\"concepts\":\"$0\",\"paths\":\"$1\"}" call append 2 call append 2 call arr 0 terms call query 2 call str 1 utf8 "WITH names(name) AS (SELECT json_extract(value,'$.ref.name') FROM json_each(?1) UNION SELECT ?2) SELECT path,digest,count(*) AS rank FROM inventory JOIN names ON instr(lower(path),lower(name))>0 WHERE snapshot=?3 GROUP BY path,digest ORDER BY rank DESC,path LIMIT 64" call append 2 call append 2 call append 2 call arr 0 terms querytext snapshot call str 1 utf8 "passages" call ranked_passages 4 pid snapshot terms querytext
 
-fn data_query 2 pid uint args uint uint do 2 idval uint discard uint 4
+fn data_query 2 pid uint args uint uint do 3 idval uint discard uint cursor uint 4
   set idval call key 2 args call str 1 utf8 "template"
-  if call same 2 idval call str 1 utf8 "recent_events" 1
-    ret call query 2 call str 1 utf8 "SELECT cursor,kind,payload AS \"payload:json\" FROM events WHERE project=? AND cursor>? ORDER BY cursor LIMIT 100" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "after"
+  if call same 2 idval call str 1 utf8 "recent_events" 5
+    set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"object\",\"properties\":{\"after\":{\"type\":\"integer\"}}}" args
+    set cursor call key 2 args call str 1 utf8 "after"
+    if call same 2 cursor 0u 1
+      set cursor call integer 1 0
+    0
+    set discard call require 2 le 0 call number 1 cursor call str 1 utf8 "after must be a nonnegative integer cursor"
+    ret call query 2 call str 1 utf8 "SELECT cursor,kind,payload AS \"payload:json\" FROM events WHERE project=? AND cursor>? ORDER BY cursor LIMIT 100" @build append 1 2 call arr 0 pid cursor
   0
-  if call same 2 idval call str 1 utf8 "request_jobs" 1
+  if call same 2 idval call str 1 utf8 "request_jobs" 2
+    set discard call require 2 call nonblank 1 call key 2 args call str 1 utf8 "request" call str 1 utf8 "request_jobs requires a nonblank request ID in request"
     ret call query 2 call str 1 utf8 "SELECT id,role,kind,state FROM jobs WHERE project=? AND request=? ORDER BY rowid LIMIT 100" call append 2 call append 2 call arr 0 pid call key 2 args call str 1 utf8 "request"
   0
-  ret call require 2 false call str 1 utf8 "Unknown parameterized query template"
+  ret call require 2 false call str 1 utf8 "Supported templates: recent_events (optional after: nonnegative integer, default 0); request_jobs (required request: request ID)."
 
 fn extended_run 3 pid uint toolname uint args uint uint do 0  15
   if or call same 2 toolname call str 1 utf8 "monitor.start" or call same 2 toolname call str 1 utf8 "monitor.stop" call same 2 toolname call str 1 utf8 "monitor.status" 1

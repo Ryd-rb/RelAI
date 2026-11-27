@@ -89,7 +89,7 @@
     "id": "data.summarize",
     "description": "Checked integer sum/count/min/max and rational mean",
     "input": {
-      "values": "i64 array"
+      "values": "required i64 array, at most 4096; [] returns an empty summary"
     },
     "output": "summary",
     "route": "portable",
@@ -192,9 +192,9 @@
   },
   {
     "id": "sheet.write",
-    "description": "Create immutable XLSX values and formula cells",
+    "description": "Create immutable XLSX cells; formula:null means no formula; duplicate coordinates and lossy integers are rejected",
     "input": {
-      "sheets": "[{name,cells:[{row,column,value|formula}]}]"
+      "sheets": "[{name,cells:[{row,column,value|formula}]}]; coordinates are zero-based; preserve inexact integers as text"
     },
     "output": "artifact metadata",
     "route": "portable",
@@ -206,11 +206,11 @@
   },
   {
     "id": "notebook.edit",
-    "description": "Derive immutable IPYNB v4 cell edits and clear edited code outputs",
+    "description": "Derive immutable IPYNB v4 edits; preserve execution for unchanged source text and clear outputs/count only for genuinely changed code",
     "input": {
-      "path": "project-relative IPYNB file path; omit when using artifact",
-      "artifact": "exact project artifact ID; use instead of path",
-      "edits": "[{index,source}]"
+      "path": "project-relative IPYNB path; omit with artifact",
+      "artifact": "exact project artifact ID instead of path",
+      "edits": "[{index,source:string|string[]}]; line arrays concatenate for text comparison"
     },
     "output": "artifact metadata",
     "route": "portable",
@@ -266,8 +266,9 @@
     "id": "verify.format",
     "description": "Canonicalize pure checked FluxR source without activation",
     "input": {
-      "source": "exact source OR version",
-      "export": "entry name"
+      "source": "literal checked FluxR source; omit when using version",
+      "version": "exact project tool version digest; takes precedence over source/export",
+      "export": "entry name for literal source; defaults to run"
     },
     "output": "canonical source",
     "route": "portable",
@@ -279,8 +280,9 @@
     "id": "verify.lint",
     "description": "Check pure source syntax, types and forbidden native/host imports",
     "input": {
-      "source": "exact source OR version",
-      "export": "entry name"
+      "source": "literal checked FluxR source; omit when using version",
+      "version": "exact project tool version digest; takes precedence over source/export",
+      "export": "entry name for literal source; defaults to run"
     },
     "output": "build result",
     "route": "portable",
@@ -292,8 +294,9 @@
     "id": "verify.build",
     "description": "Compile a pure checked module without activation",
     "input": {
-      "source": "exact source OR version",
-      "export": "entry name"
+      "source": "literal checked FluxR source; omit when using version",
+      "version": "exact project tool version digest; takes precedence over source/export",
+      "export": "entry name for literal source; defaults to run"
     },
     "output": "signature and source digest",
     "route": "portable",
@@ -305,10 +308,12 @@
     "id": "verify.test",
     "description": "Execute exact pure checked case and compare expected VM value",
     "input": {
-      "source": "exact source OR version",
-      "export": "entry name",
-      "arguments": "VM values",
-      "expected": "VM value"
+      "source": "literal checked FluxR source; omit when using version",
+      "version": "exact project tool version digest; takes precedence over source/export",
+      "export": "entry name for literal source; defaults to run",
+      "arguments": "VM values; defaults to []",
+      "inputs": "VM input values; defaults to []",
+      "expected": "expected VM value"
     },
     "output": "provisional test receipt",
     "route": "portable",
@@ -320,9 +325,11 @@
     "id": "verify.benchmark",
     "description": "Measure one bounded pure compilation-and-call",
     "input": {
-      "source": "exact source OR version",
-      "export": "entry name",
-      "arguments": "VM values"
+      "source": "literal checked FluxR source; omit when using version",
+      "version": "exact project tool version digest; takes precedence over source/export",
+      "export": "entry name for literal source; defaults to run",
+      "arguments": "VM values; defaults to []",
+      "inputs": "VM input values; defaults to []"
     },
     "output": "measured compile and call microseconds",
     "route": "portable",

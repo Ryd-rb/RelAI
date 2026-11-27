@@ -115,30 +115,35 @@
     "id": "git.worktree_create",
     "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
     "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
-    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only",
+    "description": "Propose creating a RelAI-owned private detached linked worktree"
   },
   {
     "id": "git.worktree_remove",
     "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
     "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
-    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only",
+    "description": "Propose removing an owned, clean, merged private worktree"
   },
   {
     "id": "worktree.list",
     "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
     "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
-    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only",
+    "description": "List RelAI-managed private worktrees"
   },
   {
     "id": "worktree.status",
     "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
     "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
-    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only",
+    "description": "Inspect a managed private worktree and its recovery status"
   },
   {
     "id": "worktree.apply",
     "authority": "Exact immutable proposal and typed user grant; removal additionally requires destructive=true",
     "scope": "RelAI-owned private detached linked worktrees only; no owner-selected removal paths",
-    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only"
+    "limits": "Windows TxF; same volume;4096 portable regular-file entries;8MiB raw bytes;clean merged removal only",
+    "description": "Apply one exact previously user-authorized worktree mutation"
   }
 ]

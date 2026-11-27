@@ -35,11 +35,11 @@
   },
   {
     "id": "fs.digest",
-    "description": "SHA-256 of UTF-8 file bytes",
+    "description": "SHA-256 checksum of raw file bytes, including binary files",
     "input": {
       "path": "relative path"
     },
-    "output": "digest",
+    "output": "algorithm and raw-byte digest",
     "route": "portable",
     "effects": [],
     "reuse": "disabled",
@@ -60,12 +60,13 @@
   },
   {
     "id": "fs.search",
-    "description": "Literal search in one UTF-8 file, with byte spans",
+    "description": "Search a bounded UTF-8 project file using literal text or a regular expression",
     "input": {
-      "path": "relative path",
-      "query": "literal UTF-8 text"
+      "path": "project-relative file path; preserves existing host_path and snapshot source selection",
+      "query": "literal text or regular expression",
+      "mode": "literal|regex; defaults to literal"
     },
-    "output": "matches",
+    "output": "matches addressed by byte_start/byte_end with line and column, plus source path, digest and snapshot",
     "route": "portable",
     "effects": [],
     "reuse": "disabled",
@@ -73,11 +74,12 @@
   },
   {
     "id": "data.parse",
-    "description": "Parse bounded JSON text",
+    "description": "Parse bounded JSON or CSV text",
     "input": {
-      "text": "JSON text"
+      "text": "JSON or CSV text",
+      "format": "json|csv; defaults to json"
     },
-    "output": "parsed JSON",
+    "output": "JSON: parsed value; CSV: parsed rows",
     "route": "portable",
     "effects": [],
     "reuse": "disabled",
@@ -149,7 +151,8 @@
     "id": "document.read",
     "description": "Read Markdown, DOCX or PDF text from exact file or artifact",
     "input": {
-      "path": "relative file OR artifact id",
+      "path": "project-relative file path; omit when using artifact",
+      "artifact": "exact project artifact ID; use instead of path",
       "format": "markdown|docx|pdf"
     },
     "output": "text",
@@ -178,7 +181,8 @@
     "id": "sheet.read",
     "description": "Read XLSX scalar cell values and formulas",
     "input": {
-      "path": "relative file OR artifact id"
+      "path": "project-relative file path; omit when using artifact",
+      "artifact": "exact project artifact ID; use instead of path"
     },
     "output": "sheets",
     "route": "portable",
@@ -204,7 +208,8 @@
     "id": "notebook.edit",
     "description": "Derive immutable IPYNB v4 cell edits and clear edited code outputs",
     "input": {
-      "path": "relative file OR artifact id",
+      "path": "project-relative IPYNB file path; omit when using artifact",
+      "artifact": "exact project artifact ID; use instead of path",
       "edits": "[{index,source}]"
     },
     "output": "artifact metadata",
@@ -219,7 +224,8 @@
     "id": "archive.list",
     "description": "List safe ZIP entry paths and sizes",
     "input": {
-      "path": "relative file OR artifact id"
+      "path": "project-relative ZIP file path; omit when using artifact",
+      "artifact": "exact project artifact ID; use instead of path"
     },
     "output": "entries",
     "route": "portable",
@@ -245,7 +251,8 @@
     "id": "archive.extract",
     "description": "Extract safe ZIP entries into immutable artifacts",
     "input": {
-      "path": "relative file OR artifact id"
+      "path": "project-relative ZIP file path; omit when using artifact",
+      "artifact": "exact project artifact ID; use instead of path"
     },
     "output": "artifact metadata array",
     "route": "portable",

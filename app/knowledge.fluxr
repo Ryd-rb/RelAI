@@ -36,7 +36,7 @@ pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry u
     set did pid
   0
   if call same 2 op call str 1 utf8 "list" 1
-    ret call query 2 call str 1 utf8 "SELECT d.*,coalesce(g.enabled,0) AS enabled FROM dictionaries d LEFT JOIN dictionary_links g ON g.dictionary=d.id AND g.project=? ORDER BY d.name" call append 2 call arr 0 pid
+    ret call query 2 call str 1 utf8 "SELECT d.*,CASE WHEN d.archived=0 THEN coalesce(g.enabled,0) ELSE 0 END AS enabled FROM dictionaries d LEFT JOIN dictionary_links g ON g.dictionary=d.id AND g.project=? ORDER BY d.name" call append 2 call arr 0 pid
   0
   if call same 2 op call str 1 utf8 "find" 1
     ret call vocab 1 pid
@@ -44,23 +44,28 @@ pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry u
   if call same 2 op call str 1 utf8 "expand" 1
     ret call expand 2 pid call key 2 arg call str 1 utf8 "refs"
   0
-  if call same 2 op call str 1 utf8 "create" 4
+  if call same 2 op call str 1 utf8 "create" 5
+    set discard call require 2 call nonblank 1 call key 2 arg call str 1 utf8 "name" call str 1 utf8 "Enter a dictionary name"
     set did call uid 0
     set discard call query 2 call str 1 utf8 "INSERT INTO dictionaries VALUES(?,?,?,0)" call append 2 call append 2 call append 2 call arr 0 did pid call key 2 arg call str 1 utf8 "name"
     set discard call query 2 call str 1 utf8 "INSERT INTO dictionary_links VALUES(?,?,1,1)" call append 2 call append 2 call arr 0 pid did
     ret did
   0
-  if or call same 2 op call str 1 utf8 "link" call same 2 op call str 1 utf8 "unlink" 4
+  if or call same 2 op call str 1 utf8 "link" call same 2 op call str 1 utf8 "unlink" 5
+    if call same 2 op call str 1 utf8 "link" 1
+      set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM dictionaries WHERE id=? AND archived=0" call append 2 call arr 0 did 0 0u call str 1 utf8 "Choose an existing, nonarchived dictionary to link"
+    0
     set discard call require 2 not call same 2 did call str 1 utf8 "RelAI" call str 1 utf8 "The protocol dictionary is permanent"
     set n call integer 1 0
     if call same 2 op call str 1 utf8 "link" 1
     set n call integer 1 1
   0
-    ret call query 2 call str 1 utf8 "INSERT INTO dictionary_links VALUES(?,?,?,1) ON CONFLICT(project,dictionary) DO UPDATE SET enabled=excluded.enabled,revision=dictionary_links.revision+1" call append 2 call append 2 call append 2 call arr 0 pid did n
+    ret call query 2 call str 1 utf8 "INSERT INTO dictionary_links VALUES(?,?,?,1) ON CONFLICT(project,dictionary) DO UPDATE SET enabled=excluded.enabled,revision=dictionary_links.revision+1 WHERE dictionary_links.enabled IS NOT excluded.enabled" call append 2 call append 2 call append 2 call arr 0 pid did n
   0
   set owner call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT owner FROM dictionaries WHERE id=? AND archived=0" call append 2 call arr 0 did 0 call str 1 utf8 "owner"
   set discard call require 2 call same 2 owner pid call str 1 utf8 "Edit in the dictionary owner project"
-  if call same 2 op call str 1 utf8 "rename" 1
+  if call same 2 op call str 1 utf8 "rename" 2
+    set discard call require 2 call nonblank 1 call key 2 arg call str 1 utf8 "name" call str 1 utf8 "Enter a dictionary name"
     ret call query 2 call str 1 utf8 "UPDATE dictionaries SET name=? WHERE id=?" call append 2 call append 2 call arr 0 call key 2 arg call str 1 utf8 "name" did
   0
   if call same 2 op call str 1 utf8 "archive" 1
@@ -77,7 +82,7 @@ pub dictionary 1 arg uint uint do 9 pid uint did uint op uint owner uint entry u
     set discard call require 2 and call same 2 call key 2 entry call str 1 utf8 "revision" call key 2 arg call str 1 utf8 "revision" call same 2 call key 2 entry call str 1 utf8 "dictionary" did call str 1 utf8 "Revision conflict"
     set revision call integer 1 add 1 call number 1 call key 2 entry call str 1 utf8 "revision"
   0
-  set discard call require 2 and lt 0 call size 1 call key 2 arg call str 1 utf8 "name" le call size 1 call key 2 arg call str 1 utf8 "name" 256 call str 1 utf8 "Invalid term name"
+  set discard call require 2 and call nonblank 1 call key 2 arg call str 1 utf8 "name" le call size 1 call key 2 arg call str 1 utf8 "name" 256 call str 1 utf8 "Invalid term name: supply nonblank text of at most 256 bytes"
   set discard call require 2 or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" or call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "tool" call same 2 call key 2 arg call str 1 utf8 "kind" call str 1 utf8 "skill" call str 1 utf8 "Unknown entry type"
   set discard call query 2 call str 1 utf8 "INSERT INTO entries VALUES(?,?,?,?,?,?,'user',1)" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 eid revision did call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "kind" call key 2 arg call str 1 utf8 "definition"
   set discard call query 2 call str 1 utf8 "INSERT INTO term_tool_versions SELECT r.entry,?,d.version FROM registry_terms r LEFT JOIN tool_defaults d ON d.project=r.project AND d.name=r.name WHERE r.entry=?" call append 2 call append 2 call arr 0 revision eid

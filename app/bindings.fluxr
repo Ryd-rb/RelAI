@@ -3,6 +3,11 @@ fluxr 1
 fn str 1 x0 list uint uint do 0  1
   ret host text uint 1 list uint x0
 
+fn text_ready 1 value uint uint do 0 1
+  ret call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT CASE WHEN length(trim(?1,char(9,10,11,12,13,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288)))>0 THEN 'true' ELSE 'false' END AS \"ready:json\"" call append 2 call arr 0 value 0 call str 1 utf8 "ready"
+
+fn nonblank 1 value uint bool ret call same 2 call text_ready 1 value call decode 1 call str 1 utf8 "true"
+
 fn decode 1 x0 uint uint do 0  1
   ret host parse uint 1 uint x0
 

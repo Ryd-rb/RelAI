@@ -357,7 +357,12 @@ fn tool_builtin 3 pid uint toolname uint arguments uint uint do 17 p uint root u
   ret call directory 2 root path
   0
 
-  if call same 2 toolname call str 1 utf8 "fs.count" 3
+  if call same 2 toolname call str 1 utf8 "fs.count" 4
+    if call same 2 call key 2 arguments call str 1 utf8 "rule" call str 1 utf8 "bytes" 3
+      set textval call key 2 call baseinfo 1 call read64 2 root path call str 1 utf8 "size"
+      set discard call require 2 le call number 1 textval 131072 call str 1 utf8 "File exceeds tool byte limit"
+      ret call shape 2 call str 1 utf8 "{\"count\":\"$0\",\"rule\":\"bytes\"}" call append 2 call arr 0 textval
+    0
     set textval call readtext 2 root path
     set discard call require 2 le call size 1 textval 131072 call str 1 utf8 "File exceeds tool text limit"
     ret call shape 2 call str 1 utf8 "{\"count\":\"$0\",\"rule\":\"$1\"}" call append 2 call append 2 call arr 0 call tool_count 2 textval call key 2 arguments call str 1 utf8 "rule" call key 2 arguments call str 1 utf8 "rule"

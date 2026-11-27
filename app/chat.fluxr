@@ -25,7 +25,7 @@ fn chat_ready 2 body uint attachments uint uint do 0  2
   if lt 0 call size 1 attachments 1
     ret call decode 1 call str 1 utf8 "true"
   0
-  ret call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT CASE WHEN length(trim(?1,char(9,10,11,12,13,32,133,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288)))>0 THEN 'true' ELSE 'false' END AS \"ready:json\"" call append 2 call arr 0 body 0 call str 1 utf8 "ready"
+  ret call text_ready 1 body
 
 fn chat_destination 3 pid uint draft uint suggested uint uint do 3 frozen uint binding uint checked uint 7
   set frozen call key 2 draft call str 1 utf8 "$destination"

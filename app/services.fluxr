@@ -28,9 +28,18 @@ fn git_walk 6 root uint pid uint sid uint oid uint dir uint depth int uint do 9 
     next i
   ret 0u
 
-fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint out uint oid uint sid uint oldid uint newid uint discard uint i int n int 38
+fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint out uint oid uint sid uint oldid uint newid uint discard uint i int n int 41
   set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
   set discard call require 2 not call same 2 root 0u call str 1 utf8 "Unknown project"
+  if or call same 2 toolname call str 1 utf8 "git.log" or call same 2 toolname call str 1 utf8 "git.tree" or call same 2 toolname call str 1 utf8 "git.show" call same 2 toolname call str 1 utf8 "git.snapshot" 1
+    set discard call require 2 call nonblank 1 call key 2 args call str 1 utf8 "object" call str 1 utf8 "Supply object: a starting Git commit ID for git.log or git.snapshot, a Git tree object ID for git.tree, or a Git object ID for git.show."
+  0
+  if or call same 2 toolname call str 1 utf8 "plan.get" call same 2 toolname call str 1 utf8 "project.lookup" 1
+    set discard call require 2 call nonblank 1 call key 2 args call str 1 utf8 "request" call str 1 utf8 "Supply the required request ID in request."
+  0
+  if call same 2 toolname call str 1 utf8 "job.status" 1
+    set discard call require 2 call nonblank 1 call key 2 args call str 1 utf8 "id" call str 1 utf8 "Supply the required job ID in id."
+  0
   if call same 2 toolname call str 1 utf8 "git.blame" 1
     ret call git_read 3 root call str 1 utf8 "blame" args
   0
@@ -166,7 +175,8 @@ fn extra_run 3 pid uint toolname uint args uint uint do 10 root uint row uint ou
   if call same 2 toolname call str 1 utf8 "dictionary.propose" 1
     ret call propose_wording 2 pid args
   0
-  if call same 2 toolname call str 1 utf8 "notify.local" 1
+  if call same 2 toolname call str 1 utf8 "notify.local" 2
+    set discard call require 2 call nonblank 1 call key 2 args call str 1 utf8 "message" call str 1 utf8 "Supply nonblank notification text in message."
     ret call audit 3 pid call str 1 utf8 "Notification" call shape 2 call str 1 utf8 "{\"summary\":\"$0\"}" call append 2 call arr 0 call key 2 args call str 1 utf8 "message"
   0
   ret call require 2 false call str 1 utf8 "Unknown service"

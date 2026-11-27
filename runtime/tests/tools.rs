@@ -326,6 +326,11 @@ fn deterministic_file_tools_read_fresh_bytes_and_report_exact_literal_spans() {
         f.run("fs.count", json!({"path":"readme.md","rule":"words"}))["value"]["count"],
         4
     );
+    fs::write(f.root.join("sample.bin"), [0xff, 0x00, 0xaa]).unwrap();
+    assert_eq!(
+        f.run("fs.count", json!({"path":"sample.bin","rule":"bytes"}))["value"]["count"],
+        3
+    );
     let matches =
         f.run("fs.search", json!({"path":"readme.md","query":"one"}))["value"]["matches"].clone();
     assert_eq!(

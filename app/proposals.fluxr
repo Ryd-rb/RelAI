@@ -17,7 +17,7 @@ fn propose_wording 2 pid uint args uint uint do 10 target uint dictionaryid uint
     set name call key 2 row call str 1 utf8 "name"
     set kind call key 2 row call str 1 utf8 "kind"
   1
-    set discard call require 2 and lt 0 call size 1 name le call size 1 name 256 call str 1 utf8 "Choose a name for a new knowledge entry"
+    set discard call require 2 and call nonblank 1 name le call size 1 name 256 call str 1 utf8 "Choose a nonblank name of at most 256 bytes for a new knowledge entry"
   set proposal call hash 1 call encode 1 call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 pid dictionaryid target revision name wording
   set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO proposals VALUES(?,?,?,?,?,?,'pending')" call append 2 call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 proposal pid target revision wording evidence
   set discard call query 2 call str 1 utf8 "INSERT OR IGNORE INTO proposal_terms VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 proposal dictionaryid name kind

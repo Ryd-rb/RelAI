@@ -183,12 +183,12 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "term_view" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"ref\":\"$1\"}" call append 2 call append 2 call arr 0 pid call nth 2 stack sub call size 1 stack 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"definition\"}" call arr 0 call obj 0
   0
   if call same 2 actionval call str 1 utf8 "edit_term" 2
-    set state call put 3 state call str 1 utf8 "termText" v
+    set state call ui_set_map 4 state call str 1 utf8 "termDrafts" call key 2 event call str 1 utf8 "draftKey" v
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"none\"}" call append 2 call arr 0 state call obj 0
   0
   if call same 2 actionval call str 1 utf8 "save_term" 2
-    set fixed call put 3 call key 2 event call str 1 utf8 "fixed" call str 1 utf8 "definition" call ui_default 2 call key 2 state call str 1 utf8 "termText" call key 2 call key 2 call key 2 state call str 1 utf8 "definition" call str 1 utf8 "entry" call str 1 utf8 "definition"
-    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "dictionary" fixed call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"saved_term\"}" call arr 0 call obj 0
+    set fixed call put 3 call key 2 event call str 1 utf8 "fixed" call str 1 utf8 "definition" call ui_default 2 call key 2 call key 2 state call str 1 utf8 "termDrafts" call key 2 event call str 1 utf8 "draftKey" call key 2 call key 2 call key 2 state call str 1 utf8 "definition" call str 1 utf8 "entry" call str 1 utf8 "definition"
+    ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "dictionary" fixed call shape 2 call str 1 @text r#"{"action":"saved_term","draftKey":"$0","definition":"$1"}"# @build append 1 2 call arr 0 call key 2 event call str 1 utf8 "draftKey" call key 2 fixed call str 1 utf8 "definition"
   0
   if call same 2 actionval call str 1 utf8 "refresh" 2
     if and call same 2 call key 2 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "true" call same 2 call key 2 call key 2 state call str 1 utf8 "nav" call str 1 utf8 "view" call str 1 utf8 "graph" 1
@@ -232,12 +232,14 @@ pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint sc
     set state call put 3 state call str 1 utf8 "layers" result
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
-  if call same 2 actionval call str 1 utf8 "definition" 3
+  if call same 2 actionval call str 1 utf8 "definition" 2
     set state call put 3 state call str 1 utf8 "definition" result
-    set state call put 3 state call str 1 utf8 "termText" 0u
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
-  if call same 2 actionval call str 1 utf8 "saved_term" 3
+  if call same 2 actionval call str 1 utf8 "saved_term" 4
+    if call same 2 call key 2 call key 2 state call str 1 utf8 "termDrafts" call key 2 event call str 1 utf8 "draftKey" call key 2 event call str 1 utf8 "definition" 1
+      set state call ui_set_map 4 state call str 1 utf8 "termDrafts" call key 2 event call str 1 utf8 "draftKey" 0u
+    0
     set stack call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT json_set(?1,'$[#-1]',json(?2)) AS \"stack:json\"" call append 2 call append 2 call arr 0 call key 2 state call str 1 utf8 "termStack" result 0 call str 1 utf8 "stack"
     set state call put 3 state call str 1 utf8 "termStack" stack
     ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"request\":{\"op\":\"$1\",\"input\":\"$2\",\"after\":\"$3\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 state call str 1 utf8 "term_view" call shape 2 call str 1 utf8 "{\"project\":\"$0\",\"ref\":\"$1\"}" call append 2 call append 2 call arr 0 pid result call ui_merge 2 call shape 2 call str 1 utf8 "{\"action\":\"definition\"}" call arr 0 call obj 0

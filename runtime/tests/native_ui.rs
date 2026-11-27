@@ -427,25 +427,35 @@ fn unicode_completion_shifts_pinned_markers_and_explicit_definition_history() {
     );
     ui.apply(submit);
     assert!(ui.state["definition"].is_null());
+    ui.type_message("Unsent Relay draft");
     let definition =
         ui.find(|c| c["event"]["action"] == "term" && c["event"]["ref"]["id"] == cafe["id"]);
-    let response = ui.event(definition, json!({}));
+    let response = ui.event(definition.clone(), json!({}));
     ui.apply(response);
     assert_eq!(ui.control("Café", "heading")["label"], "Café");
     assert_eq!(ui.state["termStack"].as_array().unwrap().len(), 1);
     let first_save_id = ui.control("Save revision", "button")["id"].clone();
-    let nested =
-        ui.find(|c| c["event"]["action"] == "term" && c["event"]["ref"]["id"] == tea["id"]);
-    let response = ui.event(nested, json!({}));
-    ui.apply(response);
-    assert_eq!(ui.state["definition"]["entry"]["name"], "Thé");
-    assert_ne!(ui.control("Save revision", "button")["id"], first_save_id);
-    ui.click("Back");
-    assert_eq!(ui.state["definition"]["entry"]["name"], "Café");
     ui.change(
         "Edit owner definition",
         "multiline",
         json!({"value":"Revised café definition."}),
+    );
+    let nested =
+        ui.find(|c| c["event"]["action"] == "term" && c["event"]["ref"]["id"] == tea["id"]);
+    let response = ui.event(nested.clone(), json!({}));
+    ui.apply(response);
+    assert_eq!(ui.state["definition"]["entry"]["name"], "Thé");
+    assert_ne!(ui.control("Save revision", "button")["id"], first_save_id);
+    assert_eq!(
+        ui.control("Edit owner definition", "multiline")["value"],
+        "A warm drink."
+    );
+    ui.change("Edit owner definition", "multiline", json!({"value":""}));
+    ui.click("Back");
+    assert_eq!(ui.state["definition"]["entry"]["name"], "Café");
+    assert_eq!(
+        ui.control("Edit owner definition", "multiline")["value"],
+        "Revised café definition."
     );
     ui.click("Save revision");
     assert_eq!(ui.state["definition"]["entry"]["revision"], 2);
@@ -457,6 +467,41 @@ fn unicode_completion_shifts_pinned_markers_and_explicit_definition_history() {
     ui.click("Close definition");
     assert!(ui.state["definition"].is_null());
     assert!(ui.state["termStack"].as_array().unwrap().is_empty());
+    assert_eq!(
+        ui.control("Message", "multiline")["value"],
+        "Unsent Relay draft"
+    );
+    let reopen = ui.event(definition.clone(), json!({}));
+    ui.apply(reopen);
+    assert_eq!(
+        ui.control("Edit owner definition", "multiline")["value"],
+        "Use Thé."
+    );
+    let linked = ui.event(nested, json!({}));
+    ui.apply(linked);
+    assert_eq!(
+        ui.control("Edit owner definition", "multiline")["value"],
+        ""
+    );
+    ui.click("Back");
+    ui.change(
+        "Edit owner definition",
+        "multiline",
+        json!({"value":"Edit against old revision."}),
+    );
+    let stale = ui.event(ui.control("Save revision", "button"), json!({}));
+    assert!(
+        ui.app
+            .invoke("dictionary", stale["request"]["input"].clone())
+            .is_err()
+    );
+    ui.click("Close definition");
+    let reopen = ui.event(definition, json!({}));
+    ui.apply(reopen);
+    assert_eq!(
+        ui.control("Edit owner definition", "multiline")["value"],
+        "Edit against old revision."
+    );
 }
 
 #[test]
@@ -1079,6 +1124,15 @@ fn a_question_arriving_while_typing_cannot_redirect_the_draft() {
     ui.apply(effect);
     assert_eq!(ui.control("Message", "multiline")["value"], "Two");
     ui.type_message("Two, please");
+    let question = ui.control("RelAI · Replying to this question", "detail");
+    let body = question["value"].as_str().unwrap();
+    assert_eq!(body.matches("One").count(), 1);
+    assert_eq!(body.matches("Two").count(), 1);
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["label"] == "One" || c["label"] == "Two")
+    );
     let stale_click = ui.event(choose, json!({}));
     assert_eq!(stale_click["refresh"], "none");
     ui.apply(stale_click);
@@ -1192,7 +1246,7 @@ fn a_draft_with_two_open_questions_waits_for_an_explicit_destination() {
         "Write your reply…"
     );
     let selected = ui.control("RelAI · Replying to this question", "detail");
-    assert_eq!(selected["value"], "Which build?");
+    assert_eq!(selected["value"], "Which build?\n\nRecommended · Custom");
     assert_eq!(
         ui.controls()
             .iter()

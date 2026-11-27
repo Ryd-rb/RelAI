@@ -84,7 +84,7 @@ fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft 
   if or not call same 2 interaction call str 1 utf8 "reply" not call same 2 emptydraft call decode 1 call str 1 utf8 "true" 1
     set choices call arr 0
   0
-  if and call same 2 interaction call str 1 utf8 "reply" and eq 0 call size 1 call key 2 row call str 1 utf8 "quick_choices" lt 0 call size 1 call key 2 row call str 1 utf8 "choices" 1
+  if and call same 2 interaction call str 1 utf8 "reply" and eq 0 call size 1 choices lt 0 call size 1 call key 2 row call str 1 utf8 "choices" 1
     set body call cat 2 call cat 2 body call str 1 utf8 "\n\n" call key 2 row call str 1 utf8 "choices"
   0
   set discard call ui_emit 1 call ui_merge 2 groupval call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"detail\",\"role\":\"$1\",\"label\":\"$2\",\"value\":\"$3\",\"caption\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "text" roleval speaker body caption

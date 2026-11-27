@@ -1,10 +1,13 @@
 fluxr 1
 
-fn file_selection 3 pid uint toolname uint args uint uint do 10 snapshot uint p uint root uint path uint value uint encoded uint meta uint discard uint absolute uint out uint 10
+fn file_selection 3 pid uint toolname uint args uint uint do 10 snapshot uint p uint root uint path uint value uint encoded uint meta uint discard uint absolute uint out uint 11
   set snapshot call key 2 args call str 1 utf8 "snapshot"
   set path call key 2 args call str 1 utf8 "path"
   set absolute call key 2 args call str 1 utf8 "host_path"
   set root call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT root FROM projects WHERE id=?" call append 2 call arr 0 pid 0 call str 1 utf8 "root"
+  if and call same 2 toolname call str 1 utf8 "fs.read" call same 2 absolute 0u 1
+    set discard call require 2 lt 0 call size 1 path call str 1 utf8 "Enter a project-relative file path in the path argument, for example README.md."
+  0
   if not call same 2 snapshot 0u 5
     set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM snapshots WHERE id=? AND project=?" call append 2 call append 2 call arr 0 snapshot pid 0 0u call str 1 utf8 "Snapshot unavailable for this project"
     set discard call require 2 call same 2 absolute 0u call str 1 utf8 "Choose a single source"

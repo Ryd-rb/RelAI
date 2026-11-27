@@ -1,5 +1,5 @@
 SELECT CAST(cursor AS TEXT) AS value, kind, payload AS "record:json",
-    kind || coalesce('   ·   ' || nullif(substr(replace(replace(coalesce(payload->>'$.text',
+    kind || coalesce('   ·   ' || nullif(substr(replace(replace(coalesce(nullif(payload->>'$.error',''),payload->>'$.text',
       payload->>'$.payload.question',payload->>'$.summary',payload->>'$.reason',
       payload->>'$.payload.findings',''),char(10),' '),char(13),' '),1,110),''),'') AS label
 FROM events WHERE project=?1 AND (?2='Timeline' OR kind IN ('ASK','Request stopped')

@@ -17,7 +17,7 @@ fn ui_form 3 state uint pid uint spec uint uint do 20 scope uint fields uint dra
     0
     if call same 2 call key 2 dest call str 1 utf8 "other_questions" call decode 1 call str 1 utf8 "true" 3
       set base call cat 2 scope call str 1 utf8 "/other-questions"
-      set discard call ui_emit 1 call ui_merge 2 area call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Other questions","role":"quiet","width":140,"expanded":"$1","event":{"action":"fold","key":"$0"}}"# @build append 1 2 call arr 0 base call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "false"
+      set discard call ui_emit 1 call ui_merge 2 area call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Other questions","role":"quiet","width":180,"expanded":"$1","event":{"action":"fold","key":"$0"}}"# @build append 1 2 call arr 0 base call ui_default 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "false"
       if call same 2 call key 2 call key 2 state call str 1 utf8 "folds" base call decode 1 call str 1 utf8 "true" 1
         set discard call chat_question_picker 2 scope pid
       0

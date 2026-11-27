@@ -980,7 +980,15 @@ fn revising_and_accepting_an_answer_keeps_the_exchange_and_in_progress_draft() {
     ui.type_message("Does it reload?");
     let accepted =
         ui.control("Accept answer", "button")["event"]["spec"]["fixed"]["action"].clone();
-    ui.click("Accept answer");
+    let command = ui.event(ui.control("Accept answer", "button"), json!({}));
+    let request = &command["request"];
+    let result = ui.invoke("control", request["input"].clone());
+    let reply = ui.invoke(
+        "desktop_result",
+        json!({"state":command["state"],"after":request["after"],"result":result}),
+    );
+    assert_eq!(reply["focus"], ui.control("Message", "multiline")["id"]);
+    ui.apply(reply);
     ui.control("RelAI · Accepted answer", "detail");
     ui.control("Following up on “Which command?”", "label");
     assert_eq!(
@@ -1161,6 +1169,12 @@ fn a_question_arriving_while_typing_cannot_redirect_the_draft() {
     ui.click("Reply");
     ui.click("Send");
     assert!(!ui.controls().iter().any(|c| c["label"] == "Reply"));
+    assert!(ui.controls().iter().any(|c| {
+        c["kind"] == "detail"
+            && c["value"].as_str().is_some_and(|text| {
+                text.contains("Which folder?") && text.contains("One") && text.contains("Two")
+            })
+    }));
     assert!(
         ui.app
             .invoke(

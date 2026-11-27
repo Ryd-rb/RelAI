@@ -1,9 +1,46 @@
-# Open app issues
+# RelAI app audit
 
+- [x] 001. Edit a definition opened from chat, follow a linked term, then go Back. The editor loses the first term's unsaved text. Accept when navigating also preserves an intentionally empty draft, including after a failed save.
+- [x] 002. Type a custom reply to a question with suggested answers. All suggestions disappear from the question. Accept when each suggestion remains readable exactly once and a stale button cannot overwrite the draft.
+- [x] 003. In a maximized 1280-wide desktop window, the composer fold reads “Other questi…” even with ample room alongside it. Show its full label.
+- [x] 004. Click Accept answer in Relay. The button disappears and keyboard focus lands on an unnamed pane. Focus the follow-up composer so typing can continue.
+- [x] 005. Select fs.read in the Tools library. The Arguments editor opens empty, with no indication that the user should supply a JSON object with a path. Show the selected tool's input contract beside its editor.
+- [x] 006. Run fs.read with empty arguments in Tools. It reports “read_base64: Expected text”. Identify the missing file path in terms the user can act on.
+- [x] 007. Ask Relay to inspect many parts of the app. The model batches more than eight actions, the harness rejects the response, and pressing Retry delivery can hit the same limit again. Expose the eight-action bound to the model before it plans a batch.
 - [ ] 008. After a delivered response exceeds the action limit, chat says “Delivery could not be confirmed”. Distinguish a received but rejected response from a genuinely interrupted delivery. Keep the duplicate-send warning for genuinely uncertain transport.
+- [x] 009. Answer a question, then reread it in chat history. Its suggested answers have disappeared from the record. Keep them readable without offering active reply buttons.
+- [x] 010. Two failed attempts in the Activity timeline both read “Job held”. Each event already has an error field, but only opening the detail distinguishes the cause. Include the concise recorded cause in the row.
+- [x] 011. Search Tools for tool.find. The built-in catalog and the extra services catalog both register it. Return one runnable entry for that built-in.
+- [x] 012. Select fs.read, enter its arguments, then select project.info. The runner still contains the previous tool's JSON. Restore each tool's own arguments when switching between them.
+- [x] 013. Run project.info and then select fs.read. The previous tool's output remains under the new selection. Associate a displayed result with the tool and version that produced it.
+- [x] 014. Search for a registered tool with two versions of the same contract. Both matching rows have the same visible name and description. Identify each exact version before the user selects it.
+- [x] 015. Enter a metadata-only term such as “portable” in the Tools library. It matches hidden routing metadata despite the search box promising a name or description search. Make the desktop search agree with its label and preserve full-record search for tool.find callers.
+- [x] 016. Follow the published input contract to reopen a generated document, workbook, or ZIP by artifact ID. Using path as instructed returns file-not-found. Document the separate artifact argument on all readers, including notebook editing.
+- [x] 017. Ask fs.count for the byte count of a three-byte binary file. The operation fails while decoding UTF-8. Count actual bytes and retain text decoding for word and line counts.
+- [x] 018. Search Tools for a CSV parser. data.parse accepts CSV and returns rows, but the published description and inputs mention JSON only. Make CSV parsing discoverable and describe the format and result.
+- [x] 019. Look for a regular-expression search of a project file. The fs.search tool supports regex but advertises literal search only. Show its mode argument and how results are addressed.
+- [x] 020. Look for a checksum of a binary file. The fs.digest description restricts itself to UTF-8 despite correctly hashing binary bytes. Describe raw byte hashing.
+- [x] 021. Run git.log without an object in a project with one commit. It reports a successful empty history. Use the current HEAD or tell the user which starting commit to supply.
+- [x] 022. Submit notify.local with no message. It stores a blank notification and returns success. Require nonblank notification text before writing an event.
+- [x] 023. Submit plan.get, project.lookup or job.status without the identifier in a fresh Tools form. Each returns an empty success indistinguishable from a genuine miss. Identify the required request or job ID and preserve the existing response for a well-formed unknown ID.
+- [x] 024. Look for worktree operations by what they do in the Tools library. Five built-in rows have no description, so neither the list nor a description search explains them. Supply distinct descriptions for creating, removing, listing, inspecting and applying.
+- [x] 025. Run git.tree without an object. Its opaque “git_read: Expected text” does not tell the user that a Git tree object ID is required. Give a useful prompt for Git object readers.
+- [x] 026. Create a dictionary with spaces as its name, or rename one to an empty string. Both succeed and produce an unnamed dictionary. Validate names before recording changes.
+- [x] 027. Create a dictionary entry whose name is only spaces. It becomes a blank item in the term list. Reject blank term names in both entry forms while preserving intentional edits to an existing definition's body.
 - [ ] 028. Create “Café”, then type “CAFÉ” in term completion or Dictionary search. The match disappears because SQL lower only folds ASCII. Use Unicode case folding consistently for term-name matching.
+- [x] 029. Archive a linked dictionary, then try to link it again. The operation reports success and the inventory reports it enabled, but its terms remain unavailable. Show archived dictionaries as inactive and reject new links to them.
+- [x] 030. Repeat Change link with a dictionary already in the chosen state. The link revision increments even though nothing changed. Keep the revision stable on repeated selections.
+- [x] 031. Choose an unqualified version in the Tools library. It looks runnable and the Run button is enabled although the backend refuses to execute it. Identify its lifecycle state and disable dispatch when it cannot run.
+- [x] 032. Save a Models preset with a spaces-only model ID. It persists and will be used for the next model call. Reject whitespace-only IDs and keep the editor open.
+- [x] 033. Clear Model ID, then choose to restore the inherited preset. The form requires the deleted ID even though reset needs only the role and scope. Allow reset without an ID.
+- [x] 034. Click Edit assignment on Models. Focus lands on the unnamed pane (observed in the native window). Put it in the configuration form.
+- [x] 035. Fail a Tools operation and then open Versions. The old error follows the user onto that tab and there is no Dismiss control outside chat. Allow dismissal on workspace pages and clear obsolete feedback on tab changes.
+- [x] 036. Unlink the project's own dictionary, then use Save definition on Terms. The save reports success but the term cannot be found in this project's search or completion. Explain that the destination dictionary is unlinked before saving.
 - [ ] 037. Search the Activity timeline for when an event occurred. The record stores only a sequence number and the visible rows show no time. Timestamp new events and preserve readable legacy records with unknown times.
 - [ ] 038. Open Needs attention after a held job has been superseded or a question answered. The historical event remains in the actionable list solely because of its original event kind. Keep history in Timeline and filter Needs attention by current state.
+- [x] 039. Reach maximum or minimum zoom in Project graph. The corresponding Zoom button remains enabled and repeated presses silently do nothing. Reflect the bounds in the toolbar.
+- [x] 040. Press Fit in Project graph. It sets zoom to 100 percent regardless of content or viewport. Label the action as a zoom reset and indicate the current scale.
+- [x] 041. Start RelAI with a preconfigured CARGO_TARGET_DIR. The launcher builds into that directory but tries to launch target/release from the repository, which can start an old binary or fail. Launch the executable produced by that build.
 - [ ] 042. Mention the same term twice in a chat message. Two identical definition buttons appear below it. Offer one button per distinct pinned reference while preserving both original text spans.
 - [ ] 043. Inspect definition links using a screen reader. Their names consist only of the spelling and “definition”, without kind or owning dictionary. Make the type and source discoverable without modifying the message text.
 - [ ] 044. After replying to a question, its transcript caption changes to plain “RelAI”. Preserve a question label when reading history and distinguish answered from superseded or stopped questions.

@@ -1,7 +1,8 @@
 fluxr 1
 
-pub save_term 1 arg uint uint do 2 p uint discard uint 4
+pub save_term 1 arg uint uint do 2 p uint discard uint 5
   set p call key 2 call project 1 arg call str 1 utf8 "id"
+  set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT 1 FROM dictionary_links l JOIN dictionaries d ON d.id=l.dictionary AND d.archived=0 WHERE l.project=?1 AND l.dictionary=?1 AND l.enabled=1" call append 2 call arr 0 p 0 0u call str 1 utf8 "The destination project dictionary is unlinked or archived. Enable its link before saving a project definition."
   set discard call require 2 and lt 0 call size 1 call key 2 arg call str 1 utf8 "name" lt 0 call size 1 call key 2 arg call str 1 utf8 "definition" call str 1 utf8 "Enter a term and its definition"
   set discard call dictionary 1 call put 3 call put 3 arg call str 1 utf8 "kind" call str 1 utf8 "knowledge" call str 1 utf8 "op" call str 1 utf8 "save"
   ret call query 2 call str 1 utf8 "INSERT INTO terms VALUES(?,?,?,?,1,'knowledge') ON CONFLICT(id) DO UPDATE SET definition=excluded.definition,revision=terms.revision+1" call append 2 call append 2 call append 2 call append 2 call arr 0 call hash 1 call encode 1 call append 2 call append 2 call arr 0 p call key 2 arg call str 1 utf8 "name" p call key 2 arg call str 1 utf8 "name" call key 2 arg call str 1 utf8 "definition"

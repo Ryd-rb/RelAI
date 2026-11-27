@@ -26,8 +26,12 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     set state call ui_set_map 4 state call str 1 utf8 "workspaceSelection" scope call put 3 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "workspaceSelection" scope call obj 0 name v
     ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state
   0
-  if call same 2 actionval call str 1 utf8 "pane" 2
+  if call same 2 actionval call str 1 utf8 "pane" 4
     set state call ui_set_map 4 state call str 1 utf8 "panes" call key 2 event call str 1 utf8 "page" call key 2 event call str 1 utf8 "pane"
+    set state call put 3 state call str 1 utf8 "status" 0u
+    if not call same 2 call key 2 event call str 1 utf8 "focus" 0u 1
+      ret call shape 2 call str 1 @text r#"{"state":"$0","refresh":"view","focus":"$1"}"# @build append 1 2 call arr 0 state call key 2 event call str 1 utf8 "focus"
+    0
     ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state
   0
   if call same 2 actionval call str 1 utf8 "field" 1

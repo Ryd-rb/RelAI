@@ -325,7 +325,10 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
             .len()
             > 1
     );
-    ui.click("Edit assignment");
+    let edit = ui.event(ui.control("Edit assignment", "button"), json!({}));
+    let focus = edit["focus"].clone();
+    ui.apply(edit);
+    assert_eq!(focus, ui.control("Provider", "select")["id"]);
     assert_eq!(ui.control("Model ID", "input")["section"], "model-settings");
     assert!(
         ui.controls()
@@ -643,7 +646,14 @@ fn graph_filter_pause_zoom_comparison_and_old_snapshot_read_retained_content() {
     ui.click("Zoom out");
     assert!((ui.state["zoom"].as_f64().unwrap() - 1.0).abs() < 1e-9);
     ui.click("Zoom in");
-    ui.click("Fit");
+    ui.state["zoom"] = json!(3.0);
+    ui.render(false);
+    assert_eq!(ui.control("Zoom in", "button")["enabled"], false);
+    ui.control("Zoom 300%", "label");
+    ui.state["zoom"] = json!(0.5);
+    ui.render(false);
+    assert_eq!(ui.control("Zoom out", "button")["enabled"], false);
+    ui.click("Reset zoom");
     assert_eq!(ui.state["zoom"], 1.0);
     ui.click("Resume graph");
     assert_eq!(ui.state["paused"], false);
@@ -818,6 +828,11 @@ fn tool_library_keeps_arguments_and_output_with_the_selected_tool() {
     ui.render(true);
     ui.change("Search tools", "input", json!({"value":"increment"}));
     let matching = ui.control("Matching tools", "list");
+    select(&mut ui, "increment");
+    assert_eq!(
+        ui.control("Run an exact registered version", "button")["enabled"],
+        false
+    );
     for version in versions {
         assert!(
             matching["choices"]

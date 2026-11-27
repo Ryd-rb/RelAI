@@ -14,7 +14,11 @@ if ($View -and ($Headless -or $CheckProvider -or $PSBoundParameters.ContainsKey(
 }
 $root = $PSScriptRoot
 $manifest = Join-Path $root 'Cargo.toml'
-$exe = Join-Path $root 'target/release/fluxr-app-host.exe'
+$metadataText = & cargo metadata --format-version 1 --no-deps --locked --manifest-path $manifest
+if ($LASTEXITCODE -ne 0) { throw 'Cargo workspace metadata failed.' }
+$metadata = ($metadataText -join [Environment]::NewLine) | ConvertFrom-Json
+if ([string]::IsNullOrWhiteSpace($metadata.target_directory)) { throw 'Cargo did not report target_directory.' }
+$exe = Join-Path $metadata.target_directory 'release/fluxr-app-host.exe'
 cargo build --release --locked --manifest-path $manifest
 if ($LASTEXITCODE -ne 0) { throw 'FluxR host build failed.' }
 $service = $null

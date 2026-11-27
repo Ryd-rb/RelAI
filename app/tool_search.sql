@@ -1,0 +1,1 @@
+WITH items(item) AS (SELECT value FROM json_each(?1,'$.builtins') UNION ALL SELECT value FROM json_each(?1,'$.versions')) SELECT json(item) AS "entry:json" FROM items WHERE instr(lower(coalesce(item->>'$.id',item->>'$.name','')),lower(coalesce(?2,'')))>0 OR instr(lower(coalesce(item->>'$.description',item->>'$.contract','')),lower(coalesce(?2,'')))>0 LIMIT 128

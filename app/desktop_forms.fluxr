@@ -63,8 +63,11 @@ fn ui_form 3 state uint pid uint spec uint uint do 21 ready uint scope uint fiel
       if call same 2 call key 2 spec call str 1 utf8 "presentation" call str 1 utf8 "search" 1
         set props call decode 1 call str 1 @text r#"{"caption":false,"placeholder":"Filter tools by name or description…"}"#
       0
-      if and not call same 2 dest 0u call same 2 name call str 1 utf8 "text" 2
+      if and not call same 2 dest 0u call same 2 name call str 1 utf8 "text" 3
         set props call shape 2 call str 1 utf8 "{\"caption\":false,\"placeholder\":\"Message RelAI…\",\"lines\":2}" call arr 0
+        if lt 0 call size 1 call key 2 state call str 1 utf8 "projectName" 1
+          set props call put 3 props call str 1 utf8 "placeholder" call cat 2 call cat 2 call str 1 utf8 "Message " call key 2 state call str 1 utf8 "projectName" call str 1 utf8 "…"
+        0
         if not call same 2 call key 2 dest call str 1 utf8 "unavailable" call decode 1 call str 1 utf8 "true" 3
           if not call same 2 call key 2 call key 2 dest call str 1 utf8 "bind" call str 1 utf8 "revise" 0u 1
             set props call put 3 props call str 1 utf8 "placeholder" call str 1 utf8 "Describe the change…"
@@ -144,7 +147,7 @@ fn ui_attachments 6 state uint scope uint name uint base uint items uint area ui
   set i 0
   while lt i call size 1 items 3
     set item call nth 2 items i
-    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call cat 2 call str 1 utf8 "Remove " call key 2 item call str 1 utf8 "name" call shape 2 call str 1 utf8 "{\"action\":\"remove\",\"scope\":\"$0\",\"name\":\"$1\",\"id\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 item call str 1 utf8 "id" call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 keyval call str 1 utf8 "/" call encode 1 call integer 1 div i 2
+    set discard call ui_emit 1 call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call key 2 item call str 1 utf8 "id" call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT 'Remove '||?1||' · '||CASE WHEN ?2 IS NULL THEN 'size unknown' ELSE printf('%d bytes',?2) END AS label" @build append 1 2 call arr 0 call key 2 item call str 1 utf8 "name" call key 2 item call str 1 utf8 "byte_length" 0 call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"remove\",\"scope\":\"$0\",\"name\":\"$1\",\"id\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 scope name call key 2 item call str 1 utf8 "id" call ui_merge 2 area call shape 2 call str 1 utf8 "{\"role\":\"quiet\",\"row\":\"$0\"}" call append 2 call arr 0 call cat 2 call cat 2 keyval call str 1 utf8 "/" call encode 1 call integer 1 div i 2
     next i
   ret 0u
 

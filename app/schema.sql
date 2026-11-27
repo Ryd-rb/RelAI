@@ -92,6 +92,12 @@ SELECT r.project, q.id, q.request, q.rowid AS sequence, q.body->>'$.question' AS
     SELECT 1 FROM jobs j WHERE j.request=r.id AND j.revision=r.revision AND j.kind='intake'
       AND j.input->>'$.reply'=q.id AND j.state IN ('queued','sealing','sealed','running','waiting','held','uncertain'));
 
+CREATE VIEW IF NOT EXISTS chat_topics AS
+SELECT s.request,s.project,coalesce(nullif(substr(topic,1,64)||CASE WHEN length(topic)>64 THEN '…' ELSE '' END,''),'Untitled request') AS topic
+FROM (SELECT request,project,rowid,single_line(coalesce(nullif(content->>'$.text',''),content->>'$.attachments[0].display_name','')) AS topic
+      FROM submissions) s
+WHERE s.rowid=(SELECT min(f.rowid) FROM submissions f WHERE f.request=s.request);
+
 CREATE VIEW IF NOT EXISTS pending_chat_answers AS
 SELECT r.project, r.id AS request, r.intent AS user_message,
        a.id AS answer_id, a.payload->>'$.findings' AS answer

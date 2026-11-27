@@ -127,7 +127,7 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
   0
   if call same 2 actionval call str 1 utf8 "remove" 6
     set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
-    set v call query 2 call str 1 utf8 "SELECT value->>'$.id' AS id,value->>'$.name' AS name FROM json_each(?) WHERE value->>'$.id'<>?" call append 2 call append 2 call arr 0 call key 2 draft name call key 2 event call str 1 utf8 "id"
+    set v call query 2 call str 1 utf8 "SELECT value->>'$.id' AS id,value->>'$.name' AS name,value->>'$.byte_length' AS byte_length FROM json_each(?) WHERE value->>'$.id'<>?" call append 2 call append 2 call arr 0 call key 2 draft name call key 2 event call str 1 utf8 "id"
     set state call ui_draft_set 4 state scope name v
     set state call ui_draft_set 4 state scope call str 1 utf8 "$key" 0u
     if call same 2 call chat_ready 2 call key 2 draft call str 1 utf8 "text" v call decode 1 call str 1 utf8 "false" 1
@@ -228,7 +228,7 @@ pub desktop_result 1 arg uint uint do 15 state uint event uint actionval uint sc
     0
     set state call ui_draft_set 4 state scope call str 1 utf8 "$key" 0u
     set bag call ui_default 2 call key 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope name call arr 0
-    set state call ui_draft_set 4 state scope name call append 2 bag call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"name\":\"$1\"}" call append 2 call append 2 call arr 0 call key 2 result call str 1 utf8 "id" call key 2 result call str 1 utf8 "display_name"
+    set state call ui_draft_set 4 state scope name call append 2 bag call put 3 result call str 1 utf8 "name" call key 2 result call str 1 utf8 "display_name"
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
   if call same 2 actionval call str 1 utf8 "layers" 2

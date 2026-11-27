@@ -1,0 +1,267 @@
+{
+  "snapshots": {
+    "id": "graph/snapshots",
+    "kind": "select",
+    "label": "Snapshot",
+    "caption": false,
+    "choices": "$0",
+    "value": "$1",
+    "row": "graph/toolbar",
+    "width": 276,
+    "event": {
+      "action": "path",
+      "patch": {
+        "view": "graph"
+      },
+      "key": "snapshot"
+    }
+  },
+  "pause": {
+    "id": "$0",
+    "kind": "button",
+    "label": "$1",
+    "role": "quiet",
+    "row": "graph/toolbar",
+    "width": 132,
+    "event": {
+      "action": "pause"
+    }
+  },
+  "zoomIn": {
+    "id": "$0",
+    "kind": "button",
+    "label": "Zoom in",
+    "enabled": "$1",
+    "role": "quiet",
+    "row": "graph/toolbar",
+    "width": 94,
+    "event": {
+      "action": "zoom",
+      "step": 1
+    }
+  },
+  "zoomOut": {
+    "id": "$0",
+    "kind": "button",
+    "label": "Zoom out",
+    "enabled": "$1",
+    "role": "quiet",
+    "row": "graph/toolbar",
+    "width": 94,
+    "event": {
+      "action": "zoom",
+      "step": -1
+    }
+  },
+  "resetZoom": {
+    "id": "$0",
+    "kind": "button",
+    "label": "Reset zoom",
+    "role": "quiet",
+    "row": "graph/toolbar",
+    "width": 120,
+    "event": {
+      "action": "zoom",
+      "step": 0
+    }
+  },
+  "pathFilter": {
+    "id": "graph/filter",
+    "kind": "input",
+    "label": "Filter paths",
+    "caption": false,
+    "placeholder": "Filter by path or file name…",
+    "value": "$0",
+    "event": {
+      "action": "filter"
+    }
+  },
+  "scale": {
+    "id": "graph/scale",
+    "kind": "label",
+    "role": "caption",
+    "label": "$0",
+    "row": "graph/toolbar"
+  },
+  "pathCount": {
+    "id": "graph/path-count",
+    "kind": "label",
+    "role": "caption",
+    "label": "$0"
+  },
+  "paths": {
+    "id": "$5",
+    "label": "Project paths",
+    "kind": "list",
+    "choices": "$0",
+    "value": "$1",
+    "lines": 10,
+    "zoom": "$2",
+    "event": {
+      "action": "path",
+      "patch": "$3",
+      "key": "$4"
+    }
+  },
+  "noPaths": {
+    "id": "graph/no-paths",
+    "kind": "label",
+    "role": "muted",
+    "label": "$0"
+  },
+  "comparison": {
+    "id": "$3",
+    "kind": "select",
+    "label": "Compare with snapshot",
+    "choices": "$0",
+    "value": "$1",
+    "event": {
+      "action": "compare",
+      "snapshot": "$2"
+    }
+  },
+  "inspect": {
+    "id": "$0",
+    "kind": "button",
+    "label": "Inspect source relationships",
+    "role": "primary",
+    "icon": "graph",
+    "width": 242,
+    "event": {
+      "action": "inspect",
+      "snapshot": "$1"
+    }
+  },
+  "inspectPrompt": {
+    "id": "graph/inspect-prompt",
+    "kind": "detail",
+    "role": "body",
+    "value": "Inspect this retained snapshot to see indexed source links, activity and changes from another snapshot.",
+    "lines": 3
+  },
+  "edgeFilter": {
+    "id": "graph/filter",
+    "kind": "input",
+    "label": "Filter relationships",
+    "caption": false,
+    "placeholder": "Filter source, target or symbol…",
+    "value": "$0",
+    "event": {
+      "action": "filter"
+    }
+  },
+  "coverage": {
+    "id": "graph/coverage",
+    "kind": "label",
+    "role": "caption",
+    "label": "$0"
+  },
+  "noEdges": {
+    "id": "graph/no-edges",
+    "kind": "label",
+    "role": "muted",
+    "label": "No cross-file relationships match this filter in the indexed source."
+  },
+  "sourceLink": {
+    "id": "$0",
+    "kind": "button",
+    "label": "$1",
+    "role": "quiet",
+    "width": 640,
+    "row": "$0",
+    "event": {
+      "action": "nav",
+      "patch": "$2"
+    }
+  },
+  "fileTarget": {
+    "view": "graph",
+    "snapshot": "$0",
+    "selected": "$1",
+    "pane": "Files"
+  },
+  "openTarget": {
+    "id": "$0",
+    "kind": "button",
+    "label": "Open target",
+    "role": "quiet",
+    "width": 116,
+    "row": "$1",
+    "event": {
+      "action": "nav",
+      "patch": "$2"
+    }
+  },
+  "staleHeading": {
+    "id": "graph/stale_evidence",
+    "kind": "heading",
+    "label": "Evidence needs review",
+    "role": "caption"
+  },
+  "staleBody": {
+    "id": "graph/stale_evidence/detail",
+    "kind": "detail",
+    "role": "body",
+    "value": "$0",
+    "lines": 4
+  },
+  "activityHeading": {
+    "id": "graph/activity",
+    "kind": "heading",
+    "label": "Snapshot activity",
+    "role": "caption"
+  },
+  "activityBody": {
+    "id": "graph/activity/detail",
+    "kind": "detail",
+    "role": "body",
+    "value": "$0",
+    "lines": 4
+  },
+  "changesHeading": {
+    "id": "graph/changes",
+    "kind": "heading",
+    "role": "caption",
+    "label": "Changes from comparison"
+  },
+  "changesBody": {
+    "id": "graph/changes/detail",
+    "kind": "detail",
+    "role": "body",
+    "value": "$0",
+    "lines": 6
+  },
+  "noChanges": {
+    "id": "graph/no-changes",
+    "kind": "label",
+    "role": "muted",
+    "label": "No changes between these snapshots."
+  },
+  "previousFile": {
+    "id": "$0",
+    "kind": "button",
+    "label": "$1",
+    "role": "quiet",
+    "event": {
+      "action": "nav",
+      "patch": "$2"
+    }
+  },
+  "records": {
+    "id": "graph/records",
+    "kind": "button",
+    "label": "Evidence records",
+    "role": "quiet",
+    "expanded": "$0",
+    "event": {
+      "action": "fold",
+      "key": "graph/records"
+    }
+  },
+  "recordsBody": {
+    "id": "graph/records/detail",
+    "kind": "detail",
+    "value": "$0",
+    "lines": 10
+  }
+}

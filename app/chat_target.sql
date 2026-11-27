@@ -33,13 +33,13 @@ WITH available AS (
              AND q.state!='answered')))
 ), selected AS (SELECT * FROM targets ORDER BY priority LIMIT 1),
 named AS (
-    SELECT selected.*, (SELECT coalesce(nullif(s.content->>'$.text',''),s.content->>'$.attachments[0].display_name')
-      FROM submissions s WHERE s.request=selected.topic_request AND s.project=?1 ORDER BY s.rowid LIMIT 1) AS topic
+    SELECT selected.*, (SELECT t.topic
+      FROM chat_topics t WHERE t.request=selected.topic_request AND t.project=?1) AS topic
       FROM selected
 )
 SELECT binding AS "bind:json", CASE WHEN topic_request IS NULL THEN hint
          WHEN topic IS NULL THEN hint||' this request'
-         ELSE hint||' “'||substr(topic,1,64)||CASE WHEN length(topic)>64 THEN '…' ELSE '' END||'”' END AS hint,
+         ELSE hint||' “'||topic||'”' END AS hint,
        CASE WHEN priority=4 THEN 'true' END AS "unavailable:json",
        CASE WHEN priority=4 THEN 'true' END AS "choose_question:json",
        CASE WHEN (json_extract(binding,'$.revise') IS NOT NULL OR json_extract(binding,'$.follow') IS NOT NULL)

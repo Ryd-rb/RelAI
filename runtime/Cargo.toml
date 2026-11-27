@@ -33,7 +33,7 @@ fluxr = { git = "https://github.com/Ryd-rb/FluxR-lang.git", rev = "6fe5f1ce7cf77
 fs2 = "0.4"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls","json","stream"] }
-rusqlite = { version = "0.37", features = ["bundled","serde_json"] }
+rusqlite = { version = "0.37", features = ["bundled","serde_json","functions"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 sha2 = "0.10"
 tempfile = "3"

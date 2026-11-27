@@ -45,7 +45,7 @@ fn chat_destination 3 pid uint draft uint suggested uint uint do 3 frozen uint b
 fn activity_panel 0 uint do 0  1
   ret call decode 1 call str 1 @text r#"{"type":"journal","section":"activity"}"#
 
-fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft uint uint do 19 groupval uint selected bool caption uint choices uint interaction uint speaker uint roleval uint body uint meta uint action uint reqid uint keyval uint progress uint jobsval uint item uint part uint term uint discard uint i int 27
+fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft uint uint do 19 groupval uint selected bool caption uint choices uint interaction uint speaker uint roleval uint body uint meta uint action uint reqid uint keyval uint progress uint jobsval uint item uint part uint term uint discard uint i int 32
   set interaction call key 2 row call str 1 utf8 "interaction"
   set reqid call key 2 row call str 1 utf8 "request"
   set action call key 2 row call str 1 utf8 "action"
@@ -58,6 +58,9 @@ fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft 
   0
   if call same 2 call key 2 row call str 1 utf8 "answer_status" call str 1 utf8 "earlier" 1
     set speaker call str 1 utf8 "RelAI · Earlier answer"
+  0
+  if not call same 2 call key 2 row call str 1 utf8 "question_status" 0u 1
+    set speaker call cat 2 call str 1 utf8 "RelAI · " call key 2 row call str 1 utf8 "question_status"
   0
   if call same 2 call key 2 row call str 1 utf8 "kind" call str 1 utf8 "Submission" 4
     set caption call decode 1 call str 1 utf8 "false"
@@ -87,15 +90,21 @@ fn chat_message 6 state uint pid uint row uint base uint target uint emptydraft 
   if and eq 0 call size 1 choices lt 0 call size 1 call key 2 row call str 1 utf8 "choices" 1
     set body call cat 2 call cat 2 body call str 1 utf8 "\n\n" call key 2 row call str 1 utf8 "choices"
   0
-  set discard call ui_emit 1 call ui_merge 2 groupval call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"detail\",\"role\":\"$1\",\"label\":\"$2\",\"value\":\"$3\",\"caption\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "text" roleval speaker body caption
+  set discard call chat_body 8 state base groupval roleval speaker body caption call key 2 row call str 1 utf8 "kind"
+  set discard call chat_context 4 state base call key 2 row call str 1 utf8 "work" call key 2 row call str 1 utf8 "sent_files"
+  set choices call query 2 call asset 1 call str 1 utf8 "chat_references.sql" @build append 1 2 call arr 0 call key 2 row call str 1 utf8 "parts" pid
   set i 0
-  while lt i call size 1 call key 2 row call str 1 utf8 "parts" 4
-    set part call nth 2 call key 2 row call str 1 utf8 "parts" i
+  while lt i call size 1 choices 4
+    set part call nth 2 choices i
     set term call key 2 part call str 1 utf8 "term"
     if not call same 2 term 0u 1
-      set discard call ui_emit 1 call ui_merge 2 groupval call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "term" call str 1 utf8 "/" call encode 1 call integer 1 i call cat 2 call key 2 part call str 1 utf8 "text" call str 1 utf8 " · definition" call shape 2 call str 1 utf8 "{\"action\":\"term\",\"ref\":\"$0\"}" call append 2 call arr 0 term call shape 2 call str 1 utf8 "{\"role\":\"quiet\"}" call arr 0
+      set discard call ui_emit 1 call ui_merge 2 groupval call ui_merge 2 call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"event\":\"$2\"}" call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 utf8 "/" call str 1 utf8 "term" call str 1 utf8 "/" call encode 1 call integer 1 i call key 2 part call str 1 utf8 "label" call shape 2 call str 1 utf8 "{\"action\":\"term\",\"ref\":\"$0\"}" call append 2 call arr 0 term call shape 2 call str 1 utf8 "{\"role\":\"quiet\"}" call arr 0
     0
     next i
+  set choices call key 2 row call str 1 utf8 "quick_choices"
+  if or not call same 2 interaction call str 1 utf8 "reply" not call same 2 emptydraft call decode 1 call str 1 utf8 "true" 1
+    set choices call arr 0
+  0
   set i 0
   while lt i call size 1 choices 2
     set discard call ui_emit 1 call ui_merge 2 groupval call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"kind\":\"button\",\"label\":\"$1\",\"row\":\"$2\",\"event\":{\"action\":\"choose_reply\",\"reply\":\"$3\",\"text\":\"$1\"}}" call append 2 call append 2 call append 2 call append 2 call arr 0 call cat 2 call cat 2 base call str 1 utf8 "/choice/" call encode 1 call integer 1 i call nth 2 choices i call cat 2 base call str 1 utf8 "/choices" action
@@ -196,7 +205,7 @@ fn chat_question_picker 2 scope uint pid uint uint do 1 choices uint 3
   set choices call query 2 call str 1 @text r#"
     SELECT value,label FROM (
       SELECT '' AS value,'Choose a question to answer…' AS label,-1 AS groupno,0 AS sequence
-      UNION ALL SELECT id,prompt,0,sequence FROM open_chat_questions WHERE project=?
+      UNION ALL SELECT q.id,q.prompt||CASE WHEN (SELECT count(*) FROM open_chat_questions duplicate WHERE duplicate.project=q.project AND duplicate.prompt=q.prompt)>1 THEN ' · '||coalesce((SELECT topic FROM chat_topics t WHERE t.request=q.request AND t.project=q.project),'Untitled request')||' · question '||q.id ELSE '' END,0,q.sequence FROM open_chat_questions q WHERE q.project=?
     ) ORDER BY groupno,sequence DESC LIMIT 101
   "# call append 2 call arr 0 pid
   if eq 1 call size 1 choices 1
@@ -206,6 +215,43 @@ fn chat_question_picker 2 scope uint pid uint uint do 1 choices uint 3
     "id":"$0","kind":"select","area":"composer","caption":false,"label":"Question to answer",
     "value":"","choices":"$1","event":{"action":"pick_question"}
   }"# @build append 1 2 call arr 0 call cat 2 scope call str 1 utf8 "/question-picker" choices
+
+fn chat_body 8 state uint base uint groupval uint roleval uint speaker uint body uint caption uint kind uint uint do 4 keyval uint expanded uint shown uint discard uint 7
+  set keyval call cat 2 base call str 1 utf8 "/full-answer"
+  set expanded call key 2 call key 2 state call str 1 utf8 "folds" keyval
+  set shown body
+  if and or call same 2 kind call str 1 utf8 "RESULT" call same 2 kind call str 1 utf8 "Final result" or lt 2400 call size 1 body lt 24 call number 1 call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT length(?1)-length(replace(?1,char(10),'')) AS n" call append 2 call arr 0 body 0 call str 1 utf8 "n" 1
+    if not call same 2 expanded call decode 1 call str 1 utf8 "true" 1
+      set shown call key 2 call nth 2 call query 2 call asset 1 call str 1 utf8 "chat_preview.sql" call append 2 call arr 0 body 0 call str 1 utf8 "body"
+    0
+  0
+  set discard call ui_emit 1 call ui_merge 2 groupval call shape 2 call str 1 @text r#"{"id":"$0","kind":"detail","role":"$1","label":"$2","value":"$3","caption":"$4"}"# @build append 1 5 call arr 0 call cat 2 base call str 1 utf8 "/text" roleval speaker shown caption
+  if or not call same 2 shown body call same 2 expanded call decode 1 call str 1 utf8 "true" 1
+    set discard call chat_fold 4 keyval call str 1 utf8 "Full answer" expanded groupval
+  0
+  ret 0u
+
+fn chat_fold 4 keyval uint labelval uint expanded uint extra uint uint do 0 1
+  ret call ui_emit 1 call ui_merge 2 extra call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"$1","role":"quiet","expanded":"$2","event":{"action":"fold","key":"$0"}}"# @build append 1 3 call arr 0 keyval labelval call ui_default 2 expanded call decode 1 call str 1 utf8 "false"
+
+fn chat_context 4 state uint base uint workval uint files uint uint do 3 keyval uint expanded uint discard uint 3
+  if lt 0 call size 1 workval 4
+    set keyval call cat 2 base call str 1 utf8 "/work"
+    set expanded call key 2 call key 2 state call str 1 utf8 "folds" keyval
+    set discard call chat_fold 4 keyval call str 1 utf8 "Question context" expanded call obj 0
+    if call same 2 expanded call decode 1 call str 1 utf8 "true" 1
+      set discard call ui_prose 2 call cat 2 keyval call str 1 utf8 "/body" workval
+    0
+  0
+  if lt 0 call size 1 files 4
+    set keyval call cat 2 base call str 1 utf8 "/receipts"
+    set expanded call key 2 call key 2 state call str 1 utf8 "folds" keyval
+    set discard call chat_fold 4 keyval call str 1 utf8 "Sent attachment receipts" expanded call obj 0
+    if call same 2 expanded call decode 1 call str 1 utf8 "true" 1
+      set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"detail","label":"Immutable sent attachment receipts","value":"$1","lines":8}"# @build append 1 2 call arr 0 call cat 2 keyval call str 1 utf8 "/body" call ui_show 1 files
+    0
+  0
+  ret 0u
 
 fn chat_focus 2 state uint pid uint uint do 0  1
   ret call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"data\",\"focus\":\"$1\"}" call append 2 call append 2 call arr 0 state call cat 2 call ui_form_key 2 pid call shape 2 call str 1 utf8 "{\"draft\":true}" call arr 0 call str 1 utf8 "/text"

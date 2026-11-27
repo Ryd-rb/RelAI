@@ -307,7 +307,7 @@ fn welcome_opens_a_picked_project_and_workspace_identifies_the_current_view() {
     let composer = ui.control("Message", "multiline");
     assert_eq!(composer["caption"], false);
     assert_eq!(composer["lines"], 2);
-    assert_eq!(composer["placeholder"], "Message RelAI…");
+    assert_eq!(composer["placeholder"], "Message project…");
     assert!(
         !ui.control("project", "heading")["side"]
             .as_bool()
@@ -963,7 +963,7 @@ fn send_readiness_tracks_content_and_dismissing_an_error_keeps_the_draft() {
         ui.event(send(&ui), json!({}))["request"]["input"]["attachments"],
         json!(["attached"])
     );
-    ui.click("Remove notes.txt");
+    ui.click("Remove notes.txt · size unknown");
     assert_eq!(send(&ui)["enabled"], false);
     let field = ui.control("Attach files", "button")["event"].clone();
     let scope = field["scope"].as_str().unwrap();
@@ -996,6 +996,38 @@ fn changing_composer_skills_updates_the_visible_count_and_keeps_the_message() {
     let send = ui.event(ui.control("Send", "button"), json!({}));
     assert_eq!(send["request"]["input"]["skills"], json!(["notes"]));
     assert_eq!(send["request"]["input"]["text"], "Keep my draft");
+}
+
+#[test]
+fn long_answer_preview_preserves_the_exact_answer_and_its_accept_action() {
+    let mut ui = Desktop::open();
+    let prompt = "Explain the changes.";
+    let answer = (1..=50)
+        .map(|n| format!("Line {n} with café."))
+        .collect::<Vec<_>>()
+        .join("\n");
+    ui.type_message(prompt);
+    ui.click("Send");
+    ui.receive_intake(prompt, json!([{"type":"RESULT","summary":"Explanation","findings":answer,"result_kind":"final","evidence":[],"outcome":null}]),"complete_when");
+    assert!(ui.controls().iter().any(|c| {
+        c["role"] == "incoming"
+            && c["value"]
+                .as_str()
+                .is_some_and(|s| s.contains("Line 1") && !s.contains("Line 50"))
+    }));
+    ui.click("Full answer");
+    assert!(
+        ui.controls()
+            .iter()
+            .any(|c| c["role"] == "incoming" && c["value"] == answer)
+    );
+    ui.click("Full answer");
+    ui.click("Accept answer");
+    assert!(
+        ui.controls()
+            .iter()
+            .any(|c| c["label"] == "RelAI · Accepted answer")
+    );
 }
 
 #[test]

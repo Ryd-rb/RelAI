@@ -41,7 +41,8 @@ fn ui_definition 1 state uint uint do 6 item uint entry uint dictionary uint fix
   0
   ret 0u
 
-fn ui_tree 3 state uint spec uint base uint uint do 5 nodes uint versions uint discard uint pause uint summary uint 16
+fn ui_tree 3 state uint spec uint base uint uint do 6 widgets uint nodes uint versions uint discard uint pause uint summary uint 17
+  set widgets call resource 1 call str 1 utf8 "graph_widgets.json"
   set base call cat 2 call cat 2 base call str 1 @text r#"/"# call key 2 call key 2 spec call str 1 @text r#"navigate"# call str 1 @text r#"snapshot"#
   set pause call str 1 @text r#"Pause graph"#
   if call same 2 call key 2 state call str 1 @text r#"paused"# call decode 1 call str 1 @text r#"true"# 1
@@ -49,82 +50,83 @@ fn ui_tree 3 state uint spec uint base uint uint do 5 nodes uint versions uint d
   0
   set versions call query 2 call str 1 @text r#"SELECT coalesce(value->>'$.label',value->>'$.id') AS label,value->>'$.id' AS value FROM json_each(?)"# @build append 1 1 call arr 0 call key 2 spec call str 1 @text r#"versions"#
   if lt 0 call size 1 versions 1
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/snapshots","kind":"select","label":"Snapshot","caption":false,"choices":"$0","value":"$1","row":"graph/toolbar","width":276,"event":{"action":"path","patch":{"view":"graph"},"key":"snapshot"}}"# @build append 1 2 call arr 0 versions call key 2 call key 2 spec call str 1 @text r#"navigate"# call str 1 @text r#"snapshot"#
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "snapshots" @build append 1 2 call arr 0 versions call key 2 call key 2 spec call str 1 @text r#"navigate"# call str 1 @text r#"snapshot"#
   0
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"$1","role":"quiet","row":"graph/toolbar","width":132,"event":{"action":"pause"}}"# @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/pause"# pause
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Zoom in","enabled":"$1","role":"quiet","row":"graph/toolbar","width":94,"event":{"action":"zoom","step":1}}"# @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/Zoom in"# call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json(CASE WHEN CAST(? AS REAL)<3.0 THEN 'true' ELSE 'false' END) AS "enabled:json""# call append 2 call arr 0 call encode 1 call ui_default 2 call key 2 state call str 1 utf8 "zoom" call integer 1 1 0 call str 1 utf8 "enabled"
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Zoom out","enabled":"$1","role":"quiet","row":"graph/toolbar","width":94,"event":{"action":"zoom","step":-1}}"# @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/Zoom out"# call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json(CASE WHEN CAST(? AS REAL)>0.5 THEN 'true' ELSE 'false' END) AS "enabled:json""# call append 2 call arr 0 call encode 1 call ui_default 2 call key 2 state call str 1 utf8 "zoom" call integer 1 1 0 call str 1 utf8 "enabled"
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Reset zoom","role":"quiet","row":"graph/toolbar","width":120,"event":{"action":"zoom","step":0}}"# @build append 1 1 call arr 0 call cat 2 base call str 1 @text r#"/Fit"#
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/filter","kind":"input","label":"Filter paths","caption":false,"placeholder":"Filter by path or file name…","value":"$0","event":{"action":"filter"}}"# @build append 1 1 call arr 0 call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""#
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/scale","kind":"label","role":"caption","label":"$0","row":"graph/toolbar"}"# call append 2 call arr 0 call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('Zoom %.0f%%',100.0*CAST(? AS REAL)) AS label"# call append 2 call arr 0 call encode 1 call ui_default 2 call key 2 state call str 1 utf8 "zoom" call integer 1 1 0 call str 1 utf8 "label"
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "pause" @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/pause"# pause
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "zoomIn" @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/Zoom in"# call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json(CASE WHEN CAST(? AS REAL)<3.0 THEN 'true' ELSE 'false' END) AS "enabled:json""# call append 2 call arr 0 call encode 1 call ui_default 2 call key 2 state call str 1 utf8 "zoom" call integer 1 1 0 call str 1 utf8 "enabled"
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "zoomOut" @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/Zoom out"# call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT json(CASE WHEN CAST(? AS REAL)>0.5 THEN 'true' ELSE 'false' END) AS "enabled:json""# call append 2 call arr 0 call encode 1 call ui_default 2 call key 2 state call str 1 utf8 "zoom" call integer 1 1 0 call str 1 utf8 "enabled"
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "resetZoom" @build append 1 1 call arr 0 call cat 2 base call str 1 @text r#"/Fit"#
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "pathFilter" @build append 1 1 call arr 0 call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""#
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "scale" call append 2 call arr 0 call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('Zoom %.0f%%',100.0*CAST(? AS REAL)) AS label"# call append 2 call arr 0 call encode 1 call ui_default 2 call key 2 state call str 1 utf8 "zoom" call integer 1 1 0 call str 1 utf8 "label"
   set nodes call query 2 call asset 1 call str 1 utf8 "graph_paths.sql" @build append 1 2 call arr 0 call key 2 spec call str 1 @text r#"nodes"# call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""#
   set summary call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('%d of %d paths',?1,?2) AS text"# @build append 1 2 call arr 0 call integer 1 call size 1 nodes call integer 1 call size 1 call key 2 spec call str 1 @text r#"nodes"# 0 call str 1 @text r#"text"#
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/path-count","kind":"label","role":"caption","label":"$0"}"# @build append 1 1 call arr 0 summary
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "pathCount" @build append 1 1 call arr 0 summary
   if lt 0 call size 1 nodes 1
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$5","label":"Project paths","kind":"list","choices":"$0","value":"$1","lines":10,"zoom":"$2","event":{"action":"path","patch":"$3","key":"$4"}}"# @build append 1 6 call arr 0 nodes call ui_default 2 call key 2 call key 2 state call str 1 @text r#"nav"# call str 1 @text r#"selected"# call str 1 @text r#""# call ui_default 2 call key 2 state call str 1 @text r#"zoom"# call integer 1 1 call key 2 spec call str 1 @text r#"navigate"# call key 2 spec call str 1 @text r#"pathField"# call cat 2 base call str 1 @text r#"/paths"#
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "paths" @build append 1 6 call arr 0 nodes call ui_default 2 call key 2 call key 2 state call str 1 @text r#"nav"# call str 1 @text r#"selected"# call str 1 @text r#""# call ui_default 2 call key 2 state call str 1 @text r#"zoom"# call integer 1 1 call key 2 spec call str 1 @text r#"navigate"# call key 2 spec call str 1 @text r#"pathField"# call cat 2 base call str 1 @text r#"/paths"#
   3
     set summary call str 1 @text r#"No paths match this filter."#
     if call same 2 call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""# call str 1 @text r#""# 1
       set summary call str 1 @text r#"This snapshot is empty. Capture again after adding project files."#
     0
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/no-paths","kind":"label","role":"muted","label":"$0"}"# @build append 1 1 call arr 0 summary
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "noPaths" @build append 1 1 call arr 0 summary
   ret 0u
 
-fn ui_layers 3 state uint spec uint base uint uint do 7 versions uint layer uint rows uint r uint discard uint summary uint i int 24
+fn ui_layers 3 state uint spec uint base uint uint do 8 widgets uint versions uint layer uint rows uint r uint discard uint summary uint i int 25
+  set widgets call resource 1 call str 1 utf8 "graph_widgets.json"
   set base call cat 2 call cat 2 base call str 1 @text r#"/"# call key 2 spec call str 1 @text r#"snapshot"#
   set versions call query 2 call asset 1 call str 1 utf8 "graph_compare.sql" @build append 1 2 call arr 0 call key 2 spec call str 1 @text r#"versions"# call key 2 spec call str 1 @text r#"snapshot"#
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$3","kind":"select","label":"Compare with snapshot","choices":"$0","value":"$1","event":{"action":"compare","snapshot":"$2"}}"# @build append 1 4 call arr 0 versions call ui_default 2 call key 2 state call str 1 @text r#"before"# call str 1 @text r#""# call key 2 spec call str 1 @text r#"snapshot"# call cat 2 base call str 1 @text r#"/compare"#
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "comparison" @build append 1 4 call arr 0 versions call ui_default 2 call key 2 state call str 1 @text r#"before"# call str 1 @text r#""# call key 2 spec call str 1 @text r#"snapshot"# call cat 2 base call str 1 @text r#"/compare"#
   set layer call key 2 state call str 1 @text r#"layers"#
   if and not call same 2 call key 2 layer call str 1 @text r#"snapshot"# 0u not call same 2 call key 2 layer call str 1 @text r#"snapshot"# call key 2 spec call str 1 @text r#"snapshot"# 1
     set layer 0u
   0
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Inspect source relationships","role":"primary","icon":"graph","width":242,"event":{"action":"inspect","snapshot":"$1"}}"# @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/inspect"# call key 2 spec call str 1 @text r#"snapshot"#
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "inspect" @build append 1 2 call arr 0 call cat 2 base call str 1 @text r#"/inspect"# call key 2 spec call str 1 @text r#"snapshot"#
   if call same 2 layer 0u 2
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/inspect-prompt","kind":"detail","role":"body","value":"Inspect this retained snapshot to see indexed source links, activity and changes from another snapshot.","lines":3}"# call arr 0
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "inspectPrompt" call arr 0
     ret 0u
   0
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/filter","kind":"input","label":"Filter relationships","caption":false,"placeholder":"Filter source, target or symbol…","value":"$0","event":{"action":"filter"}}"# @build append 1 1 call arr 0 call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""#
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "edgeFilter" @build append 1 1 call arr 0 call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""#
   set summary call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT printf('%s of %s source files indexed · %d relationships',?1,?2,json_array_length(?3)) AS text"# @build append 1 3 call arr 0 call key 2 call key 2 layer call str 1 @text r#"coverage"# call str 1 @text r#"indexed"# call key 2 call key 2 layer call str 1 @text r#"coverage"# call str 1 @text r#"total"# call key 2 layer call str 1 @text r#"edges"# 0 call str 1 @text r#"text"#
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/coverage","kind":"label","role":"caption","label":"$0"}"# @build append 1 1 call arr 0 summary
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "coverage" @build append 1 1 call arr 0 summary
   set rows call key 2 call nth 2 call query 2 call asset 1 call str 1 utf8 "graph_relationships.sql" @build append 1 2 call arr 0 call key 2 layer call str 1 @text r#"edges"# call ui_default 2 call key 2 state call str 1 @text r#"filter"# call str 1 @text r#""# 0 call str 1 @text r#"items"#
   if eq 0 call size 1 rows 1
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/no-edges","kind":"label","role":"muted","label":"No cross-file relationships match this filter in the indexed source."}"# call arr 0
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "noEdges" call arr 0
   0
   set rows call ui_page_items 5 state call str 1 @text r#"edges"# rows call str 1 @text r#"Previous relationships"# call str 1 @text r#"More relationships"#
   set i 0
   while lt i call size 1 rows 4
     set r call nth 2 rows i
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"$1","role":"quiet","width":640,"row":"$0","event":{"action":"nav","patch":"$2"}}"# @build append 1 3 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 @text r#"/edge/"# call encode 1 call integer 1 i call str 1 @text r#"/"# call hash 1 call encode 1 r call cat 2 call cat 2 call cat 2 call cat 2 call key 2 r call str 1 @text r#"source"# call str 1 @text r#" → "# call key 2 r call str 1 @text r#"target"# call str 1 @text r#" · "# call ui_default 2 call key 2 r call str 1 @text r#"name"# call str 1 @text r#"reference"# call shape 2 call str 1 @text r#"{"view":"graph","snapshot":"$0","selected":"$1","pane":"Files"}"# @build append 1 2 call arr 0 call key 2 spec call str 1 @text r#"snapshot"# call key 2 r call str 1 @text r#"source"#
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"Open target","role":"quiet","width":116,"row":"$1","event":{"action":"nav","patch":"$2"}}"# @build append 1 3 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 @text r#"/edge/"# call encode 1 call integer 1 i call str 1 @text r#"/"# call hash 1 call encode 1 r call str 1 @text r#"/target"# call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 @text r#"/edge/"# call encode 1 call integer 1 i call str 1 @text r#"/"# call hash 1 call encode 1 r call shape 2 call str 1 @text r#"{"view":"graph","snapshot":"$0","selected":"$1","pane":"Files"}"# @build append 1 2 call arr 0 call key 2 spec call str 1 @text r#"snapshot"# call key 2 r call str 1 @text r#"target"#
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "sourceLink" @build append 1 3 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 @text r#"/edge/"# call encode 1 call integer 1 i call str 1 @text r#"/"# call hash 1 call encode 1 r call cat 2 call cat 2 call cat 2 call cat 2 call key 2 r call str 1 @text r#"source"# call str 1 @text r#" → "# call key 2 r call str 1 @text r#"target"# call str 1 @text r#" · "# call ui_default 2 call key 2 r call str 1 @text r#"name"# call str 1 @text r#"reference"# call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "fileTarget" @build append 1 2 call arr 0 call key 2 spec call str 1 @text r#"snapshot"# call key 2 r call str 1 @text r#"source"#
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "openTarget" @build append 1 3 call arr 0 call cat 2 call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 @text r#"/edge/"# call encode 1 call integer 1 i call str 1 @text r#"/"# call hash 1 call encode 1 r call str 1 @text r#"/target"# call cat 2 call cat 2 call cat 2 call cat 2 base call str 1 @text r#"/edge/"# call encode 1 call integer 1 i call str 1 @text r#"/"# call hash 1 call encode 1 r call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "fileTarget" @build append 1 2 call arr 0 call key 2 spec call str 1 @text r#"snapshot"# call key 2 r call str 1 @text r#"target"#
     next i
   if lt 0 call size 1 call key 2 layer call str 1 @text r#"stale_evidence"# 3
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/stale_evidence","kind":"heading","label":"Evidence needs review","role":"caption"}"# call arr 0
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "staleHeading" call arr 0
     set summary call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT group_concat((value->>'$.path')||' · indexed version differs',char(10)) AS text FROM json_each(?)"# @build append 1 1 call arr 0 call key 2 layer call str 1 @text r#"stale_evidence"# 0 call str 1 @text r#"text"#
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/stale_evidence/detail","kind":"detail","role":"body","value":"$0","lines":4}"# @build append 1 1 call arr 0 summary
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "staleBody" @build append 1 1 call arr 0 summary
   0
   if lt 0 call size 1 call key 2 layer call str 1 @text r#"activity"# 3
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/activity","kind":"heading","label":"Snapshot activity","role":"caption"}"# call arr 0
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "activityHeading" call arr 0
     set summary call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT group_concat((value->>'$.kind')||' · event '||(value->>'$.cursor'),char(10)) AS text FROM json_each(?)"# @build append 1 1 call arr 0 call key 2 layer call str 1 @text r#"activity"# 0 call str 1 @text r#"text"#
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/activity/detail","kind":"detail","role":"body","value":"$0","lines":4}"# @build append 1 1 call arr 0 summary
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "activityBody" @build append 1 1 call arr 0 summary
   0
   set rows call ui_page_items 5 state call str 1 @text r#"changes"# call key 2 layer call str 1 @text r#"changes"# call str 1 @text r#"Previous changes"# call str 1 @text r#"More changes"#
   if lt 0 call size 1 rows 3
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/changes","kind":"heading","role":"caption","label":"Changes from comparison"}"# call arr 0
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "changesHeading" call arr 0
     set summary call key 2 call nth 2 call query 2 call asset 1 call str 1 utf8 "graph_changes.sql" @build append 1 1 call arr 0 rows 0 call str 1 @text r#"text"#
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/changes/detail","kind":"detail","role":"body","value":"$0","lines":6}"# @build append 1 1 call arr 0 summary
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "changesBody" @build append 1 1 call arr 0 summary
   1
     if not call same 2 call ui_default 2 call key 2 state call str 1 @text r#"before"# call str 1 @text r#""# call str 1 @text r#""# 1
-      set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/no-changes","kind":"label","role":"muted","label":"No changes between these snapshots."}"# call arr 0
+      set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "noChanges" call arr 0
     0
   set i 0
   while lt i call size 1 rows 3
     set r call nth 2 rows i
     if not call same 2 call key 2 r call str 1 @text r#"old"# 0u 1
-      set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"$0","kind":"button","label":"$1","role":"quiet","event":{"action":"nav","patch":"$2"}}"# @build append 1 3 call arr 0 call cat 2 call cat 2 base call str 1 @text r#"/previous/"# call key 2 r call str 1 @text r#"path"# call cat 2 call str 1 @text r#"Open previous "# call key 2 r call str 1 @text r#"path"# call shape 2 call str 1 @text r#"{"view":"graph","snapshot":"$0","selected":"$1","pane":"Files"}"# @build append 1 2 call arr 0 call key 2 state call str 1 @text r#"before"# call key 2 r call str 1 @text r#"path"#
+      set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "previousFile" @build append 1 3 call arr 0 call cat 2 call cat 2 base call str 1 @text r#"/previous/"# call key 2 r call str 1 @text r#"path"# call cat 2 call str 1 @text r#"Open previous "# call key 2 r call str 1 @text r#"path"# call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "fileTarget" @build append 1 2 call arr 0 call key 2 state call str 1 @text r#"before"# call key 2 r call str 1 @text r#"path"#
     0
     next i
-  set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/records","kind":"button","label":"Evidence records","role":"quiet","expanded":"$0","event":{"action":"fold","key":"graph/records"}}"# @build append 1 1 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 @text r#"folds"# call str 1 @text r#"graph/records"# call decode 1 call str 1 @text r#"false"#
+  set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "records" @build append 1 1 call arr 0 call ui_default 2 call key 2 call key 2 state call str 1 @text r#"folds"# call str 1 @text r#"graph/records"# call decode 1 call str 1 @text r#"false"#
   if call same 2 call key 2 call key 2 state call str 1 @text r#"folds"# call str 1 @text r#"graph/records"# call decode 1 call str 1 @text r#"true"# 1
-    set discard call ui_emit 1 call shape 2 call str 1 @text r#"{"id":"graph/records/detail","kind":"detail","value":"$0","lines":10}"# @build append 1 1 call arr 0 call ui_show 1 layer
+    set discard call ui_emit 1 call shape 2 call encode 1 call key 2 widgets call str 1 utf8 "recordsBody" @build append 1 1 call arr 0 call ui_show 1 layer
   0
   ret 0u

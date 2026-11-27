@@ -16,6 +16,9 @@ WITH visible AS NOT MATERIALIZED (
     SELECT * FROM visible WHERE ?3 IS NOT NULL AND cursor>?3 ORDER BY cursor LIMIT 24
 ), page AS (SELECT * FROM older UNION ALL SELECT * FROM newer)
 SELECT p.cursor, p.kind, p.request, p.state, CASE WHEN p.kind='Final result' THEN f.action ELSE p.payload->>'$.action' END AS action,
+    CASE WHEN p.kind='ASK' THEN CASE WHEN p.state='stopped' THEN 'Stopped question' WHEN q.revision<p.revision THEN 'Superseded question' WHEN q.state='answered' THEN 'Answered question' WHEN q.state='answer_queued' THEN 'Question · reply queued' ELSE 'Question' END END AS question_status,
+    CASE WHEN p.kind='ASK' THEN p.payload->>'$.payload.work' END AS work,
+    CASE WHEN p.kind='Submission' THEN coalesce(p.payload->'$.attachments','[]') ELSE '[]' END AS "sent_files:json",
     CASE p.kind WHEN 'Submission' THEN p.payload->>'$.text'
       WHEN 'ASK' THEN p.payload->>'$.payload.question'
       WHEN 'RESULT' THEN p.payload->>'$.payload.findings'

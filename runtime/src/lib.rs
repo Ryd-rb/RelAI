@@ -359,6 +359,20 @@ impl App {
         let config: Value = serde_json::from_slice(&read(&bundle.join("app.json"))?)?;
         let modules = application::link(&bundle, &config)?;
         let db = Connection::open(data.join("state.sqlite3"))?;
+        db.create_scalar_function(
+            "single_line",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC
+                | rusqlite::functions::FunctionFlags::SQLITE_INNOCUOUS,
+            |ctx| {
+                Ok(ctx
+                    .get::<String>(0)?
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" "))
+            },
+        )?;
         db.execute_batch(
             "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
         )?;

@@ -76,7 +76,7 @@ pub capture 1 arg uint uint do 7 p uint info uint meta uint aid uint mime uint n
   set info call baseinfo 1 call key 2 arg call str 1 utf8 "base64"
   set discard call require 2 not call same 2 call key 2 call resource 1 call str 1 utf8 "media.json" mime 0u call str 1 utf8 "Unsupported attachment type"
   if call same 2 call key 2 call resource 1 call str 1 utf8 "media.json" mime call str 1 utf8 "text" 1
-    set discard call require 2 not call same 2 call key 2 info call str 1 utf8 "text" 0u call str 1 utf8 "Invalid UTF-8"
+    set discard call require 2 not call same 2 call key 2 info call str 1 utf8 "text" 0u call str 1 utf8 "Invalid UTF-8. Attach text or source files as UTF-8, or choose a PDF, PNG or JPEG for binary content."
   0
   set aid call uid 0
   set meta call shape 2 call str 1 utf8 "{\"id\":\"$0\",\"artifact_id\":\"$0\",\"display_name\":\"$1\",\"media_type\":\"$2\",\"byte_length\":\"$3\",\"digest\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0 aid name mime call key 2 info call str 1 utf8 "size" call key 2 info call str 1 utf8 "digest"

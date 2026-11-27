@@ -205,8 +205,18 @@ impl Desktop {
                     let paths: Vec<PathBuf> = if kind == "drop" {
                         serde_json::from_value(input["paths"].clone())?
                     } else {
-                        rfd::FileDialog::new().pick_files().unwrap_or_default()
+                        let mut dialog = rfd::FileDialog::new();
+                        if let Some(root) = self.view["subtitle"]
+                            .as_str()
+                            .map(Path::new)
+                            .filter(|p| p.is_dir())
+                        {
+                            dialog = dialog.set_directory(root);
+                        }
+                        dialog.pick_files().unwrap_or_default()
                     };
+                    let total = paths.len();
+                    let mut added = 0usize;
                     let mut errors = Vec::new();
                     for path in paths {
                         if let Err(e) = self.capture(&effect["after"], &path) {
@@ -214,10 +224,16 @@ impl Desktop {
                                 "{}: {e:#}",
                                 path.file_name().unwrap_or_default().to_string_lossy()
                             ));
+                        } else {
+                            added += 1;
                         }
                     }
                     if !errors.is_empty() {
-                        self.state["status"] = json!(errors.join("\n"));
+                        self.state["status"] = json!(format!(
+                            "Added {added} of {total} selected files; {} failed. Successful attachments remain in the draft.\n{}",
+                            errors.len(),
+                            errors.join("\n")
+                        ));
                     }
                     return Ok(Some(self.render(false, &Value::Null)?));
                 }
@@ -420,7 +436,17 @@ mod tests {
                 .iter()
                 .any(|c| c["id"] == "status" && c["area"] == "composer")
         );
-        assert!(controls.iter().any(|c| c["label"] == "Remove manual.md"));
+        assert!(
+            controls
+                .iter()
+                .any(|c| c["label"] == "Remove manual.md · 13 bytes")
+        );
+        assert!(
+            desktop.state["status"]
+                .as_str()
+                .unwrap()
+                .contains("Added 1 of 2")
+        );
         assert!(!controls.iter().any(|c| c["label"] == "Remove private.txt"));
         assert!(
             desktop.state["status"]

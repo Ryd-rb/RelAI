@@ -78,7 +78,9 @@ fn ui_complete 2 state uint event uint uint do 12 scope uint name uint draft uin
 
 fn ui_nav 2 state uint patch uint uint do 3 navval uint scope uint discard uint 6
   set navval call ui_default 2 call key 2 state call str 1 utf8 "nav" call obj 0
-  if and not call same 2 call key 2 patch call str 1 utf8 "project" 0u not call same 2 call key 2 patch call str 1 utf8 "project" call key 2 navval call str 1 utf8 "project" 4
+  if and not call same 2 call key 2 patch call str 1 utf8 "project" 0u not call same 2 call key 2 patch call str 1 utf8 "project" call key 2 navval call str 1 utf8 "project" 6
+    set state call ui_set_map 4 state call str 1 utf8 "chatPages" call ui_default 2 call key 2 navval call str 1 utf8 "project" call str 1 utf8 "welcome" call shape 2 call str 1 @text r#"{"older":"$0","newer":"$1"}"# @build append 1 2 call arr 0 call key 2 navval call str 1 utf8 "older" call key 2 navval call str 1 utf8 "newer"
+    set patch call ui_merge 2 call ui_default 2 call key 2 call key 2 state call str 1 utf8 "chatPages" call key 2 patch call str 1 utf8 "project" call decode 1 call str 1 utf8 "{\"older\":null,\"newer\":null}" patch
     set discard call query 2 call str 1 @text r#"
       INSERT INTO desktop_selection(singleton,project) SELECT 1,id FROM projects WHERE id=?
       ON CONFLICT(singleton) DO UPDATE SET project=excluded.project WHERE project<>excluded.project

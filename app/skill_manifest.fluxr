@@ -6,7 +6,7 @@ fn skill_manifest 2 sid uint pkg uint uint do 12 manifest uint refs uint drafts 
     ret 0u
   0
   set manifest call decode 1 manifest
-  set discard call require 2 call subset 2 call keys 1 manifest call append 2 call append 2 call arr 0 call str 1 utf8 "tool_refs" call str 1 utf8 "tool_drafts" call str 1 utf8 "Unknown skill manifest field"
+  set discard call check 2 call decode 1 call str 1 @text r#"{"type":"object","properties":{"tool_refs":{"type":"array","maxItems":32},"tool_drafts":{"type":"array","maxItems":8}},"additionalProperties":false}"# manifest
   set refs call key 2 manifest call str 1 utf8 "tool_refs"
   set drafts call key 2 manifest call str 1 utf8 "tool_drafts"
   set discard call require 2 and le call size 1 refs 32 le call size 1 drafts 8 call str 1 utf8 "Skill manifest exceeds bounds"

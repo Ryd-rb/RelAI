@@ -5,7 +5,7 @@ fn propose_wording 2 pid uint args uint uint do 10 target uint dictionaryid uint
   set revision call key 2 args call str 1 utf8 "revision"
   set wording call key 2 args call str 1 utf8 "definition"
   set evidence call key 2 args call str 1 utf8 "source"
-  set discard call require 2 and lt 0 call size 1 wording le call size 1 wording 32768 call str 1 utf8 "Proposed wording exceeds limits"
+  set discard call require 2 and call nonblank 1 wording le call size 1 wording 32768 call str 1 utf8 "Proposed wording must be nonblank and at most 32768 bytes"
   set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 utf8 "SELECT id FROM artifacts WHERE project=?1 AND id=?2 UNION ALL SELECT id FROM submissions WHERE project=?1 AND id=?2 UNION ALL SELECT id FROM jobs WHERE project=?1 AND id=?2 AND receipt IS NOT NULL" call append 2 call append 2 call arr 0 pid evidence 0 0u call str 1 utf8 "Choose a recorded project source"
   set dictionaryid pid
   set name call key 2 args call str 1 utf8 "name"

@@ -726,6 +726,55 @@ fn identical_skill_reinstall_preserves_revision_and_removed_skill_stops_suggesti
 }
 
 #[test]
+fn skill_search_folds_unicode_and_install_rejects_nonarray_manifest_members() {
+    let mut ui = Desktop::open();
+    let skill = ui._temp.path().join("unicode-skill");
+    fs::create_dir(&skill).unwrap();
+    fs::write(
+        skill.join("SKILL.md"),
+        "---\nname: Étage\ndescription: Test skill\n---\nRemember the floor.",
+    )
+    .unwrap();
+    let manifest = skill.join("relai-skill.json");
+    for invalid in [json!({"tool_refs":{}}), json!({"tool_drafts":{}})] {
+        fs::write(&manifest, invalid.to_string()).unwrap();
+        assert!(
+            ui.app
+                .invoke(
+                    "skill",
+                    json!({"project":ui.view["project"],"op":"install","path":skill})
+                )
+                .is_err()
+        );
+    }
+    fs::write(&manifest, r#"{"tool_refs":[],"tool_drafts":[]}"#).unwrap();
+    let installed = ui.invoke("skill", json!({"op":"install","path":skill}));
+    let hit = ui.invoke(
+        "tool_run",
+        json!({"tool":"skill.find","arguments":{"query":"étage","active":true}}),
+    );
+    assert_eq!(hit["value"][0]["id"], installed["id"]);
+}
+
+#[test]
+fn missing_git_and_worktree_grants_do_not_report_revocation() {
+    let mut ui = Desktop::open();
+    for op in ["git_revoke", "worktree_revoke"] {
+        assert_eq!(
+            ui.invoke(op, json!({"grant":"missing"})),
+            json!({"revoked":false})
+        );
+    }
+    let db = rusqlite::Connection::open(ui._temp.path().join("state/state.sqlite3")).unwrap();
+    let audits: u32 = db.query_row(
+        "SELECT count(*) FROM events WHERE kind IN ('Git authority revoked','Worktree authority revoked')",
+        [],
+        |row| row.get(0),
+    ).unwrap();
+    assert_eq!(audits, 0);
+}
+
+#[test]
 fn revision_proposal_keeps_base_wording_and_reports_a_conflict() {
     let mut ui = Desktop::open();
     let source = ui.invoke(
@@ -1325,20 +1374,40 @@ fn tools_fold_preserves_typed_json_and_dispatches_exact_data() {
         "Malformed arguments must fail before dispatch"
     );
     ui.click("Versions");
+    ui.click("Test a draft");
+    let test = ui.find(|c| c["event"]["spec"]["op"] == "tool_test");
+    ui.change("Version digest", "input", json!({"value":"literal"}));
+    ui.change(
+        "Test case",
+        "multiline",
+        json!({"value":"{\"nested\":{\"flag\":true},\"count\":2}"}),
+    );
+    let request = ui.event(test, json!({}));
+    assert_eq!(request["request"]["op"], "tool_test");
+    assert_eq!(
+        request["request"]["input"]["case"]["nested"],
+        json!({"flag":true})
+    );
+    assert_eq!(request["request"]["input"]["case"]["count"], 2);
+    assert!(request["request"]["input"]["project"].is_string());
+
     ui.click("Promote a version");
     let promote = ui.find(|c| c["event"]["spec"]["op"] == "tool_promote");
-    let scope = promote["event"]["scope"].clone();
-    let payload = ui.find(|c| c["label"] == "Typed request" && c["event"]["scope"] == scope);
-    let response = ui.event(
-        payload,
-        json!({"value":"{\"version\":\"literal\",\"nested\":{\"flag\":true},\"count\":2}"}),
+    ui.change("Tool name", "input", json!({"value":"increment"}));
+    ui.change(
+        "Version digest to promote",
+        "input",
+        json!({"value":"version-2"}),
     );
-    ui.apply(response);
+    ui.change(
+        "Expected current default digest (optional)",
+        "input",
+        json!({"value":"version-1"}),
+    );
     let request = ui.event(promote, json!({}));
-    assert_eq!(request["request"]["op"], "tool_promote");
-    assert_eq!(request["request"]["input"]["nested"], json!({"flag":true}));
-    assert_eq!(request["request"]["input"]["count"], 2);
-    assert!(request["request"]["input"]["project"].is_string());
+    assert_eq!(request["request"]["input"]["tool"], "increment");
+    assert_eq!(request["request"]["input"]["version"], "version-2");
+    assert_eq!(request["request"]["input"]["expected"], "version-1");
 }
 
 #[test]
@@ -1377,6 +1446,18 @@ fn tool_library_keeps_arguments_and_output_with_the_selected_tool() {
     );
     select(&mut ui, "fs.read");
     assert_eq!(ui.control("Arguments", "multiline")["value"], input);
+    ui.click("Run tool");
+    assert!(
+        ui.controls()
+            .iter()
+            .any(|c| c["id"].as_str().unwrap().ends_with("/output"))
+    );
+    ui.change("Arguments", "multiline", json!({"value":"{broken"}));
+    assert!(
+        !ui.controls()
+            .iter()
+            .any(|c| c["id"].as_str().unwrap().ends_with("/output"))
+    );
     assert!(ui.controls().iter().any(|c| {
         c["kind"] == "detail"
             && c["value"]
@@ -1430,6 +1511,35 @@ fn tool_library_keeps_arguments_and_output_with_the_selected_tool() {
                     .contains(version.as_str().unwrap()))
         );
     }
+}
+
+#[test]
+fn changes_forms_send_labeled_effect_and_completed_fetch_ids() {
+    let mut ui = Desktop::open();
+    ui.click("Tools");
+    ui.click("Changes");
+    ui.click("Inspect proposal");
+    let inspect = ui.find(|c| c["event"]["spec"]["op"] == "effect_get");
+    ui.change("Effect ID", "input", json!({"value":"proposed-patch"}));
+    let request = ui.event(inspect, json!({}));
+    assert_eq!(request["request"]["input"]["effect"], "proposed-patch");
+
+    ui.click("Install a fetched skill");
+    let install = ui.find(|c| c["event"]["spec"]["op"] == "skill");
+    ui.change(
+        "Completed fetch transfer ID",
+        "input",
+        json!({"value":"completed-fetch"}),
+    );
+    ui.change(
+        "Package directory in the fetched tree",
+        "input",
+        json!({"value":"skills/example"}),
+    );
+    let request = ui.event(install, json!({}));
+    assert_eq!(request["request"]["input"]["transfer"], "completed-fetch");
+    assert_eq!(request["request"]["input"]["path"], "skills/example");
+    assert_eq!(request["request"]["input"]["op"], "install_git");
 }
 
 #[test]
@@ -1613,6 +1723,92 @@ fn file_only_messages_retain_the_author_size_and_exact_attachment_receipt() {
             .unwrap()
             .contains(capture["digest"].as_str().unwrap())
     );
+}
+
+#[test]
+fn draft_attachment_removal_keeps_the_other_exact_receipt() {
+    let mut ui = Desktop::open();
+    let mut controls = Vec::new();
+    for (name, bytes) in [("alpha.txt", "YQ=="), ("beta.txt", "Yg==")] {
+        let after = ui.event(ui.control("Attach files", "button"), json!({}))["after"].clone();
+        let receipt = ui.invoke(
+            "capture",
+            json!({"name":name,"mime":"text/plain","base64":bytes}),
+        );
+        let result = ui
+            .app
+            .invoke(
+                "desktop_result",
+                json!({
+                    "state":ui.state,"project":ui.view["project"],"after":after,"result":receipt
+                }),
+            )
+            .unwrap();
+        ui.apply(result);
+        controls.push(ui.control(&format!("Remove {name} · 1 byte"), "button"));
+    }
+    let scope = controls[0]["event"]["scope"].as_str().unwrap();
+    let previous = ui.state["drafts"][scope]["attachments"][1].clone();
+    assert!(previous["digest"].is_string());
+    assert!(previous["media_type"].is_string() || previous["mime"].is_string());
+    ui.click("Remove alpha.txt · 1 byte");
+    assert_eq!(ui.state["drafts"][scope]["attachments"], json!([previous]));
+}
+
+#[test]
+fn incompatible_pdf_stays_in_the_draft_and_submitted_receipts_are_replayable() {
+    let mut ui = Desktop::open();
+    let name = format!("{}.pdf", "界".repeat(90));
+    let after = ui.event(ui.control("Attach files", "button"), json!({}))["after"].clone();
+    let receipt = ui.invoke(
+        "capture",
+        json!({"name":name,"mime":"application/pdf","base64":"JVBERi0xLjQK"}),
+    );
+    assert_eq!(receipt["display_name"], name);
+    let result = ui
+        .app
+        .invoke(
+            "desktop_result",
+            json!({
+                "state":ui.state,"project":ui.view["project"],"after":after,"result":receipt
+            }),
+        )
+        .unwrap();
+    ui.apply(result);
+    let send = ui.event(ui.control("Send", "button"), json!({}));
+    let arguments = send["request"]["input"].clone();
+    let error = ui
+        .app
+        .invoke("submit", arguments.clone())
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("does not support PDF attachments"),
+        "{error}"
+    );
+    assert!(ui.controls().iter().any(|c| {
+        c["label"]
+            .as_str()
+            .is_some_and(|label| label.contains(&name))
+    }));
+    assert!(ui.controls().iter().all(|c| c["label"] != "You"));
+
+    ui.invoke(
+        "save_model",
+        json!({"role":"discriminator","provider":"anthropic","model":"test","effort":"low"}),
+    );
+    let receipt = ui.app.invoke("submit", arguments.clone()).unwrap();
+    ui.invoke(
+        "save_model",
+        json!({"role":"discriminator","provider":"qwen","model":"test","effort":"low"}),
+    );
+    assert_eq!(
+        ui.app.invoke("submit", arguments.clone()).unwrap()["id"],
+        receipt["id"]
+    );
+    let mut new_arguments = arguments;
+    new_arguments["key"] = json!("separate-pdf-message");
+    assert!(ui.app.invoke("submit", new_arguments).is_err());
 }
 
 #[test]
@@ -2154,6 +2350,11 @@ fn large_history_and_graph_comparison_remain_browsable() {
     assert!(ui.controls().len() < 150);
     ui.click("More changes");
     ui.control("Open previous file-12", "button");
+    let compare = ui.control("Compare with snapshot", "select");
+    let same = ui.event(compare.clone(), json!({"value":"old"}));
+    assert_eq!(same["state"]["pages"]["changes"], 1);
+    let changed = ui.event(compare, json!({"value":"different"}));
+    assert_eq!(changed["state"]["pages"]["changes"], 0);
     ui.click("More relationships");
     ui.control("source → target-12 · call", "button");
     ui.control("Results 13–24 of 512", "label");

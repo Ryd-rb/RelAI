@@ -147,13 +147,17 @@ pub guest_tool_tested 1 arg uint uint do 13 state uint entry uint case uint obse
 
   ret call shape 2 call str 1 utf8 "{\"version\":\"$0\",\"active\":\"$1\",\"evidence_digest\":\"$2\",\"checks\":\"$3\",\"runtime\":\"$4\"}" call append 2 call append 2 call append 2 call append 2 call append 2 call arr 0  call key 2 entry call str 1 utf8 "version" passedval evidence receipts call tool_runtime 0
 
-pub tool_promote 1 arg uint uint do 4 pid uint entry uint current uint discard uint 9
+pub tool_promote 1 arg uint uint do 5 pid uint entry uint current uint discard uint expected uint 11
   set pid call key 2 call project 1 arg call str 1 utf8 "id"
   set entry call tool_entry 2 pid call key 2 arg call str 1 utf8 "version"
   set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "status" call str 1 utf8 "active" call str 1 utf8 "Default must be independently qualified and active"
   set discard call require 2 call same 2 call key 2 entry call str 1 utf8 "name" call key 2 arg call str 1 utf8 "tool" call str 1 utf8 "Tool name differs from the exact version"
   set current call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT version FROM tool_defaults WHERE project=? AND name=?" call append 2 call append 2 call arr 0  pid call key 2 arg call str 1 utf8 "tool" 0 call str 1 utf8 "version"
-  set discard call require 2 call same 2 current call key 2 arg call str 1 utf8 "expected" call str 1 utf8 "Expected default is stale"
+  set expected call key 2 arg call str 1 utf8 "expected"
+  if call same 2 expected call str 1 utf8 "" 1
+    set expected 0u
+  0
+  set discard call require 2 call same 2 current expected call str 1 utf8 "Expected default is stale"
   set discard call query 2 call str 1 utf8 "INSERT INTO tool_defaults(project,name,version) VALUES(?,?,?) ON CONFLICT(project,name) DO UPDATE SET version=excluded.version" call append 2 call append 2 call append 2 call arr 0  pid call key 2 arg call str 1 utf8 "tool" call key 2 entry call str 1 utf8 "version"
   set discard call sync_tool_term 2 pid call key 2 entry call str 1 utf8 "name"
   ret call shape 2 call str 1 utf8 "{\"version\":\"$0\",\"default\":true}" call append 2 call arr 0  call key 2 entry call str 1 utf8 "version"
@@ -254,13 +258,19 @@ fn tool_summary 1 values uint uint do 8 discard uint out uint meanval uint i int
 
   ret out
 
-fn tool_transform 1 arg uint uint do 10 rows uint fields uint filterval uint out uint item uint projected uint discard uint invalid uint i int k int 11
+fn tool_transform 1 arg uint uint do 10 rows uint fields uint filterval uint out uint item uint projected uint discard uint invalid uint i int k int 13
   set rows call key 2 arg call str 1 utf8 "rows"
   set discard call check 2 call decode 1 call str 1 utf8 "{\"type\":\"array\",\"maxItems\":4096}" rows
   set invalid call key 2 call nth 2 call query 2 call str 1 utf8 "SELECT 'rows['||key||'] must be an object' AS error FROM json_each(?) WHERE type<>'object' ORDER BY CAST(key AS INTEGER) LIMIT 1" call append 2 call arr 0 rows 0 call str 1 utf8 "error"
   set discard call require 2 call same 2 invalid 0u call ui_default 2 invalid call str 1 utf8 "Invalid object row"
   set fields call key 2 arg call str 1 utf8 "fields"
   set filterval call key 2 arg call str 1 utf8 "filter"
+  if not call same 2 fields 0u 1
+    set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 @text r#"SELECT 1 AS ok WHERE json_type(?1)='array' AND NOT EXISTS(SELECT 1 FROM json_each(?1) WHERE type<>'text')"# call append 2 call arr 0 call encode 1 fields 0 0u call str 1 utf8 "fields must be an array of strings"
+  0
+  if not call same 2 filterval 0u 1
+    set discard call require 2 not call same 2 call nth 2 call query 2 call str 1 @text r#"SELECT 1 AS ok WHERE json_type(?1)='object' AND json_type(?1,'$.field')='text' AND json_type(?1,'$.value') IS NOT NULL"# call append 2 call arr 0 call encode 1 filterval 0 0u call str 1 utf8 "filter requires a string field and a value"
+  0
   set out call arr 0
   set i 0
   set discard call require 2 le call size 1 rows 4096 call str 1 utf8 "Row count exceeds bound"

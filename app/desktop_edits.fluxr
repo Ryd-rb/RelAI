@@ -3,7 +3,7 @@ fluxr 1
 fn ui_shift_markers 4 markers uint start uint oldend uint newend uint uint do 0  1
   ret call query 2 call str 1 utf8 "SELECT CASE WHEN value->>'$.end'<=?2 THEN value->>'$.start' ELSE value->>'$.start'+?4-?3 END AS start,CASE WHEN value->>'$.end'<=?2 THEN value->>'$.end' ELSE value->>'$.end'+?4-?3 END AS end,value->'$.ref' AS \"ref:json\" FROM json_each(?1) WHERE value->>'$.end'<=?2 OR value->>'$.start'>=?3 ORDER BY start" call append 2 call append 2 call append 2 call append 2 call arr 0 markers start oldend newend
 
-fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint name uint draft uint v uint old uint span uint hits uint previous uint caret uint readiness uint changed uint 24
+fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint name uint draft uint v uint old uint span uint hits uint previous uint caret uint readiness uint changed uint 25
   set scope call key 2 event call str 1 utf8 "scope"
   set name call key 2 event call str 1 utf8 "name"
   set draft call ui_default 2 call key 2 call key 2 state call str 1 utf8 "drafts" scope call obj 0
@@ -18,6 +18,10 @@ fn ui_edit 4 state uint pid uint event uint inputval uint uint do 11 scope uint 
     ret call shape 2 call str 1 @text r#"{"state":"$0","refresh":"view"}"# call append 2 call arr 0 state
   0
   set old call ui_default 2 call key 2 draft name call str 1 utf8 ""
+  if and call same 2 call key 2 event call str 1 utf8 "runner" call decode 1 call str 1 utf8 "true" and call same 2 name call str 1 utf8 "arguments" and not call same 2 old v not call same 2 call key 2 call key 2 state call str 1 utf8 "outputs" scope 0u 2
+    set state call ui_set_map 4 state call str 1 utf8 "outputs" scope 0u
+    set event call put 3 event call str 1 utf8 "refresh" call str 1 utf8 "view"
+  0
   set draft call put 3 draft name v
   if not call same 2 readiness 0u 4
     set previous call chat_ready 2 call key 2 draft call str 1 utf8 "text" call key 2 draft call str 1 utf8 "attachments"
@@ -76,7 +80,7 @@ fn ui_complete 2 state uint event uint uint do 12 scope uint name uint draft uin
   set state call ui_set_map 4 state call str 1 utf8 "drafts" scope draft
   ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call shape 2 call str 1 utf8 "{\"focus\":\"$0\",\"selection\":{\"id\":\"$0\",\"start\":\"$1\",\"end\":\"$1\"}}" call append 2 call append 2 call arr 0 call cat 2 call cat 2 scope call str 1 utf8 "/" name endval
 
-fn ui_nav 2 state uint patch uint uint do 3 navval uint scope uint discard uint 6
+fn ui_nav 2 state uint patch uint uint do 3 navval uint scope uint discard uint 7
   set navval call ui_default 2 call key 2 state call str 1 utf8 "nav" call obj 0
   if and not call same 2 call key 2 patch call str 1 utf8 "project" 0u not call same 2 call key 2 patch call str 1 utf8 "project" call key 2 navval call str 1 utf8 "project" 10
     set state call ui_set_map 4 state call str 1 utf8 "chatPages" call ui_default 2 call key 2 navval call str 1 utf8 "project" call str 1 utf8 "welcome" call shape 2 call str 1 @text r#"{"older":"$0","newer":"$1"}"# @build append 1 2 call arr 0 call key 2 navval call str 1 utf8 "older" call key 2 navval call str 1 utf8 "newer"
@@ -92,6 +96,9 @@ fn ui_nav 2 state uint patch uint uint do 3 navval uint scope uint discard uint 
     set state call put 3 state call str 1 utf8 "relationshipFilter" 0u
     set state call ui_set_map 4 state call str 1 utf8 "pages" call str 1 utf8 "edges" call integer 1 0
     set state call put 3 state call str 1 utf8 "paused" call decode 1 call str 1 utf8 "false"
+  0
+  if and call same 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 "graph" not call same 2 call key 2 patch call str 1 utf8 "snapshot" call key 2 navval call str 1 utf8 "snapshot" 1
+    set state call ui_set_map 4 state call str 1 utf8 "pages" call str 1 utf8 "changes" call integer 1 0
   0
   if or not call same 2 call key 2 patch call str 1 utf8 "snapshot" call key 2 navval call str 1 utf8 "snapshot" not call same 2 call key 2 patch call str 1 utf8 "view" call str 1 utf8 "graph" 2
     set state call put 3 state call str 1 utf8 "layers" 0u

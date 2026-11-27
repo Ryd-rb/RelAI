@@ -138,7 +138,7 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
   0
   if call same 2 actionval call str 1 utf8 "remove" 6
     set draft call key 2 call key 2 state call str 1 utf8 "drafts" scope
-    set v call query 2 call str 1 utf8 "SELECT value->>'$.id' AS id,value->>'$.name' AS name,value->>'$.byte_length' AS byte_length FROM json_each(?) WHERE value->>'$.id'<>?" call append 2 call append 2 call arr 0 call key 2 draft name call key 2 event call str 1 utf8 "id"
+    set v call key 2 call nth 2 call query 2 call str 1 @text r#"SELECT COALESCE(json_group_array(json(value) ORDER BY CAST(key AS INTEGER)),'[]') AS "items:json" FROM json_each(?) WHERE value->>'$.id'<>?"# call append 2 call append 2 call arr 0 call key 2 draft name call key 2 event call str 1 utf8 "id" 0 call str 1 utf8 "items"
     set state call ui_draft_set 4 state scope name v
     set state call ui_draft_set 4 state scope call str 1 utf8 "$key" 0u
     if call same 2 call chat_ready 2 call key 2 draft call str 1 utf8 "text" v call decode 1 call str 1 utf8 "false" 1
@@ -174,7 +174,10 @@ pub desktop_event 1 arg uint uint do 15 state uint pid uint event uint inputval 
     ret call ui_merge 2 call shape 2 call str 1 utf8 "{\"state\":\"$0\",\"refresh\":\"view\"}" call append 2 call arr 0 state call obj 0
   0
   if or call same 2 actionval call str 1 utf8 "compare" call same 2 actionval call str 1 utf8 "inspect" 4
-    if call same 2 actionval call str 1 utf8 "compare" 1
+    if call same 2 actionval call str 1 utf8 "compare" 2
+      if not call same 2 call ui_default 2 call key 2 state call str 1 utf8 "before" call str 1 utf8 "" call ui_default 2 v call str 1 utf8 "" 1
+        set state call ui_set_map 4 state call str 1 utf8 "pages" call str 1 utf8 "changes" call integer 1 0
+      0
       set state call put 3 state call str 1 utf8 "before" v
     0
     set before call key 2 state call str 1 utf8 "before"

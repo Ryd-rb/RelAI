@@ -172,16 +172,14 @@
           "type": "form",
           "label": "Promote a version",
           "op": "tool_promote",
+          "text": "Enter the current default's version digest as the expected default. Leave it blank only if this tool has no existing default.",
           "fields": [
-            {
-              "name": "payload",
-              "label": "Typed request",
-              "type": "json"
-            }
+            {"name": "tool", "label": "Tool name", "type": "text", "required": true},
+            {"name": "version", "label": "Version digest to promote", "type": "text", "required": true},
+            {"name": "expected", "label": "Expected current default digest (optional)", "type": "text"}
           ],
           "fixed": {},
-          "showResult": true,
-          "jsonPayload": "payload"
+          "showResult": true
         }
       ]
     },
@@ -225,6 +223,7 @@
               "type": "form",
               "op": "source_access",
               "label": "Select or revoke a live source",
+              "text": "Use the open request ID and a numeric revision. Omit session to use the request's discriminator, or supply a session ID for that request. Allow and revoke require host_path; list does not. Replace the example ID and path with your own.\n\nList: {\"op\":\"list\",\"request\":\"0123456789abcdef0123456789abcdef\",\"revision\":1}\nAllow: {\"op\":\"allow\",\"request\":\"0123456789abcdef0123456789abcdef\",\"revision\":1,\"host_path\":\"C:/work/notes.txt\"}\nRevoke: {\"op\":\"revoke\",\"request\":\"0123456789abcdef0123456789abcdef\",\"revision\":1,\"host_path\":\"C:/work/notes.txt\"}",
               "fields": [
                 {
                   "name": "payload",
@@ -257,14 +256,14 @@
               "op": "effect_get",
               "fields": [
                 {
-                  "name": "payload",
-                  "label": "Typed request",
-                  "type": "json"
+                  "name": "effect",
+                  "label": "Effect ID",
+                  "type": "text",
+                  "required": true
                 }
               ],
               "fixed": {},
-              "showResult": true,
-              "jsonPayload": "payload"
+              "showResult": true
             }
           ]
         },
@@ -507,16 +506,13 @@
               "type": "form",
               "label": "Install a fetched skill",
               "op": "skill",
+              "text": "Use the transfer ID from a completed Git fetch and the package directory containing SKILL.md in that fetched tree.",
               "fields": [
-                {
-                  "name": "payload",
-                  "label": "Typed request",
-                  "type": "json"
-                }
+                {"name": "transfer", "label": "Completed fetch transfer ID", "type": "text", "required": true},
+                {"name": "path", "label": "Package directory in the fetched tree", "type": "text"}
               ],
-              "fixed": {},
-              "showResult": true,
-              "jsonPayload": "payload"
+              "fixed": {"op": "install_git"},
+              "showResult": true
             }
           ]
         }

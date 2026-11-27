@@ -71,7 +71,7 @@ pub open_project 1 arg uint uint do 4 root uint row uint pid uint discard uint 8
 pub capture 1 arg uint uint do 7 p uint info uint meta uint aid uint mime uint name uint discard uint 11
   set p call key 2 call project 1 arg call str 1 utf8 "id"
   set name call key 2 arg call str 1 utf8 "name"
-  set discard call require 2 and lt 0 call size 1 name le call size 1 name 255 call str 1 utf8 "Invalid filename"
+  set discard call require 2 and lt 0 call size 1 name le call size 1 name 1024 call str 1 utf8 "Invalid filename"
   set mime call key 2 arg call str 1 utf8 "mime"
   set info call baseinfo 1 call key 2 arg call str 1 utf8 "base64"
   set discard call require 2 not call same 2 call key 2 call resource 1 call str 1 utf8 "media.json" mime 0u call str 1 utf8 "Unsupported attachment type"
@@ -83,7 +83,7 @@ pub capture 1 arg uint uint do 7 p uint info uint meta uint aid uint mime uint n
   set discard call query 2 call str 1 utf8 "INSERT INTO artifacts VALUES(?,?,?,?)" call append 2 call append 2 call append 2 call append 2 call arr 0 aid p meta call key 2 arg call str 1 utf8 "base64"
   ret meta
 
-pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyval uint finger uint prior uint rid uint sid uint prompt uint items uint files uint file uint body uint summary uint discard uint reply uint steer uint i int 38
+pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyval uint finger uint prior uint rid uint sid uint prompt uint items uint files uint file uint body uint summary uint discard uint reply uint steer uint i int 39
   set p call project 1 arg
   set pid call key 2 p call str 1 utf8 "id"
   set keyval call key 2 arg call str 1 utf8 "key"
@@ -105,6 +105,9 @@ pub submit 1 arg uint uint do 19 revise uint previous uint p uint pid uint keyva
     set discard call require 2 not call same 2 file 0u call str 1 utf8 "Unavailable attachment"
     set files call append 2 files file
     next i
+  if and lt 0 call size 1 files not call same 2 call key 2 call preset 2 pid call str 1 utf8 "discriminator" call str 1 utf8 "provider" call str 1 utf8 "anthropic" 1
+    set discard call require 2 call same 2 call nth 2 call query 2 call str 1 @text r#"SELECT 1 AS pdf FROM json_each(?) WHERE value->>'$.media_type'='application/pdf' LIMIT 1"# call append 2 call arr 0 files 0 0u call str 1 utf8 "The selected provider does not support PDF attachments. Remove the PDF or select Anthropic before sending."
+  0
   set reply call key 2 arg call str 1 utf8 "reply"
   set steer call key 2 arg call str 1 utf8 "steer"
   set previous 0u

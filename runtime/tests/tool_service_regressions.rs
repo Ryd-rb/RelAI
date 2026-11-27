@@ -66,6 +66,24 @@ fn null_filters_object_rows_required_numbers_and_query_cursors() {
         .unwrap_err()
         .to_string();
     assert!(error.contains("rows[1]"), "{error}");
+    for fields in [json!("x"), json!({"field":"x"}), json!(["x", 1])] {
+        let error = f
+            .tool(
+                "data.transform",
+                json!({"rows":[{"x":null}],"fields":fields}),
+            )
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("fields"), "{error}");
+    }
+    let error = f
+        .tool(
+            "data.transform",
+            json!({"rows":[{"x":null}],"filter":{"field":"x"}}),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("value"), "{error}");
     for values in [Value::Null, json!({}), json!([1, "x"])] {
         assert!(f.tool("data.summarize", json!({"values":values})).is_err());
     }

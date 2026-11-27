@@ -39,9 +39,12 @@ set discard call query 2 call str 1 utf8 "UPDATE managed_worktrees SET state='au
 set discard call audit 3 pid call str 1 utf8 "Managed worktree user grant" arg
 ret call shape 2 call str 1 utf8 "{\"mutation\":\"$0\",\"grant\":\"$1\",\"digest\":\"$2\",\"state\":\"authorized\"}" call append 2 call append 2 call append 2 call arr 0  call key 2 record call str 1 utf8 "id" gid call key 2 record call str 1 utf8 "digest"
 
-pub worktree_revoke 1 arg uint uint do 2 pid uint discard uint 4
+pub worktree_revoke 1 arg uint uint do 2 pid uint discard uint 5
 set pid call key 2 call project 1 arg call str 1 utf8 "id"
-set discard call query 2 call str 1 utf8 "UPDATE worktree_grants SET state='revoked' WHERE id=? AND project=? AND state='active'" call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "grant" pid
+set discard call query 2 call str 1 utf8 "UPDATE worktree_grants SET state='revoked' WHERE id=? AND project=? AND state='active' RETURNING id" call append 2 call append 2 call arr 0  call key 2 arg call str 1 utf8 "grant" pid
+if eq 0 call size 1 discard 1
+ret call decode 1 call str 1 utf8 "{\"revoked\":false}"
+0
 set discard call audit 3 pid call str 1 utf8 "Worktree authority revoked" arg
 ret call decode 1 call str 1 utf8 "{\"revoked\":true}"
 
